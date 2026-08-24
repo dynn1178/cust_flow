@@ -298,12 +298,25 @@ function paintSelection() {
 }
 function renderFlow() { renderNodes(); drawEdges(); }
 
-function applyTransform() {
-  const v = B().view;
-  $("#flowWorld").style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
+/* 움직이는 동안에는 GPU 레이어로 부드럽게, 멈추면 레이어를 풀어
+   브라우저가 현재 배율로 글자를 다시 그리게 한다(확대 시 흐려짐 방지). */
+let settleTimer = 0;
+function settleTransform() {
+  const v = B().view, w = $("#flowWorld");
+  w.style.willChange = "auto";
+  w.style.transform = "translate(" + v.panX + "px," + v.panY + "px) scale(" + v.zoom + ")";
+}
+function applyTransform(live) {
+  const v = B().view, w = $("#flowWorld");
+  clearTimeout(settleTimer);
+  if (live) {
+    w.style.willChange = "transform";
+    w.style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
+    settleTimer = setTimeout(settleTransform, 160);
+  } else settleTransform();
   $("#zVal").textContent = Math.round(v.zoom * 100) + "%";
 }
-const applyTransformSoon = onFrame(applyTransform);
+const applyTransformSoon = onFrame(function () { applyTransform(true); });
 function zoomTo(z, cx, cy) {
   const v = B().view, old = v.zoom;
   z = clamp(z, 0.25, 2.2);

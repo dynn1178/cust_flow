@@ -168,7 +168,7 @@ select.field{cursor:pointer}
 #flowSurface{position:absolute; inset:0; cursor:grab; touch-action:none}
 #flowSurface.panning{cursor:grabbing}
 #flowSurface.linking{cursor:crosshair}
-#flowWorld{position:absolute; top:0; left:0; transform-origin:0 0; width:0; height:0; will-change:transform}
+#flowWorld{position:absolute; top:0; left:0; transform-origin:0 0; width:0; height:0}
 #edgeLayer{position:absolute; overflow:visible; left:0; top:0; width:1px; height:1px; pointer-events:none}
 #edgeLayer .hit{stroke:transparent; stroke-width:18; fill:none; pointer-events:stroke; cursor:pointer}
 #edgeLayer path.wire{fill:none; stroke-linecap:round; transition:stroke .12s}
@@ -184,7 +184,7 @@ select.field{cursor:pointer}
 .node{
   position:absolute; width:190px; border-radius:var(--r-md); overflow:hidden; cursor:grab;
   background:var(--glass-3); border:1px solid var(--stroke); box-shadow:var(--shadow-sm);
-  contain:layout paint style; transition:box-shadow .15s,border-color .15s;
+  contain:layout style; transition:box-shadow .15s,border-color .15s;
 }
 .node.size-s{width:150px} .node.size-m{width:190px} .node.size-l{width:240px}
 .node.sharp{border-radius:5px}

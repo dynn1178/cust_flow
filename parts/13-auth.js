@@ -256,10 +256,18 @@ async function openMembersModal() {
 /* ---------------- UI ---------------- */
 function applyRoleUI() {
   const on = supaOn();
-  $("#btnAuth").style.display = on ? "" : "none";
+  const btn = $("#btnAuth"), label = $("#authName");
+  btn.style.display = "";                       // 항상 보이게 — 설정 입구가 여기다
   document.body.classList.toggle("viewer", on && !isStaff());
-  const label = $("#authName");
-  if (!on) return;
+  if (!on) {
+    label.textContent = "로그인 설정";
+    btn.classList.remove("on");
+    btn.title = "구글 로그인을 쓰려면 Supabase 프로젝트를 연결하세요";
+    $("use", btn).setAttribute("href", "#i-lock");
+    return;
+  }
+  $("use", btn).setAttribute("href", me ? "#i-check" : "#i-lock");
+  btn.title = me ? me.email : "구글 계정으로 로그인";
   if (me) {
     const r = ROLE[me.role] || ROLE.viewer;
     label.innerHTML = esc(me.name) + ' <span class="rolechip" style="--c:' + r.c + '">' + r.name + "</span>";
@@ -270,6 +278,7 @@ function applyRoleUI() {
   }
 }
 function openAuthMenu() {
+  if (!supaOn()) return openServerModal();       // 아직 서버 미연결 → 설정부터
   if (!me) return signIn();
   openMenu(
     '<div class="mi" style="cursor:default">' + ico("check", "xs") + esc(me.email) + "</div>" +

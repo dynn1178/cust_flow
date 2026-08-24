@@ -176,7 +176,7 @@ select.field{cursor:pointer}
 #flowSurface{position:absolute; inset:0; cursor:grab; touch-action:none}
 #flowSurface.panning{cursor:grabbing}
 #flowSurface.linking{cursor:crosshair}
-#flowWorld{position:absolute; top:0; left:0; transform-origin:0 0; width:0; height:0; will-change:transform}
+#flowWorld{position:absolute; top:0; left:0; transform-origin:0 0; width:0; height:0}
 #edgeLayer{position:absolute; overflow:visible; left:0; top:0; width:1px; height:1px; pointer-events:none}
 #edgeLayer .hit{stroke:transparent; stroke-width:18; fill:none; pointer-events:stroke; cursor:pointer}
 #edgeLayer path.wire{fill:none; stroke-linecap:round; transition:stroke .12s}
@@ -192,7 +192,7 @@ select.field{cursor:pointer}
 .node{
   position:absolute; width:190px; border-radius:var(--r-md); overflow:hidden; cursor:grab;
   background:var(--glass-3); border:1px solid var(--stroke); box-shadow:var(--shadow-sm);
-  contain:layout paint style; transition:box-shadow .15s,border-color .15s;
+  contain:layout style; transition:box-shadow .15s,border-color .15s;
 }
 .node.size-s{width:150px} .node.size-m{width:190px} .node.size-l{width:240px}
 .node.sharp{border-radius:5px}
@@ -1388,12 +1388,25 @@ function paintSelection() {
 }
 function renderFlow() { renderNodes(); drawEdges(); }
 
-function applyTransform() {
-  const v = B().view;
-  $("#flowWorld").style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
+/* 움직이는 동안에는 GPU 레이어로 부드럽게, 멈추면 레이어를 풀어
+   브라우저가 현재 배율로 글자를 다시 그리게 한다(확대 시 흐려짐 방지). */
+let settleTimer = 0;
+function settleTransform() {
+  const v = B().view, w = $("#flowWorld");
+  w.style.willChange = "auto";
+  w.style.transform = "translate(" + v.panX + "px," + v.panY + "px) scale(" + v.zoom + ")";
+}
+function applyTransform(live) {
+  const v = B().view, w = $("#flowWorld");
+  clearTimeout(settleTimer);
+  if (live) {
+    w.style.willChange = "transform";
+    w.style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
+    settleTimer = setTimeout(settleTransform, 160);
+  } else settleTransform();
   $("#zVal").textContent = Math.round(v.zoom * 100) + "%";
 }
-const applyTransformSoon = onFrame(applyTransform);
+const applyTransformSoon = onFrame(function () { applyTransform(true); });
 function zoomTo(z, cx, cy) {
   const v = B().view, old = v.zoom;
   z = clamp(z, 0.25, 2.2);
@@ -3423,10 +3436,18 @@ async function openMembersModal() {
 /* ---------------- UI ---------------- */
 function applyRoleUI() {
   const on = supaOn();
-  $("#btnAuth").style.display = on ? "" : "none";
+  const btn = $("#btnAuth"), label = $("#authName");
+  btn.style.display = "";                       // 항상 보이게 — 설정 입구가 여기다
   document.body.classList.toggle("viewer", on && !isStaff());
-  const label = $("#authName");
-  if (!on) return;
+  if (!on) {
+    label.textContent = "로그인 설정";
+    btn.classList.remove("on");
+    btn.title = "구글 로그인을 쓰려면 Supabase 프로젝트를 연결하세요";
+    $("use", btn).setAttribute("href", "#i-lock");
+    return;
+  }
+  $("use", btn).setAttribute("href", me ? "#i-check" : "#i-lock");
+  btn.title = me ? me.email : "구글 계정으로 로그인";
   if (me) {
     const r = ROLE[me.role] || ROLE.viewer;
     label.innerHTML = esc(me.name) + ' <span class="rolechip" style="--c:' + r.c + '">' + r.name + "</span>";
@@ -3437,6 +3458,7 @@ function applyRoleUI() {
   }
 }
 function openAuthMenu() {
+  if (!supaOn()) return openServerModal();       // 아직 서버 미연결 → 설정부터
   if (!me) return signIn();
   openMenu(
     '<div class="mi" style="cursor:default">' + ico("check", "xs") + esc(me.email) + "</div>" +
