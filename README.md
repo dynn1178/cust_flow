@@ -117,13 +117,15 @@ Supabase가 연결되면 비밀번호 잠금 버튼은 사라지고 로그인 �
 
 ## 빌드
 
-`parts/`의 조각을 순서대로 이어 붙여 `journey-atlas.html`을 만든다.
+`parts/`의 조각을 순서대로 이어 붙인다.
 
 ```sh
-cat parts/01-head.html parts/02-css.html parts/03-markup.html \
-    parts/04-core.js parts/05-flow.js parts/06-stage.js \
-    parts/07-panels.js parts/09-storage.js parts/10-import.js \
-    parts/08-shell.js > journey-atlas.html
+./build.sh
 ```
 
-Artifact 런타임에서는 `<!doctype>`/`<head>`/`<body>`가 배포 시 자동으로 감싸지므로 조각에는 넣지 않는다.
+| 산출물 | 용도 |
+| --- | --- |
+| `index.html` | 웹 서버 배포용. `<!doctype>` · `<meta charset="utf-8">` 포함 |
+| `journey-atlas.html` | claude.ai Artifact 배포용. 플랫폼이 doctype/head/body를 감싸므로 조각에는 넣지 않는다 |
+
+웹에 올릴 때는 `index.html`이 루트에 있어야 한다(없으면 `/`에서 404). 절차는 [DEPLOY.md](DEPLOY.md).

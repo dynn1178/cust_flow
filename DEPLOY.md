@@ -58,11 +58,17 @@ const SUPA_DEFAULT = {
 빌드:
 
 ```sh
-cat parts/01-head.html parts/02-css.html parts/03-markup.html \
-    parts/04-core.js parts/05-flow.js parts/06-stage.js parts/07-panels.js \
-    parts/09-storage.js parts/10-import.js parts/11-lock.js parts/12-boards.js \
-    parts/13-auth.js parts/08-shell.js > journey-atlas.html
+./build.sh          # Windows: sh build.sh  또는 Git Bash
 ```
+
+두 파일이 만들어집니다.
+
+| 파일 | 용도 |
+| --- | --- |
+| `index.html` | **웹 배포용** — `<!doctype>` · `<meta charset="utf-8">` 까지 포함된 온전한 문서 |
+| `journey-atlas.html` | claude.ai Artifact 배포용 (플랫폼이 doctype/head/body를 감쌈) |
+
+`index.html`을 **반드시 커밋**하세요. 이 파일이 없으면 배포 후 `/` 에서 404가 납니다.
 
 임시로 시험만 해 볼 때는 앱 우상단 **폴더 아이콘 → 서버(Supabase)** 에서 URL·anon key를 넣어도 됩니다(그 브라우저에만 저장됨).
 
@@ -70,14 +76,36 @@ cat parts/01-head.html parts/02-css.html parts/03-markup.html \
 
 `journey-atlas.html` 파일 하나만 올리면 됩니다. 빌드 도구·서버 코드가 필요 없습니다.
 
-| 방법 | 절차 |
+`index.html` 하나만 있으면 됩니다. 빌드 도구·서버 코드가 필요 없습니다.
+
+| 방법 | 설정 |
 | --- | --- |
-| **Vercel** | 저장소 연결 → Framework Preset `Other` → 배포. `journey-atlas.html`을 `index.html`로 복사해 두면 루트에서 열립니다 |
-| **Netlify** | 폴더를 드래그&드롭 |
-| **GitHub Pages** | 저장소 Settings → Pages → 브랜치 지정. `index.html` 이름 필요 |
-| **사내 웹서버** | 파일만 복사 |
+| **Vercel** | 저장소 연결 → **Framework Preset `Other`**, **Build Command 비움**, **Output Directory 비움**(루트 그대로) → Deploy |
+| **Netlify** | 폴더 드래그&드롭, 또는 저장소 연결 후 Build command 비움 · Publish directory `.` |
+| **GitHub Pages** | Settings → Pages → 브랜치 `main` / 폴더 `/ (root)` |
+| **사내 웹서버** | `index.html` 복사 (`Content-Type: text/html; charset=utf-8` 권장) |
 
 배포 주소를 2-4의 **Site URL / Redirect URLs** 에 반드시 넣어야 로그인 후 되돌아옵니다.
+
+### 배포했는데 `404: NOT_FOUND` 가 뜬다면
+
+거의 항상 **루트에 `index.html` 이 없어서** 입니다.
+
+1. `./build.sh` 를 실행해 `index.html` 이 만들어졌는지 확인
+2. `git add index.html && git commit && git push` — 커밋에 포함됐는지 확인
+3. Vercel 프로젝트 설정에서 **Build Command 가 비어 있고 Output Directory 가 비어 있는지** 확인
+   (프레임워크 프리셋이 잡혀 있으면 빌드 산출물 폴더를 찾다가 아무것도 못 찾습니다)
+4. Vercel → Deployments → 해당 배포 → **Source** 탭에서 `index.html` 이 실제로 올라갔는지 확인
+5. 그래도 404면 `vercel.json` 이 저장소에 있는지 확인(이 저장소에 포함돼 있습니다)
+
+저장소에는 배포에 불필요한 파일을 빼는 `.vercelignore`(`parts/`, `supabase/`, `*.md`)와
+캐시 설정용 `vercel.json` 이 함께 들어 있습니다.
+
+### 로그인했는데 다시 로그인 화면으로 돌아온다면
+
+Supabase → Authentication → **URL Configuration** 의 Site URL / Redirect URLs 에
+배포 주소가 **정확히**(끝 슬래시 포함 여부까지) 들어 있는지 확인하세요.
+앱은 `https://도메인/경로` 형태로 되돌아옵니다.
 
 ## 5. 첫 사용
 

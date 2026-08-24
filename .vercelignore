@@ -1,0 +1,5 @@
+parts
+supabase
+*.md
+build.sh
+.gitattributes

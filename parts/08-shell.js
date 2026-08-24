@@ -187,7 +187,7 @@ async function boot() {
   if (restored === true) { updateStorageUI(); initLock(); return; }
 
   let remote = null;                                  // 2) Artifact 공유본
-  if (location.protocol !== "file:") {
+  if (location.protocol !== "file:" && window.claude) {   // 자체 호스팅에서는 없는 파일이라 요청하지 않는다
     try {
       const r = await fetch("data/journey.json", { cache: "no-store" });
       if (r.ok) remote = normalize(await r.json());
