@@ -3176,7 +3176,15 @@ function initBoards() {
    - 배포한 사이트에서만 동작한다. claude.ai Artifact 안에서는 외부 도메인
      접근이 차단되므로 로그인 버튼이 나타나지 않는다.
    ======================================================================== */
-const SUPA_DEFAULT = { url: "", anon: "", bucket: "jta-images", docId: "main" };
+/* 배포 기본값 — 방문자가 아무것도 설정하지 않아도 바로 구글 로그인이 뜬다.
+   anon key 는 공개용 키다(모든 Supabase 웹앱이 브라우저에 노출하는 값).
+   실제 권한은 서버의 RLS 정책이 판단한다. service_role 키는 절대 넣지 말 것. */
+const SUPA_DEFAULT = {
+  url:    "https://qlupuuspcrhgpfhzixkv.supabase.co",
+  anon:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsdXB1dXNwY3JoZ3BmaHppeGt2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjI0MTMsImV4cCI6MjA4ODgzODQxM30.rmyi0MXrpuZ91iih_8M3QbKlMHnMx5dhdqsnh9ctKt4",
+  bucket: "jta-images",
+  docId:  "main"
+};
 const SUPA_KEY = "jta:supabase";
 const SESS = "jta:session";
 const ROLE = {
@@ -3193,7 +3201,13 @@ function supaCfg() {
   try { saved = JSON.parse(localStorage.getItem(SUPA_KEY) || "null"); } catch (e) {}
   return Object.assign({}, SUPA_DEFAULT, saved || {});
 }
-function supaOn() { const c = supaCfg(); return !!(c.url && c.anon); }
+function inArtifact() { return !!(window.claude && window.claude.use); }   // claude.ai 미리보기
+function supaOn() {
+  if (inArtifact()) return false;                    // 미리보기: 외부 도메인 접속 차단
+  if (location.protocol === "file:") return false;   // 로컬 파일: OAuth 리디렉션 불가
+  const c = supaCfg();
+  return !!(c.url && c.anon);
+}
 function myRole() { return me ? me.role : null; }
 function isStaff() { return myRole() === "server_admin" || myRole() === "operator"; }
 
@@ -3430,10 +3444,12 @@ function applyRoleUI() {
   btn.style.display = "";                       // 항상 보이게 — 설정 입구가 여기다
   document.body.classList.toggle("viewer", on && !isStaff());
   if (!on) {
-    label.textContent = "로그인 설정";
+    label.textContent = "구글로 로그인";
     btn.classList.remove("on");
-    btn.title = "구글 로그인을 쓰려면 Supabase 프로젝트를 연결하세요";
     $("use", btn).setAttribute("href", "#i-lock");
+    btn.title = inArtifact()
+      ? "이 미리보기 화면에서는 구글 로그인이 차단됩니다 — 배포한 주소에서 로그인하세요"
+      : "구글 로그인을 쓰려면 Supabase 프로젝트를 연결하세요";
     return;
   }
   $("use", btn).setAttribute("href", me ? "#i-check" : "#i-lock");
@@ -3448,8 +3464,11 @@ function applyRoleUI() {
   }
 }
 function openAuthMenu() {
-  if (!supaOn()) return openServerModal();       // 아직 서버 미연결 → 설정부터
-  if (!me) return signIn();
+  if (inArtifact()) {
+    return toast("이 미리보기 화면에서는 구글 로그인이 차단됩니다. 배포한 주소에서 로그인하세요.", "bad");
+  }
+  if (!supaOn()) return openServerModal();       // 연결 정보가 비어 있을 때만 설정 화면
+  if (!me) return signIn();                      // 설정 화면 없이 바로 구글 로그인
   openMenu(
     '<div class="mi" style="cursor:default">' + ico("check", "xs") + esc(me.email) + "</div>" +
     (isStaff() ? '<button class="mi" data-act="members">' + ico("lock", "xs") + "회원 · 권한 관리</button>" : "") +
