@@ -1,0 +1,328 @@
+
+/* ========================================================================
+   스테이지 — 화면 크게 보기 · 레이어 그리기 · 캠페인 배치
+   렌더 원칙: 화면 이미지는 한 번만 붙이고, 레이어 SVG만 다시 그린다.
+   ======================================================================== */
+let mounted = { id: null, src: null, w: 0, h: 0 };
+
+function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
+function stageScale(n) {
+  const d = docSize(n);
+  if (stageZoom) return stageZoom;
+  const box = $("#stageScroll").getBoundingClientRect();
+  return clamp(Math.min((box.width - 36) / d.w, (box.height - 36) / d.h), 0.05, 4);
+}
+function bbox(l) {
+  if (l.kind === "pen") {
+    const xs = l.points.map(p => p[0]), ys = l.points.map(p => p[1]);
+    return { x: Math.min.apply(null, xs), y: Math.min.apply(null, ys), w: Math.max.apply(null, xs) - Math.min.apply(null, xs), h: Math.max.apply(null, ys) - Math.min.apply(null, ys) };
+  }
+  if (l.kind === "text") return { x: l.x, y: l.y, w: Math.max(40, (l.text || "").length * (l.size || 18) * 0.62), h: (l.size || 18) * 1.25 };
+  return { x: Math.min(l.x, l.x + l.w), y: Math.min(l.y, l.y + l.h), w: Math.abs(l.w), h: Math.abs(l.h) };
+}
+function layerMarkup(l, n, idx) {
+  const c = l.color || "#e0483f", sw = l.stroke || 3;
+  let s = "";
+  if (l.kind === "rect") s = '<rect class="shape" x="' + Math.min(l.x, l.x + l.w) + '" y="' + Math.min(l.y, l.y + l.h) + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" rx="6" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
+  else if (l.kind === "ellipse") s = '<ellipse class="shape" cx="' + (l.x + l.w / 2) + '" cy="' + (l.y + l.h / 2) + '" rx="' + Math.abs(l.w / 2) + '" ry="' + Math.abs(l.h / 2) + '" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
+  else if (l.kind === "arrow") {
+    const x2 = l.x + l.w, y2 = l.y + l.h, a = Math.atan2(l.h, l.w), hl = 13 + sw * 2;
+    const p1 = [x2 - hl * Math.cos(a - 0.42), y2 - hl * Math.sin(a - 0.42)], p2 = [x2 - hl * Math.cos(a + 0.42), y2 - hl * Math.sin(a + 0.42)];
+    s = '<line class="shape" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round"/>' +
+        '<polygon points="' + x2 + "," + y2 + " " + p1.join(",") + " " + p2.join(",") + '" fill="' + c + '"/>';
+  } else if (l.kind === "text")
+    s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '" stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke">' + esc(l.text || "텍스트") + "</text>";
+  else if (l.kind === "pen")
+    s = '<polyline class="shape" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" fill="none" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  else if (l.kind === "image")
+    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none"/>';
+
+  let pin = "";
+  if (l.campId) {
+    const b = bbox(l), found = n.camps.find(x => x.id === l.campId);
+    const col = found ? CHAN[found.chan].c : "var(--camp)";
+    pin = '<g class="pin" data-pin="' + l.campId + '" transform="translate(' + b.x + "," + b.y + ')">' +
+      '<circle r="11" fill="' + col + '"/><text>' + (idx + 1) + "</text></g>";
+  }
+  return '<g class="lyr" data-layer="' + l.id + '">' + s + pin + "</g>";
+}
+function renderLayers() {
+  const n = curNode(), svg = $("#layerSvg");
+  if (!n || !svg) return;
+  const s = stageScale(n);
+  const L = (n.layers || []).find(x => x.id === sel.layer);
+  let selUI = "";
+  if (L) {
+    const b = bbox(L), hs = 6 / s;
+    selUI = '<rect class="selbox" x="' + (b.x - 3) + '" y="' + (b.y - 3) + '" width="' + (b.w + 6) + '" height="' + (b.h + 6) + '"/>' +
+      (L.kind === "pen" ? "" : '<rect class="handle" data-handle="1" x="' + (b.x + b.w - hs) + '" y="' + (b.y + b.h - hs) + '" width="' + hs * 2 + '" height="' + hs * 2 + '" rx="' + hs * 0.5 + '"/>');
+  }
+  svg.innerHTML = (n.layers || []).map((l, i) => layerMarkup(l, n, i)).join("") + selUI;
+}
+const paintLayers = onFrame(renderLayers);
+
+function renderStage() {
+  const n = curNode();
+  const doc = $("#stageDoc"), empty = $("#stageEmpty");
+  if (!n) {
+    doc.innerHTML = ""; doc.style.width = doc.style.height = "0";
+    mounted = { id: null, src: null, w: 0, h: 0 };
+    empty.style.display = "grid"; $("#stageTitle").textContent = "페이지를 선택하세요"; $("#stageFoot").innerHTML = "";
+    return;
+  }
+  empty.style.display = "none";
+  $("#stageTitle").textContent = n.name;
+  const d = docSize(n), s = stageScale(n), src = shotSrc(n);
+  doc.style.width = Math.round(d.w * s) + "px";
+  doc.style.height = Math.round(d.h * s) + "px";
+  $("#sVal").textContent = stageZoom ? Math.round(s * 100) + "%" : "맞춤";
+  $("#sFit").classList.toggle("on", !stageZoom);
+
+  if (mounted.id !== n.id || mounted.src !== src || mounted.w !== d.w || mounted.h !== d.h) {
+    const shot = src
+      ? '<img class="shot" src="' + src + '" alt="' + esc(n.name) + ' 화면" draggable="false">'
+      : '<div class="noshot"><div class="empty">' + ico("image") + "<div>화면 이미지를 올리거나 붙여넣기(Ctrl+V)<br>없이도 레이어를 그릴 수 있습니다</div></div></div>";
+    doc.innerHTML = shot + '<svg id="layerSvg" viewBox="0 0 ' + d.w + " " + d.h + '"></svg>';
+    mounted = { id: n.id, src: src, w: d.w, h: d.h };
+  }
+  renderLayers();
+  renderStageFoot(n, (n.layers || []).find(x => x.id === sel.layer));
+}
+function renderStageFoot(n, L) {
+  const d = docSize(n);
+  let html = '<span class="mono" style="font-size:11px">' + d.w + " × " + d.h + "</span>";
+  html += '<span class="tool-sep"></span><span>레이어 ' + (n.layers || []).length + "개</span>";
+  if (L) {
+    const camp = L.campId ? n.camps.find(c => c.id === L.campId) : null;
+    html += '<span class="tool-sep"></span><span style="color:var(--ink-2)">선택: ' + LKIND(L) + "</span>";
+    if (camp) html += '<span class="chip" style="--c:' + CHAN[camp.chan].c + '">' + ico("mega", "xs") + esc(camp.name) + "</span>";
+    html += '<div class="spacer"></div>' +
+      '<button class="btn sm" data-lact="front">앞으로</button><button class="btn sm" data-lact="back">뒤로</button>' +
+      '<button class="btn sm danger" data-lact="del">' + ico("trash", "xs") + "삭제</button>";
+  } else {
+    html += '<div class="spacer"></div><span>도형을 그린 뒤 왼쪽 패널에서 캠페인을 연결하세요</span>';
+  }
+  $("#stageFoot").innerHTML = html;
+}
+function LKIND(l) { return { rect: "사각형", ellipse: "원", arrow: "화살표", text: "텍스트", pen: "펜", image: "이미지" }[l.kind] || l.kind; }
+
+/* ---------------- 이미지 처리 ---------------- */
+let webpOk = null;
+function supportsWebp() {
+  if (webpOk === null) {
+    const cv = document.createElement("canvas"); cv.width = cv.height = 1;
+    webpOk = cv.toDataURL("image/webp").indexOf("data:image/webp") === 0;
+  }
+  return webpOk;
+}
+function readImage(file, maxW, quality, keepAlpha) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const r = Math.min(1, maxW / img.width);
+        const w = Math.max(1, Math.round(img.width * r)), h = Math.max(1, Math.round(img.height * r));
+        const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img, 0, 0, w, h);
+        const type = supportsWebp() ? "image/webp" : (keepAlpha ? "image/png" : "image/jpeg");
+        res({ src: cv.toDataURL(type, quality), w, h, type });
+      };
+      img.onerror = rej; img.src = fr.result;
+    };
+    fr.onerror = rej; fr.readAsDataURL(file);
+  });
+}
+async function setShot(file, node, quiet) {
+  const n = node || curNode(); if (!n || !file) return;
+  try {
+    const big = await readImage(file, 1200, 0.82, false);
+    const th = await readImage(file, 300, 0.6, false);
+    n.shotData = big.src; n.shotW = big.w; n.shotH = big.h; n.shotType = big.type;
+    n.thumb = th.src; n.shotDirty = true;
+    if (n.id === sel.node) stageZoom = null;
+    markDirty();
+    if (!quiet) {
+      renderFlow();
+      if (n.id === sel.node) renderStage();
+      toast("화면 이미지를 등록했습니다 · " + Math.round(big.src.length / 1365) + "KB", "ok");
+    }
+  } catch (e) {
+    if (quiet) throw e;
+    toast("이미지를 읽지 못했습니다", "bad");
+  }
+}
+async function addImageLayer(file) {
+  const n = curNode(); if (!n || !file) return;
+  try {
+    const im = await readImage(file, 640, 0.82, true);
+    const d = docSize(n), r = Math.min(1, (d.w * 0.55) / im.w);
+    n.layers.push({ id: uid("l"), kind: "image", src: im.src, x: Math.round(d.w * 0.1), y: Math.round(d.h * 0.1), w: Math.round(im.w * r), h: Math.round(im.h * r), campId: null });
+    sel.layer = n.layers[n.layers.length - 1].id;
+    markDirty(); renderFlow(); renderStage(); renderPanels();
+  } catch (e) { toast("이미지를 읽지 못했습니다", "bad"); }
+}
+function removeShot() {
+  const n = curNode(); if (!n) return;
+  n.shotData = null; n.shot = null; n.thumb = null; n.shotW = DOC_W; n.shotH = DOC_H; n.shotDirty = false;
+  markDirty(); renderFlow(); renderStage();
+}
+function pickFile(cb) {
+  const inp = $("#filePick");
+  inp.value = "";
+  inp.onchange = () => { if (inp.files && inp.files[0]) cb(inp.files[0]); };
+  inp.click();
+}
+
+/* ---------------- 레이어 상호작용 ---------------- */
+function initStage() {
+  const doc = $("#stageDoc"), wrap = $("#stageWrap");
+  const toDoc = ev => {
+    const n = curNode(), d = docSize(n), r = doc.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) / (r.width / d.w), y: (ev.clientY - r.top) / (r.height / d.h) };
+  };
+
+  doc.addEventListener("pointerdown", e => {
+    const n = curNode(); if (!n || !canEdit()) return;
+    const p = toDoc(e);
+    const handle = e.target.closest("[data-handle]");
+    const lyrEl = e.target.closest("[data-layer]");
+
+    if (layerTool !== "select") {                       /* 새 레이어 그리기 */
+      e.preventDefault();
+      if (layerTool === "text") {
+        openForm({
+          title: "텍스트 레이어", icon: "text",
+          fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }],
+          values: { text: "", size: "18" },
+          onSave: v => {
+            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, campId: null });
+            sel.layer = n.layers[n.layers.length - 1].id;
+            setTool("select"); markDirty(); renderFlow(); renderStage(); renderPanels();
+          }
+        });
+        return;
+      }
+      const l = layerTool === "pen"
+        ? { id: uid("l"), kind: "pen", points: [[p.x, p.y]], color: drawColor, stroke: 4, campId: null }
+        : { id: uid("l"), kind: layerTool, x: p.x, y: p.y, w: 0, h: 0, color: drawColor, stroke: 3, fill: "none", campId: null };
+      n.layers.push(l); sel.layer = l.id;
+      const mv = ev => {
+        const q = toDoc(ev);
+        if (l.kind === "pen") { const last = l.points[l.points.length - 1]; if (Math.abs(q.x - last[0]) + Math.abs(q.y - last[1]) > 2) l.points.push([q.x, q.y]); }
+        else { l.w = q.x - l.x; l.h = q.y - l.y; }
+        paintLayers();
+      };
+      const up = () => {
+        doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up);
+        if (l.kind !== "pen" && Math.abs(l.w) < 6 && Math.abs(l.h) < 6) { n.layers = n.layers.filter(x => x.id !== l.id); sel.layer = null; }
+        if (l.kind === "pen" && l.points.length < 3) { n.layers = n.layers.filter(x => x.id !== l.id); sel.layer = null; }
+        setTool("select"); markDirty(); renderFlow(); renderStage(); renderPanels();
+      };
+      doc.setPointerCapture(e.pointerId);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      return;
+    }
+
+    if (handle && sel.layer) {                           /* 리사이즈 */
+      e.preventDefault();
+      const l = n.layers.find(x => x.id === sel.layer);
+      const mv = ev => { const q = toDoc(ev); l.w = q.x - l.x; l.h = q.y - l.y; paintLayers(); };
+      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); markDirty(); renderLayers(); };
+      doc.setPointerCapture(e.pointerId);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      return;
+    }
+
+    if (lyrEl) {                                         /* 선택 + 이동 */
+      e.preventDefault();
+      const l = n.layers.find(x => x.id === lyrEl.dataset.layer);
+      if (sel.layer !== l.id) { sel.layer = l.id; renderLayers(); renderStageFoot(n, l); renderPanels(); }
+      const st = { x: p.x, y: p.y }, orig = l.kind === "pen" ? l.points.map(q => q.slice()) : { x: l.x, y: l.y };
+      let moved = false;
+      const mv = ev => {
+        const q = toDoc(ev), dx = q.x - st.x, dy = q.y - st.y;
+        if (!moved && Math.abs(dx) + Math.abs(dy) < 1) return;
+        moved = true;
+        if (l.kind === "pen") l.points = orig.map(pt => [pt[0] + dx, pt[1] + dy]);
+        else { l.x = orig.x + dx; l.y = orig.y + dy; }
+        paintLayers();
+      };
+      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); if (moved) { markDirty(); renderLayers(); } };
+      doc.setPointerCapture(e.pointerId);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      return;
+    }
+    if (sel.layer) { sel.layer = null; renderLayers(); renderStageFoot(n, null); renderPanels(); }
+  });
+
+  $("#stageFoot").addEventListener("click", e => {
+    const b = e.target.closest("[data-lact]"); if (!b) return;
+    const n = curNode(), i = n.layers.findIndex(x => x.id === sel.layer);
+    if (i < 0) return;
+    const l = n.layers[i];
+    if (b.dataset.lact === "del") { n.layers.splice(i, 1); sel.layer = null; }
+    if (b.dataset.lact === "front") { n.layers.splice(i, 1); n.layers.push(l); }
+    if (b.dataset.lact === "back") { n.layers.splice(i, 1); n.layers.unshift(l); }
+    markDirty(); renderFlow(); renderStage(); renderPanels();
+  });
+
+  $("#layerTools").addEventListener("click", e => {
+    const b = e.target.closest("[data-tool]"); if (b) setTool(b.dataset.tool);
+  });
+  $("#swatches").innerHTML = SWATCH.map(c => '<button class="sw' + (c === drawColor ? " on" : "") + '" data-c="' + c + '" style="background:' + c + '" title="' + c + '"></button>').join("");
+  $("#swatches").addEventListener("click", e => {
+    const b = e.target.closest("[data-c]"); if (!b) return;
+    drawColor = b.dataset.c;
+    $$(".sw").forEach(x => x.classList.toggle("on", x === b));
+    const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
+    if (L) { L.color = drawColor; markDirty(); renderLayers(); }
+  });
+
+  $("#btnShot").addEventListener("click", () => {
+    const n = curNode();
+    if (n && shotSrc(n)) {
+      openForm({
+        title: "화면 이미지", icon: "image", okText: "새 이미지 올리기",
+        fields: [], note: "현재 등록된 화면을 교체하거나 삭제합니다. 레이어는 그대로 유지됩니다.",
+        values: {}, onSave: () => pickFile(setShot),
+        onDelete: () => confirmDel("이 화면의 이미지를 삭제할까요?", removeShot)
+      });
+    } else pickFile(setShot);
+  });
+  $("#btnLayerImg").addEventListener("click", () => pickFile(addImageLayer));
+  $("#sIn").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) * 1.2, .1, 4); renderStage(); });
+  $("#sOut").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) / 1.2, .1, 4); renderStage(); });
+  $("#sFit").addEventListener("click", () => { stageZoom = null; renderStage(); });
+
+  ["dragenter", "dragover"].forEach(t => wrap.addEventListener(t, e => { e.preventDefault(); wrap.classList.add("dragover"); }));
+  ["dragleave", "drop"].forEach(t => wrap.addEventListener(t, e => { e.preventDefault(); if (t === "dragleave" && wrap.contains(e.relatedTarget)) return; wrap.classList.remove("dragover"); }));
+  wrap.addEventListener("drop", e => {
+    if (!canEdit()) return;
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f && /^image\//.test(f.type)) { const n = curNode(); n && shotSrc(n) ? addImageLayer(f) : setShot(f); }
+  });
+  document.addEventListener("paste", e => {
+    if (!canEdit()) return;
+    const items = e.clipboardData && e.clipboardData.items; if (!items) return;
+    for (const it of items) {
+      if (it.type && it.type.indexOf("image") === 0) {
+        const f = it.getAsFile();
+        if (f) { const n = curNode(); n && shotSrc(n) ? addImageLayer(f) : setShot(f); e.preventDefault(); }
+        return;
+      }
+    }
+  });
+  const fitSoon = onFrame(() => { if (!stageZoom) renderStage(); });
+  new ResizeObserver(fitSoon).observe($("#stageScroll"));
+}
+function setTool(t) {
+  layerTool = t;
+  $$("#layerTools .btn").forEach(b => b.classList.toggle("on", b.dataset.tool === t));
+  $("#stageDoc").style.cursor = t === "select" ? "default" : "crosshair";
+}
+function selectNode(id) {
+  sel.node = id; sel.layer = null;
+  state.ui.sel = id;
+  paintSelection(); renderStage(); renderPanels();
+}

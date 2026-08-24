@@ -1,0 +1,433 @@
+<script>
+"use strict";
+/* ========================================================================
+   Journey Tag Atlas — 고객 여정 · 태깅 · CRM 캠페인 통합 보드
+   ======================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.prototype.slice.call(r.querySelectorAll(s));
+const uid = p => p + Math.random().toString(36).slice(2, 7) + Date.now().toString(36).slice(-3);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ico = (n, cls) => '<svg class="ico ' + (cls || "") + '"><use href="#i-' + n + '"/></svg>';
+
+/* ---------------- 도메인 상수 ---------------- */
+const PLAT = {
+  amplitude: { name: "Amplitude", ico: "amp", c: "var(--amp)" },
+  braze:     { name: "Braze",     ico: "braze", c: "var(--braze)" },
+  ga4:       { name: "GA4",       ico: "ga4", c: "var(--ga4)" }
+};
+const TRIGGER = { view: "화면 노출", click: "클릭", submit: "제출/전송", scroll: "스크롤", timer: "체류", custom: "커스텀" };
+const TSTATUS = { live: "적용됨", todo: "작업 예정", deprecated: "폐기" };
+const TSTATUS_C = { live: "var(--ok)", todo: "var(--warn)", deprecated: "var(--ink-3)" };
+const CHAN = {
+  push:   { name: "앱 푸시", c: "var(--braze)", ico: "braze" },
+  inapp:  { name: "인앱 메시지", c: "var(--camp)", ico: "mega" },
+  email:  { name: "이메일", c: "var(--amp)", ico: "mail" },
+  kakao:  { name: "알림톡", c: "var(--ga4)", ico: "chat" },
+  banner: { name: "배너·띠", c: "var(--accent)", ico: "banner" },
+  sms:    { name: "문자", c: "var(--ok)", ico: "chat" }
+};
+const CSTATUS = { live: "운영중", draft: "기획중", test: "테스트", ended: "종료" };
+const CSTATUS_C = { live: "var(--ok)", draft: "var(--ink-3)", test: "var(--warn)", ended: "var(--bad)" };
+const KIND = { entry: "진입", page: "페이지", modal: "모달·시트", decision: "분기", exit: "이탈·종료" };
+const SWATCH = ["#e0483f", "#f2913c", "#12a97a", "#2f6fed", "#8b5cf6", "#111827", "#ffffff"];
+/* 노드·연결선 공통 색 팔레트 */
+const HUE = {
+  none:   { name: "기본", c: "var(--ink-3)" },
+  blue:   { name: "파랑", c: "#3b76f0" },
+  violet: { name: "보라", c: "#8b5cf6" },
+  green:  { name: "초록", c: "#12a97a" },
+  amber:  { name: "주황", c: "#e08a1e" },
+  red:    { name: "빨강", c: "#e0483f" },
+  slate:  { name: "회색", c: "#64748b" }
+};
+const NSIZE = { s: { name: "작게", w: 150 }, m: { name: "보통", w: 190 }, l: { name: "크게", w: 240 } };
+const ROUTE = { curve: "곡선", ortho: "직각", line: "직선" };
+const HEADSZ = { s: { name: "작게", m: 0.72 }, m: { name: "보통", m: 1 }, l: { name: "크게", m: 1.5 }, xl: { name: "아주 크게", m: 2.1 } };
+/* 카드에서 무엇을 크게 볼지 — 페이지 이름은 그대로 두고 아래 항목만 바뀐다 */
+const FOCUS = {
+  all:       { name: "전체", ico: "density" },
+  simple:    { name: "간단", ico: "density" },
+  camp:      { name: "캠페인 위주", ico: "mega", c: "var(--camp)" },
+  amplitude: { name: "Amplitude 위주", ico: "amp", c: "var(--amp)" },
+  braze:     { name: "Braze 위주", ico: "braze", c: "var(--braze)" },
+  ga4:       { name: "GA4 위주", ico: "ga4", c: "var(--ga4)" }
+};
+const ANCHOR = { auto: "자동", n: "위", e: "오른쪽", s: "아래", w: "왼쪽" };
+const DOC_W = 390, DOC_H = 844;
+const GRID = 22;
+
+/* ---------------- 시드 데이터 ---------------- */
+function seed() {
+  const N = (id, kind, name, path, x, y, note, style) => Object.assign({
+    id, kind, name, path, x, y, note: note || "", shot: null, shotData: null, thumb: null,
+    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+  }, style || {});
+  const T = (platform, event, trigger, selector, status, props, note) =>
+    ({ id: uid("t"), platform, event, trigger, selector: selector || "", status, props: props || [], note: note || "" });
+  const C = (name, chan, segment, timing, status, extId, landing, note) =>
+    ({ id: uid("c"), name, chan, segment, timing, status, extId: extId || "", landing: landing || "", note: note || "" });
+
+  const nodes = [
+    N("n1", "entry", "앱 실행 · 스플래시", "app://launch", 66, 88, "", { hue: "slate", size: "s" }),
+    N("n2", "page", "홈 (비회원)", "/home", 330, 88, "로그인 없이 진입하는 첫 화면. 상단 배너 3종 롤링.", { hue: "blue" }),
+    N("n3", "page", "카테고리 · 검색", "/category", 594, 88),
+    N("n4", "page", "상품 상세", "/product/:id", 858, 88, "옵션 변경 시 같은 화면에서 재조회.", { hue: "blue" }),
+    N("n5", "decision", "로그인 · 회원가입", "/auth", 1122, 88, "구매·찜 시도 시 노출되는 분기 지점.", { hue: "amber" }),
+    N("n9", "exit", "이탈 (앱 종료)", "app://exit", 330, 374, "", { hue: "red", size: "s" }),
+    N("n6", "page", "장바구니", "/cart", 858, 374, "", { hue: "green" }),
+    N("n7", "page", "주문서 · 결제", "/checkout", 1122, 374, "", { hue: "green" }),
+    N("n8", "page", "주문 완료", "/order/complete", 1386, 374, "", { hue: "green" })
+  ];
+  const map = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+  map.n2.tags = [
+    T("amplitude", "home_viewed", "view", "", "live", [{ k: "user_type", v: "guest | member" }, { k: "banner_ids", v: "array" }], "세션 첫 화면 진입 시 1회"),
+    T("amplitude", "home_banner_clicked", "click", ".main-banner .slide", "live", [{ k: "banner_id", v: "string" }, { k: "slot", v: "1|2|3" }]),
+    T("braze", "Home Screen Viewed", "view", "", "live", [{ k: "is_logged_in", v: "boolean" }], "인앱 메시지 트리거 이벤트"),
+    T("ga4", "screen_view", "view", "", "live", [{ k: "screen_name", v: "home" }, { k: "screen_class", v: "HomeActivity" }]),
+    T("ga4", "select_promotion", "click", ".main-banner .slide", "todo", [{ k: "promotion_name", v: "string" }], "GA4 표준 이벤트로 교체 예정")
+  ];
+  map.n4.tags = [
+    T("amplitude", "product_detail_viewed", "view", "", "live", [{ k: "product_id", v: "string" }, { k: "price", v: "number" }, { k: "soldout", v: "boolean" }]),
+    T("amplitude", "add_to_cart_clicked", "click", "#btn-cart", "live", [{ k: "product_id", v: "string" }, { k: "option_id", v: "string" }, { k: "qty", v: "number" }]),
+    T("braze", "Product Viewed", "view", "", "live", [{ k: "product_id", v: "string" }, { k: "category", v: "string" }], "가격 인하 푸시 세그먼트 소스"),
+    T("ga4", "view_item", "view", "", "live", [{ k: "items", v: "array" }, { k: "value", v: "number" }]),
+    T("ga4", "add_to_cart", "click", "#btn-cart", "live", [{ k: "items", v: "array" }])
+  ];
+  map.n5.tags = [
+    T("amplitude", "login_attempted", "submit", "form#login", "live", [{ k: "method", v: "kakao | apple | email" }]),
+    T("amplitude", "signup_completed", "submit", "form#signup", "live", [{ k: "method", v: "string" }, { k: "referrer_page", v: "string" }]),
+    T("braze", "user_identified", "custom", "", "live", [{ k: "external_id", v: "string" }], "로그인 성공 직후 changeUser 호출")
+  ];
+  map.n6.tags = [
+    T("amplitude", "cart_viewed", "view", "", "live", [{ k: "item_count", v: "number" }, { k: "cart_value", v: "number" }]),
+    T("braze", "Cart Updated", "custom", "", "live", [{ k: "cart_value", v: "number" }], "장바구니 이탈 캠페인 트리거"),
+    T("ga4", "view_cart", "view", "", "live", [{ k: "items", v: "array" }])
+  ];
+  map.n7.tags = [
+    T("amplitude", "checkout_started", "view", "", "live", [{ k: "payment_method", v: "string" }]),
+    T("ga4", "begin_checkout", "view", "", "todo", [{ k: "items", v: "array" }], "결제 리뉴얼 후 재검증 필요")
+  ];
+  map.n8.tags = [
+    T("amplitude", "purchase_completed", "view", "", "live", [{ k: "order_id", v: "string" }, { k: "revenue", v: "number" }, { k: "coupon_id", v: "string" }]),
+    T("braze", "purchase", "custom", "", "live", [{ k: "product_id", v: "string" }, { k: "price", v: "number" }], "Braze Purchase 객체로 전송"),
+    T("ga4", "purchase", "view", "", "live", [{ k: "transaction_id", v: "string" }, { k: "value", v: "number" }])
+  ];
+
+  map.n2.camps = [
+    C("첫 방문 15% 쿠폰팩", "inapp", "설치 후 7일 이내 · 비회원", "홈 진입 3초 후", "live", "BRZ-INAPP-1042", "/promo/welcome", "홈 진입 이벤트 트리거. 세션당 1회 캡."),
+    C("시즌 기획전 상단 띠배너", "banner", "전체", "상시", "live", "CMS-BNR-208", "/event/season")
+  ];
+  map.n4.camps = [C("찜한 상품 가격 인하 알림", "push", "Product Viewed 3일 내 · 미구매", "가격 변동 감지 시", "live", "BRZ-PUSH-3310", "/product/:id")];
+  map.n6.camps = [C("장바구니 이탈 리마인드", "push", "Cart Updated 후 4시간 미결제", "4시간 지연 발송", "live", "BRZ-PUSH-2871", "/cart", "1일 1회 · 야간 발송 제외")];
+  map.n8.camps = [C("첫 구매 감사 · 리뷰 요청", "kakao", "첫 주문 완료 회원", "배송 완료 D+2", "test", "KKO-1180", "/review/write")];
+  map.n9.camps = [C("미전환 이탈 리마케팅", "email", "3일 내 방문 · 장바구니 0", "D+3 오전 10시", "draft", "BRZ-EMAIL-770", "/home")];
+
+  const E = (from, to, label, style, extra) => Object.assign({
+    id: uid("e"), from, to, label: label || "", style: style || "solid", kind: "arrow",
+    route: "curve", hue: "none", width: 2, head: "m", a1: "auto", a2: "auto", points: []
+  }, extra || {});
+  const edges = [
+    E("n1", "n2", "앱 진입"),
+    E("n2", "n3", "카테고리 탐색"),
+    E("n3", "n4", "상품 선택"),
+    E("n4", "n6", "장바구니 담기", "solid", { hue: "green" }),
+    E("n4", "n5", "구매·찜 시도", "dashed", { hue: "amber" }),
+    E("n5", "n6", "로그인 완료"),
+    E("n6", "n7", "주문하기", "solid", { hue: "green" }),
+    E("n7", "n8", "결제 성공", "solid", { hue: "green" }),
+    E("n2", "n9", "미전환 이탈", "dashed", { hue: "red" }),
+    E("n9", "n2", "리마케팅 복귀", "dashed", { hue: "violet", route: "ortho" })
+  ];
+  return {
+    v: 2, title: "고객 여정 태그 맵", updatedAt: 0, bi: 0,
+    boards: [{ id: "b1", name: "커머스 앱 · 구매 여정", nodes, edges, sel: "n2", view: { zoom: 0.72, panX: 24, panY: 12, fitted: false } }],
+    ui: { flowH: 372, leftW: 274, rightW: 300, focus: "all", snap: true }
+  };
+}
+
+/* ---------------- 상태 ---------------- */
+let state = seed();
+let sel = { node: "n2", edge: null, layer: null };
+let stageZoom = null;            // null = 영역 맞춤
+let layerTool = "select";
+let drawColor = SWATCH[0];
+let dirty = false, saveAvail = false;
+let savedRefs = [];              // 마지막 저장 시점에 쓰이던 이미지 파일 목록
+const DRAFT_KEY = "draft:" + location.pathname;
+
+const B = () => state.boards[state.bi] || state.boards[0];
+const nodeById = id => B().nodes.find(n => n.id === id);
+const curNode = () => nodeById(sel.node);
+const edgeById = id => B().edges.find(e => e.id === id);
+/* 태그·캠페인 목록은 모든 보드를 한 번에 본다 */
+const allTags = () => state.boards.reduce((a, b) => a.concat(b.nodes.reduce((c, n) => c.concat(n.tags.map(t => ({ t, n, b }))), [])), []);
+const allCamps = () => state.boards.reduce((a, b) => a.concat(b.nodes.reduce((c, n) => c.concat(n.camps.map(x => ({ c: x, n, b }))), [])), []);
+const hueOf = k => (HUE[k] || HUE.none).c;
+
+/* ---------------- 화면 이미지 주소 ----------------
+   n.shotData = 아직 저장 안 된 원본(dataURL)
+   n.shot     = {ref,w,h} 저장된 파일 · {url,w,h} 외부 호스팅 주소 */
+function shotSrc(n) {
+  if (!n) return null;
+  if (n.shotData) return n.shotData;
+  if (typeof n.shot === "string") return n.shot;          // 예전 인라인 형식
+  if (n.shot && n.shot.url) return n.shot.url;
+  if (n.shot && n.shot.ref) return "data/" + n.shot.ref;
+  return null;
+}
+function thumbSrc(n) { return n && (n.thumb || shotSrc(n)); }
+function dataUrlToBlob(u) {
+  const i = u.indexOf(","), head = u.slice(0, i), b64 = u.slice(i + 1);
+  const mime = (/:(.*?);/.exec(head) || [, "image/jpeg"])[1];
+  const bin = atob(b64), arr = new Uint8Array(bin.length);
+  for (let k = 0; k < bin.length; k++) arr[k] = bin.charCodeAt(k);
+  return new Blob([arr], { type: mime });
+}
+function extOf(mime) { return mime.indexOf("webp") > 0 ? "webp" : mime.indexOf("png") > 0 ? "png" : "jpg"; }
+
+/* ---------------- IndexedDB 임시 저장 ---------------- */
+let dbPromise = null;
+function idb() {
+  if (!dbPromise) dbPromise = new Promise((res, rej) => {
+    const r = indexedDB.open("jta-db", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("kv");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return dbPromise;
+}
+async function idbSet(k, v) {
+  const db = await idb();
+  return new Promise((res, rej) => {
+    const t = db.transaction("kv", "readwrite");
+    t.objectStore("kv").put(v, k);
+    t.oncomplete = () => res(); t.onerror = () => rej(t.error);
+  });
+}
+async function idbGet(k) {
+  const db = await idb();
+  return new Promise((res, rej) => {
+    const t = db.transaction("kv", "readonly"), q = t.objectStore("kv").get(k);
+    q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
+  });
+}
+async function idbDel(k) {
+  const db = await idb();
+  return new Promise((res, rej) => {
+    const t = db.transaction("kv", "readwrite");
+    t.objectStore("kv").delete(k);
+    t.oncomplete = () => res(); t.onerror = () => rej(t.error);
+  });
+}
+
+/* ---------------- 토스트 ---------------- */
+function toast(msg, kind, action) {
+  const el = document.createElement("div");
+  el.className = "toast " + (kind || "");
+  el.textContent = msg;
+  if (action) {
+    const b = document.createElement("button");
+    b.className = "btn sm"; b.textContent = action.label;
+    b.onclick = () => { el.remove(); action.fn(); };
+    el.appendChild(b); el.style.pointerEvents = "auto";
+  }
+  $("#toast").appendChild(el);
+  setTimeout(() => { el.style.transition = "opacity .3s"; el.style.opacity = "0"; setTimeout(() => el.remove(), 320); }, action ? 6000 : 2600);
+}
+
+/* ---------------- 저장 ---------------- */
+let draftTimer = null;
+function markDirty() {
+  if (!dirty) { dirty = true; setSaveChip("dirty", "저장 안 됨"); }
+  invalidateViews();
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(saveDraft, 900);
+}
+function saveDraft() {
+  const run = () => idbSet(DRAFT_KEY, { data: state, savedAt: Date.now(), base: state.updatedAt, refs: savedRefs }).catch(() => {});
+  if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 2500 }); else setTimeout(run, 0);
+}
+function setSaveChip(st, text) {
+  const c = $("#saveChip"); c.dataset.state = st; $("#saveText").textContent = text;
+}
+
+/* 저장용 스냅샷: 이미지를 파일(또는 호스팅 URL)로 분리하고 JSON에는 참조만 남긴다 */
+function buildSnapshot() {
+  const uploads = [], used = [];
+  const boards = state.boards.map(b => {
+    const nodes = b.nodes.map(n => {
+      const c = Object.assign({}, n);
+      delete c.shotData; delete c.shotDirty;
+      const legacy = typeof n.shot === "string" ? n.shot : null;
+      const raw = n.shotDirty && n.shotData ? n.shotData : legacy;
+      if (raw) {
+        const blob = dataUrlToBlob(raw);
+        const ref = "img/" + n.id + "-" + Date.now().toString(36) + "." + extOf(blob.type);
+        uploads.push({ ref, blob, node: n });
+        c.shot = { ref, w: n.shotW, h: n.shotH };
+      } else if (n.shot && n.shot.path) c.shot = { path: n.shot.path, w: n.shot.w, h: n.shot.h };  // 서버 저장소
+      else if (n.shot && n.shot.url) c.shot = { url: n.shot.url, w: n.shot.w, h: n.shot.h };
+      else if (n.shot && n.shot.ref) c.shot = { ref: n.shot.ref, w: n.shot.w, h: n.shot.h };
+      else c.shot = null;
+      if (c.shot && c.shot.ref) used.push(c.shot.ref);
+      return c;
+    });
+    return Object.assign({}, b, { nodes });
+  });
+  const data = Object.assign({}, state, { boards, updatedAt: Date.now() });
+  const removals = savedRefs.filter(r => used.indexOf(r) < 0);
+  return {
+    data, uploads, removals, used,
+    commit() {
+      state.boards.forEach((b, bi) => b.nodes.forEach((n, i) => { n.shot = boards[bi].nodes[i].shot; n.shotDirty = false; }));
+      state.updatedAt = data.updatedAt;
+      savedRefs = used;
+    }
+  };
+}
+function snapshotBytes(s) {
+  return JSON.stringify(s.data).length + s.uploads.reduce((a, u) => a + u.blob.size, 0);
+}
+
+async function shareSave() {
+  if (folder.dir) return folderSave();          // 폴더 연결 상태면 폴더에 저장
+  const api = await claudeApi();
+  if (!api) { toast("이 화면에서는 공유 저장을 쓸 수 없습니다. JSON 내보내기나 폴더 연결을 사용하세요.", "bad"); return; }
+  const btn = $("#btnShare"); btn.disabled = true;
+  setSaveChip("dirty", "저장 중…");
+  const snap = buildSnapshot();
+  try {
+    await hostUploadAll(snap);                  // 이미지 호스팅을 쓰면 URL로 대체
+    const files = { "data/journey.json": JSON.stringify(snap.data) };
+    snap.uploads.forEach(u => { files["data/" + u.ref] = u.blob; });
+    snap.removals.forEach(r => { files["data/" + r] = null; });
+    await api.publish(files);
+    snap.commit();
+    dirty = false;
+    setSaveChip("ok", "공유 저장됨 · " + timeAgo(state.updatedAt));
+    saveDraft();
+    toast("저장했습니다" + (snap.uploads.length ? " · 이미지 " + snap.uploads.length + "개 업로드" : "") + ". 링크를 받은 사람은 같은 내용을 봅니다.", "ok");
+  } catch (err) {
+    const code = err && err.code;
+    if (code === "conflict") {
+      setSaveChip("dirty", "저장 안 됨");
+      toast("다른 사람이 먼저 저장했습니다. 새로고침해 최신본을 받은 뒤 다시 저장하세요.", "bad");
+    } else if (code === "not_writer" || code === "not_granted" || code === "capability_disabled") {
+      saveAvail = false; $("#btnShare").style.display = "none";
+      setSaveChip("off", "읽기 전용");
+      toast("이 뷰는 읽기 전용입니다. JSON 내보내기로 사본을 만들 수 있습니다.", "bad");
+    } else if (code === "too_large") {
+      toast("전체 용량이 한도를 넘었습니다(" + Math.round(snapshotBytes(snap) / 1048576 * 10) / 10 + "MB). 화면 이미지 일부를 삭제하세요.", "bad");
+      setSaveChip("dirty", "저장 안 됨");
+    } else {
+      toast("저장에 실패했습니다: " + (err && err.message ? err.message : code || "알 수 없는 오류"), "bad");
+      setSaveChip("dirty", "저장 안 됨");
+    }
+  } finally { btn.disabled = false; }
+}
+async function claudeApi() {
+  try {
+    if (!window.claude || !window.claude.use) return null;
+    return await window.claude.use("artifact");
+  } catch (e) { return null; }
+}
+function timeAgo(ts) {
+  if (!ts) return "방금";
+  const d = Math.floor((Date.now() - ts) / 1000);
+  if (d < 60) return "방금";
+  if (d < 3600) return Math.floor(d / 60) + "분 전";
+  if (d < 86400) return Math.floor(d / 3600) + "시간 전";
+  return new Date(ts).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" });
+}
+async function saveFile(filename, text, mime) {
+  try {
+    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
+    if (dl) { await dl.save({ filename, data: text }); toast(filename + " 저장 완료", "ok"); return; }
+  } catch (e) { /* 아래 폴백 */ }
+  try { await navigator.clipboard.writeText(text); toast("다운로드가 막혀 있어 클립보드에 복사했습니다.", "ok"); }
+  catch (e) { toast("파일을 내보낼 수 없습니다.", "bad"); }
+}
+
+/* ---------------- 모달 ---------------- */
+function modalHost() {                    // 이전 모달의 이벤트 리스너까지 버린다
+  const old = $("#modalRoot"), fresh = old.cloneNode(false);
+  old.replaceWith(fresh);
+  return fresh;
+}
+function closeModal() { modalHost(); }
+function openForm(opt) {
+  const vals = Object.assign({}, opt.values);
+  const rows = opt.fields.map(f => {
+    const v = vals[f.k];
+    if (f.type === "select") {
+      const os = Object.entries(f.opts).map(([k, o]) => '<option value="' + k + '"' + (v === k ? " selected" : "") + ">" + esc(typeof o === "string" ? o : o.name) + "</option>").join("");
+      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><select class="field" data-k="' + f.k + '">' + os + "</select></div>";
+    }
+    if (f.type === "swatch") {
+      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="hues" data-hue="' + f.k + '">' +
+        Object.entries(HUE).map(([k, h]) => '<button type="button" class="hue' + (v === k ? " on" : "") + '" data-v="' + k + '" title="' + h.name +
+          '" style="--h:' + h.c + '"></button>').join("") + "</div></div>";
+    }
+    if (f.type === "textarea")
+      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><textarea class="field" data-k="' + f.k + '" placeholder="' + esc(f.ph || "") + '">' + esc(v || "") + "</textarea></div>";
+    if (f.type === "kv") {
+      const items = (v || []).map(kvRow).join("");
+      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="frow" data-kv="' + f.k + '" style="gap:6px">' + items +
+        '</div><button class="btn sm" data-addkv="' + f.k + '" type="button">' + ico("plus", "xs") + "속성 추가</button></div>";
+    }
+    if (f.type === "check")
+      return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><input class="field' + (f.mono ? " mono" : "") + '" data-k="' + f.k + '" value="' + esc(v || "") + '" placeholder="' + esc(f.ph || "") + '"></div>';
+  }).join("");
+
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico(opt.icon || "edit") + "<h3>" + esc(opt.title) + '</h3><button class="btn icon sm" data-x>' + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' + rows + (opt.note ? '<p class="hint">' + opt.note + "</p>" : "") + "</div>" +
+      '<div class="modal-foot">' + (opt.onDelete ? '<button class="btn danger" data-del>' + ico("trash", "xs") + (opt.deleteText || "삭제") + "</button>" : "") +
+        '<div class="spacer"></div><button class="btn" data-x>취소</button><button class="btn primary" data-ok>' + esc(opt.okText || "저장") + "</button></div>" +
+    "</div></div>";
+
+  const collect = () => {
+    const out = Object.assign({}, vals);
+    $$("[data-k]", root).forEach(el => { out[el.dataset.k] = el.value.trim(); });
+    $$("[data-c]", root).forEach(el => { out[el.dataset.c] = el.checked; });
+    $$("[data-hue]", root).forEach(box => { const on = $(".hue.on", box); out[box.dataset.hue] = on ? on.dataset.v : "none"; });
+    $$("[data-kv]", root).forEach(box => {
+      out[box.dataset.kv] = $$(".proprow", box).map(r => ({ k: $$("input", r)[0].value.trim(), v: $$("input", r)[1].value.trim() })).filter(p => p.k || p.v);
+    });
+    return out;
+  };
+  root.addEventListener("click", e => {
+    const t = e.target;
+    if (t.closest("[data-x]") || t.classList.contains("scrim")) return closeModal();
+    const hue = t.closest(".hue");
+    if (hue) { $$(".hue", hue.parentNode).forEach(h => h.classList.toggle("on", h === hue)); return; }
+    if (t.closest("[data-addkv]")) {
+      const k = t.closest("[data-addkv]").dataset.addkv;
+      $('[data-kv="' + k + '"]', root).insertAdjacentHTML("beforeend", kvRow({ k: "", v: "" }));
+    }
+    if (t.closest("[data-rmkv]")) t.closest(".proprow").remove();
+    if (t.closest("[data-del]")) { closeModal(); opt.onDelete(); }
+    if (t.closest("[data-ok]")) { const d = collect(); closeModal(); opt.onSave(d); }
+  });
+  root.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+  const first = $(".field", root); if (first) first.focus();
+}
+function kvRow(p) {
+  return '<div class="proprow"><input class="field" value="' + esc(p.k) + '" placeholder="속성 key"><input class="field" value="' + esc(p.v) + '" placeholder="타입 · 예시값">' +
+    '<button class="btn icon sm" data-rmkv type="button">' + ico("close", "xs") + "</button></div>";
+}
+function confirmDel(msg, fn) {
+  const root = modalHost();
+  root.innerHTML = '<div class="scrim"><div class="modal glass" style="width:min(380px,100%)">' +
+    '<div class="modal-body"><h3 style="margin:0;font-size:14.5px">' + esc(msg) + "</h3><p class=\"hint\">되돌릴 수 없습니다.</p></div>" +
+    '<div class="modal-foot"><button class="btn" data-x>취소</button><button class="btn primary" data-ok style="background:var(--bad)">삭제</button></div></div></div>';
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal();
+    if (e.target.closest("[data-ok]")) { closeModal(); fn(); }
+  });
+}

@@ -1,0 +1,687 @@
+
+/* ========================================================================
+   여정 도식화 — 노드 배치 · 연결선 라우팅 · 자석 정렬 · 자동 정렬
+   렌더 원칙: 구조가 바뀔 때만 DOM을 만들고, 드래그 중에는 속성만 갱신한다.
+   ======================================================================== */
+const NSZ = {};                       // 노드 실제 크기 캐시
+const EDGE_EL = {};                   // 엣지 id -> DOM 참조
+let flowMode = "select";
+let linkFrom = null;
+
+function onFrame(fn) {                // 다음 프레임에 한 번만 실행
+  let id = 0, last = null;
+  return function () {
+    last = arguments;
+    if (id) return;
+    id = requestAnimationFrame(() => { id = 0; fn.apply(null, last); });
+  };
+}
+function nodeW(n) { return (NSIZE[n.size] || NSIZE.m).w; }
+function nodeRect(n) {
+  const s = NSZ[n.id];
+  return { x: n.x, y: n.y, w: s ? s.w : nodeW(n), h: s ? s.h : 150 };
+}
+
+/* ---------------- 연결선 기하 ---------------- */
+const SIDE_N = { n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, e: { x: 1, y: 0 }, w: { x: -1, y: 0 } };
+function sidePoint(r, side) {
+  if (side === "n") return { x: r.x + r.w / 2, y: r.y };
+  if (side === "s") return { x: r.x + r.w / 2, y: r.y + r.h };
+  if (side === "w") return { x: r.x, y: r.y + r.h / 2 };
+  return { x: r.x + r.w, y: r.y + r.h / 2 };
+}
+function autoSide(r, target) {
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const dx = target.x - cx, dy = target.y - cy;
+  if (Math.abs(dx) * r.h >= Math.abs(dy) * r.w) return dx >= 0 ? "e" : "w";
+  return dy >= 0 ? "s" : "n";
+}
+function edgeGeom(e) {
+  const a = nodeById(e.from), b = nodeById(e.to);
+  if (!a || !b) return null;
+  const ra = nodeRect(a), rb = nodeRect(b);
+  const wps = (e.points || []).map(p => ({ x: p.x, y: p.y }));
+  const firstT = wps[0] || { x: rb.x + rb.w / 2, y: rb.y + rb.h / 2 };
+  const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
+  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT);
+  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT);
+  return { p1: sidePoint(ra, s1), n1: SIDE_N[s1], p2: sidePoint(rb, s2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb };
+}
+function smoothPath(pts) {
+  if (pts.length < 2) return "";
+  let d = "M " + pts[0].x + " " + pts[0].y;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    d += " C " + c1.x + " " + c1.y + " " + c2.x + " " + c2.y + " " + p2.x + " " + p2.y;
+  }
+  return d;
+}
+function roundedPath(pts, r) {
+  if (pts.length < 3) return "M " + pts.map(p => p.x + " " + p.y).join(" L ");
+  let d = "M " + pts[0].x + " " + pts[0].y;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i], a = pts[i - 1], b = pts[i + 1];
+    const d1 = Math.hypot(p.x - a.x, p.y - a.y), d2 = Math.hypot(b.x - p.x, b.y - p.y);
+    const rr = Math.min(r, d1 / 2, d2 / 2);
+    if (rr < 1) { d += " L " + p.x + " " + p.y; continue; }
+    const s = { x: p.x + (a.x - p.x) / d1 * rr, y: p.y + (a.y - p.y) / d1 * rr };
+    const t = { x: p.x + (b.x - p.x) / d2 * rr, y: p.y + (b.y - p.y) / d2 * rr };
+    d += " L " + s.x + " " + s.y + " Q " + p.x + " " + p.y + " " + t.x + " " + t.y;
+  }
+  const last = pts[pts.length - 1];
+  return d + " L " + last.x + " " + last.y;
+}
+function orthoPoints(g) {
+  const out = [g.p1];
+  let cur = { x: g.p1.x + g.n1.x * 24, y: g.p1.y + g.n1.y * 24 };
+  out.push(cur);
+  let horiz = g.n1.x !== 0;
+  const targets = g.wps.concat([{ x: g.p2.x + g.n2.x * 24, y: g.p2.y + g.n2.y * 24 }]);
+  targets.forEach(t => {
+    if (Math.abs(t.x - cur.x) > 0.5 && Math.abs(t.y - cur.y) > 0.5) {
+      out.push(horiz ? { x: t.x, y: cur.y } : { x: cur.x, y: t.y });
+      horiz = !horiz;
+    }
+    out.push(t); cur = t;
+  });
+  out.push(g.p2);
+  return out.filter((p, i, arr) => i === 0 || Math.abs(p.x - arr[i - 1].x) > 0.4 || Math.abs(p.y - arr[i - 1].y) > 0.4);
+}
+function pathFor(e) {
+  const g = edgeGeom(e);
+  if (!g) return null;
+  if (g.self) {                                     // 같은 노드로 돌아오는 연결
+    const r = g.ra, x = r.x + r.w, y = r.y + r.h * 0.3, y2 = r.y + r.h * 0.72;
+    return "M " + x + " " + y + " C " + (x + 86) + " " + (y - 38) + " " + (x + 86) + " " + (y2 + 38) + " " + x + " " + y2;
+  }
+  if (e.route === "line") return "M " + [g.p1].concat(g.wps, [g.p2]).map(p => p.x + " " + p.y).join(" L ");
+  if (e.route === "ortho") return roundedPath(orthoPoints(g), 12);
+  if (!g.wps.length) {                              // 기본 곡선 — 연결점 방향으로 부드럽게 빠져나간다
+    const dist = Math.hypot(g.p2.x - g.p1.x, g.p2.y - g.p1.y);
+    const c = clamp(dist * 0.42, 40, 190);
+    return "M " + g.p1.x + " " + g.p1.y +
+      " C " + (g.p1.x + g.n1.x * c) + " " + (g.p1.y + g.n1.y * c) +
+      " " + (g.p2.x + g.n2.x * c) + " " + (g.p2.y + g.n2.y * c) +
+      " " + g.p2.x + " " + g.p2.y;
+  }
+  const stub = 26;
+  return smoothPath([g.p1, { x: g.p1.x + g.n1.x * stub, y: g.p1.y + g.n1.y * stub }]
+    .concat(g.wps, [{ x: g.p2.x + g.n2.x * stub, y: g.p2.y + g.n2.y * stub }, g.p2]));
+}
+
+/* ---------------- 연결선 DOM ---------------- */
+function edgeEl(e) {
+  let rec = EDGE_EL[e.id];
+  if (rec && rec.g.isConnected) return rec;
+  const mk = t => document.createElementNS("http://www.w3.org/2000/svg", t);
+  const g = mk("g"), wire = mk("path"), hit = mk("path"), head = mk("path"), tail = mk("path"), text = mk("text");
+  g.setAttribute("data-edge", e.id);
+  wire.setAttribute("class", "wire"); hit.setAttribute("class", "hit");
+  head.setAttribute("class", "head"); tail.setAttribute("class", "head");
+  text.setAttribute("text-anchor", "middle");
+  [wire, hit, head, tail, text].forEach(x => g.appendChild(x));
+  $("#edgeG").appendChild(g);
+  rec = EDGE_EL[e.id] = { g, wire, hit, head, tail, text, d: "", label: null };
+  return rec;
+}
+function headPath(rec, at, back, size) {
+  const L = rec.wire.getTotalLength();
+  if (!L) return "";
+  const pe = rec.wire.getPointAtLength(at), pb = rec.wire.getPointAtLength(back);
+  const a = Math.atan2(pe.y - pb.y, pe.x - pb.x);
+  return "M " + pe.x + " " + pe.y +
+    " L " + (pe.x - size * Math.cos(a - 0.4)) + " " + (pe.y - size * Math.sin(a - 0.4)) +
+    " L " + (pe.x - size * Math.cos(a + 0.4)) + " " + (pe.y - size * Math.sin(a + 0.4)) + " Z";
+}
+function styleEdge(e, rec) {
+  const on = sel.edge === e.id;
+  const color = on ? "var(--accent)" : (e.hue && e.hue !== "none" ? hueOf(e.hue) : "var(--ink-3)");
+  rec.g.setAttribute("class", on ? "sel" : "");
+  rec.wire.style.stroke = color;
+  rec.wire.style.strokeWidth = (e.width || 2) + (on ? 0.8 : 0);
+  rec.head.style.fill = color; rec.tail.style.fill = color;
+  if (e.style === "dashed") rec.wire.setAttribute("stroke-dasharray", (e.width || 2) * 3.2 + " " + (e.width || 2) * 2.6);
+  else rec.wire.removeAttribute("stroke-dasharray");
+  if (rec.label !== e.label) { rec.text.textContent = e.label || ""; rec.label = e.label; }
+}
+function geomEdge(e, rec) {
+  const d = pathFor(e);
+  if (!d) return;
+  if (d !== rec.d) {
+    rec.d = d;
+    rec.wire.setAttribute("d", d);
+    rec.hit.setAttribute("d", d);
+  }
+  const L = rec.wire.getTotalLength();
+  const size = (7 + (e.width || 2) * 1.5) * ((HEADSZ[e.head] || HEADSZ.m).m);
+  rec.head.setAttribute("d", e.kind === "none" ? "" : headPath(rec, L, Math.max(0, L - 14), size));
+  rec.tail.setAttribute("d", e.kind === "both" ? headPath(rec, 0, Math.min(L, 14), size) : "");
+  if (e.label) {
+    const pt = rec.wire.getPointAtLength(L * 0.5);
+    rec.text.setAttribute("x", pt.x);
+    rec.text.setAttribute("y", pt.y - 7);
+  }
+}
+function drawEdges() {
+  const seen = {};
+  B().edges.forEach(e => { const rec = edgeEl(e); seen[e.id] = 1; styleEdge(e, rec); geomEdge(e, rec); });
+  Object.keys(EDGE_EL).forEach(id => { if (!seen[id]) { EDGE_EL[id].g.remove(); delete EDGE_EL[id]; } });
+  drawEdgeHandles();
+}
+function moveEdgesOf(nodeId) {
+  B().edges.forEach(e => { if (e.from === nodeId || e.to === nodeId) { const rec = EDGE_EL[e.id]; if (rec) geomEdge(e, rec); } });
+  if (sel.edge) drawEdgeHandles();
+}
+
+/* 선택된 연결선의 경로 편집 손잡이 */
+function drawEdgeHandles() {
+  const box = $("#edgeHandles");
+  const e = sel.edge ? edgeById(sel.edge) : null;
+  if (!e || e.from === e.to || !canEdit()) { if (box.innerHTML) box.innerHTML = ""; return; }
+  const g = edgeGeom(e); if (!g) { box.innerHTML = ""; return; }
+  const pts = [g.p1].concat(g.wps, [g.p2]);
+  let h = "";
+  g.wps.forEach((p, i) => { h += '<circle class="wp" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="6"></circle>'; });
+  for (let i = 0; i < pts.length - 1; i++) {
+    const m = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
+    h += '<circle class="wpadd" data-add="' + i + '" cx="' + m.x + '" cy="' + m.y + '" r="5"></circle>';
+  }
+  box.innerHTML = h;
+}
+
+/* ---------------- 노드 ---------------- */
+function campRow(c) {
+  const ch = CHAN[c.chan] || CHAN.push;
+  return '<div class="ncamp" style="--c:' + ch.c + '" title="' + esc(ch.name + " · " + (c.segment || "대상 미정") + " · " + CSTATUS[c.status]) + '">' +
+    ico(ch.ico, "xs") + '<span class="nc-name">' + esc(c.name) + "</span>" +
+    '<span class="nc-dot" style="background:' + CSTATUS_C[c.status] + '"></span></div>';
+}
+function tagRowsBig(n, plat) {
+  const list = n.tags.filter(t => t.platform === plat);
+  if (!list.length) return '<div class="fnone">' + PLAT[plat].name + " 태그 없음</div>";
+  return '<div class="node-focus tags">' + list.slice(0, 6).map(t =>
+    '<div class="fitem" style="--c:' + PLAT[plat].c + '">' +
+      '<span class="fdot" style="background:' + TSTATUS_C[t.status] + '" title="' + TSTATUS[t.status] + '"></span>' +
+      '<span class="ftext"><span class="fev">' + esc(t.event) + "</span>" +
+      '<span class="fmeta">' + (TRIGGER[t.trigger] || t.trigger) + " · " + TSTATUS[t.status] +
+      (t.selector ? " · " + esc(t.selector) : "") + "</span></span></div>").join("") +
+    (list.length > 6 ? '<div class="fitem more">+' + (list.length - 6) + "개 더</div>" : "") + "</div>";
+}
+function campRowsBig(n) {
+  if (!n.camps.length) return '<div class="fnone">등록된 캠페인 없음</div>';
+  return '<div class="node-focus camps">' + n.camps.slice(0, 6).map(c => {
+    const ch = CHAN[c.chan] || CHAN.push;
+    return '<div class="fitem" style="--c:' + ch.c + '">' + ico(ch.ico, "xs") +
+      '<span class="ftext"><span class="fev">' + esc(c.name) + "</span>" +
+      '<span class="fmeta">' + ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : "") + "</span></span>" +
+      '<span class="fdot" style="background:' + CSTATUS_C[c.status] + '"></span></div>';
+  }).join("") + (n.camps.length > 6 ? '<div class="fitem more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
+}
+function focusCount(n, f) {
+  if (f === "camp") return n.camps.length;
+  if (PLAT[f]) return n.tags.filter(t => t.platform === f).length;
+  return 0;
+}
+function nodeHtml(n) {
+  const f = state.ui.focus || "all";
+  const cnt = { amplitude: 0, braze: 0, ga4: 0 };
+  n.tags.forEach(t => { if (cnt[t.platform] != null) cnt[t.platform]++; });
+  let bd = "";
+  if (f === "all" || f === "simple") {
+    Object.keys(PLAT).forEach(p => {
+      if (cnt[p]) bd += '<span class="bdg" style="--c:' + PLAT[p].c + '" title="' + PLAT[p].name + " 태그 " + cnt[p] + '개">' + ico(PLAT[p].ico, "xs") + "<b>" + cnt[p] + "</b></span>";
+    });
+    if (n.layers && n.layers.length) bd += '<span class="bdg" style="--c:var(--ink-3)" title="레이어 ' + n.layers.length + '개">' + ico("layers", "xs") + "<b>" + n.layers.length + "</b></span>";
+    if (f === "simple" && n.camps.length)
+      bd += '<span class="bdg" style="--c:var(--camp)" title="CRM 캠페인 ' + n.camps.length + '개">' + ico("mega", "xs") + "<b>" + n.camps.length + "</b></span>";
+  } else {
+    const meta = FOCUS[f];
+    bd = '<span class="bdg big" style="--c:' + (meta.c || "var(--ink-3)") + '">' + ico(meta.ico, "xs") + "<b>" + focusCount(n, f) + "</b></span>";
+  }
+
+  const th = thumbSrc(n);
+  const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async">'
+                    : '<div class="ph">' + ico("image") + "<span>화면 미등록</span></div>") +
+    '<div class="thumb-acts edit-only">' +
+      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양 바꾸기" tabindex="-1"><span>' +
+      ico("edit", "xs") + "설정</span></button>" +
+      '<button class="pick" data-pick="' + n.id + '" title="이 페이지의 화면 올리기" tabindex="-1"><span>' +
+      ico("camera", "xs") + (th ? "교체" : "화면") + "</span></button>" +
+    "</div>";
+
+  let body = "";
+  if (f === "all") {
+    body = n.camps.length ? '<div class="node-camps">' + n.camps.slice(0, 4).map(campRow).join("") +
+      (n.camps.length > 4 ? '<div class="ncamp more">+' + (n.camps.length - 4) + " 개 더</div>" : "") + "</div>" : "";
+  } else if (f === "camp") body = campRowsBig(n);
+  else if (PLAT[f]) body = tagRowsBig(n, f);
+
+  return '<div class="node-thumb">' + thumb + '<span class="node-kind">' + esc(KIND[n.kind] || "페이지") + "</span></div>" +
+    '<div class="node-main"><div class="node-name">' + esc(n.name) + "</div>" +
+    (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
+    (bd ? '<div class="node-badges">' + bd + "</div>" : "") + body + "</div>";
+}
+function renderNodes() {
+  const layer = $("#nodeLayer");
+  const have = {};
+  $$(".node", layer).forEach(el => { have[el.dataset.node] = el; });
+  B().nodes.forEach(n => {
+    let el = have[n.id];
+    if (!el) { el = document.createElement("div"); el.dataset.node = n.id; layer.appendChild(el); }
+    else delete have[n.id];
+    const f = state.ui.focus || "all";
+    const dim = (f === "camp" || PLAT[f]) && focusCount(n, f) === 0;
+    el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
+    el.style.setProperty("--nc", hueOf(n.hue));
+    const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
+      state.ui.focus, n.tags.map(t => t.platform + t.status + t.event).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
+      (thumbSrc(n) || "").length].join("§");
+    if (el.dataset.sig !== sig) {
+      el.innerHTML = nodeHtml(n) +
+        '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
+        '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>';
+      el.dataset.sig = sig;
+    }
+    el.style.left = n.x + "px"; el.style.top = n.y + "px";
+    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150 };
+  });
+  Object.keys(have).forEach(id => { have[id].remove(); delete NSZ[id]; });
+  paintSelection();
+}
+function paintSelection() {
+  $$("#nodeLayer .node").forEach(el => {
+    el.classList.toggle("sel", el.dataset.node === sel.node);
+    el.classList.toggle("link-src", el.dataset.node === linkFrom);
+  });
+}
+function renderFlow() { renderNodes(); drawEdges(); }
+
+function applyTransform() {
+  const v = B().view;
+  $("#flowWorld").style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
+  $("#zVal").textContent = Math.round(v.zoom * 100) + "%";
+}
+const applyTransformSoon = onFrame(applyTransform);
+function zoomTo(z, cx, cy) {
+  const v = B().view, old = v.zoom;
+  z = clamp(z, 0.25, 2.2);
+  if (cx == null) { const r = $("#flowSurface").getBoundingClientRect(); cx = r.width / 2; cy = r.height / 2; }
+  v.panX = cx - (cx - v.panX) * (z / old);
+  v.panY = cy - (cy - v.panY) * (z / old);
+  v.zoom = z;
+  applyTransformSoon(); markDirty();
+}
+function fitFlow() {
+  const nodes = B().nodes;
+  if (!nodes.length) return;
+  const r = $("#flowSurface").getBoundingClientRect();
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  nodes.forEach(n => { const q = nodeRect(n); x1 = Math.min(x1, q.x); y1 = Math.min(y1, q.y); x2 = Math.max(x2, q.x + q.w + 90); y2 = Math.max(y2, q.y + q.h); });
+  const v = B().view;
+  const padT = 62, padB = 46, padX = 34;                 // 툴바·확대바에 가리지 않도록
+  v.zoom = clamp(Math.min((r.width - padX * 2) / (x2 - x1), (r.height - padT - padB) / (y2 - y1)), 0.25, 1.4);
+  v.panX = padX + (r.width - padX * 2 - (x2 - x1) * v.zoom) / 2 - x1 * v.zoom;
+  v.panY = padT + (r.height - padT - padB - (y2 - y1) * v.zoom) / 2 - y1 * v.zoom;
+  applyTransform(); markDirty();
+}
+
+/* ---------------- 자석 정렬 ---------------- */
+const SNAP_T = 7;
+function snapPos(n, x, y) {
+  const guides = [];
+  if (!state.ui.snap) return { x: Math.round(x), y: Math.round(y), guides };
+  const sz = NSZ[n.id] || { w: nodeW(n), h: 150 };
+  const mine = { x: [x, x + sz.w / 2, x + sz.w], y: [y, y + sz.h / 2, y + sz.h] };
+  let bx = null, by = null;
+  B().nodes.forEach(o => {
+    if (o.id === n.id) return;
+    const r = nodeRect(o);
+    [r.x, r.x + r.w / 2, r.x + r.w].forEach(ov => mine.x.forEach(mv => {
+      const d = Math.abs(mv - ov);
+      if (d <= SNAP_T && (!bx || d < bx.d)) bx = { d, at: ov, shift: ov - mv, o: r };
+    }));
+    [r.y, r.y + r.h / 2, r.y + r.h].forEach(ov => mine.y.forEach(mv => {
+      const d = Math.abs(mv - ov);
+      if (d <= SNAP_T && (!by || d < by.d)) by = { d, at: ov, shift: ov - mv, o: r };
+    }));
+  });
+  const nx = Math.round(bx ? x + bx.shift : Math.round(x / GRID) * GRID);
+  const ny = Math.round(by ? y + by.shift : Math.round(y / GRID) * GRID);
+  if (bx) guides.push({ v: true, at: bx.at, a: Math.min(ny, bx.o.y) - 26, b: Math.max(ny + sz.h, bx.o.y + bx.o.h) + 26 });
+  if (by) guides.push({ v: false, at: by.at, a: Math.min(nx, by.o.x) - 26, b: Math.max(nx + sz.w, by.o.x + by.o.w) + 26 });
+  return { x: nx, y: ny, guides };
+}
+function drawGuides(guides) {
+  const g = $("#guideG");
+  const html = (guides || []).map(q => q.v
+    ? '<line class="guide" x1="' + q.at + '" y1="' + q.a + '" x2="' + q.at + '" y2="' + q.b + '"></line>'
+    : '<line class="guide" x1="' + q.a + '" y1="' + q.at + '" x2="' + q.b + '" y2="' + q.at + '"></line>').join("");
+  if (g.innerHTML !== html) g.innerHTML = html;
+}
+
+/* ---------------- 상호작용 ---------------- */
+function initFlow() {
+  const surf = $("#flowSurface");
+  const busy = on => $("#flowPane").classList.toggle("busy", on);
+  const toWorld = (ev, r) => ({ x: (ev.clientX - r.left - B().view.panX) / B().view.zoom, y: (ev.clientY - r.top - B().view.panY) / B().view.zoom });
+
+  surf.addEventListener("wheel", e => {
+    e.preventDefault();
+    const r = surf.getBoundingClientRect();
+    zoomTo(B().view.zoom * (e.deltaY < 0 ? 1.12 : 0.893), e.clientX - r.left, e.clientY - r.top);
+  }, { passive: false });
+
+  surf.addEventListener("pointerdown", e => {
+    const r = surf.getBoundingClientRect();
+    const wp = e.target.closest("[data-wp]"), add = e.target.closest("[data-add]");
+    const port = e.target.closest("[data-port]");
+    const nodeEl = e.target.closest("[data-node]");
+    const edgeHit = e.target.closest("[data-edge]");
+    const editable = canEdit();
+
+    if (editable && (wp || add) && sel.edge) {           /* 경로 꺾임점 드래그 · 추가 */
+      e.preventDefault(); e.stopPropagation();
+      const ed = edgeById(sel.edge);
+      let idx;
+      if (wp) idx = +wp.dataset.wp;
+      else { idx = +add.dataset.add; ed.points.splice(idx, 0, toWorld(e, r)); }
+      const paint = onFrame(p => {
+        ed.points[idx] = { x: Math.round(p.x), y: Math.round(p.y) };
+        geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
+      });
+      const mv = ev => paint(toWorld(ev, r));
+      const up = () => {
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        markDirty(); geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
+      };
+      surf.setPointerCapture(e.pointerId);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      return;
+    }
+
+    if (editable && port) {                              /* 포트 드래그 → 연결 */
+      e.preventDefault(); e.stopPropagation();
+      const from = port.dataset.port, ghost = $("#ghostWire");
+      const rf = nodeRect(nodeById(from));
+      const c0 = { x: rf.x + rf.w / 2, y: rf.y + rf.h / 2 };
+      ghost.style.display = "";
+      const paint = onFrame(p => ghost.setAttribute("d", "M " + c0.x + " " + c0.y + " L " + p.x + " " + p.y));
+      const mv = ev => paint(toWorld(ev, r));
+      const up = ev => {
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        ghost.style.display = "none";
+        const tgt = document.elementFromPoint(ev.clientX, ev.clientY);
+        const tn = tgt && tgt.closest("[data-node]");
+        if (tn) addEdge(from, tn.dataset.node);
+      };
+      surf.setPointerCapture(e.pointerId);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      return;
+    }
+
+    if (nodeEl) {                                        /* 노드 선택 · 이동 */
+      const id = nodeEl.dataset.node;
+      if (editable && flowMode === "link") {
+        e.preventDefault();
+        if (!linkFrom) { linkFrom = id; paintSelection(); toast("연결할 도착 페이지를 클릭하세요"); }
+        else { addEdge(linkFrom, id); linkFrom = null; paintSelection(); }
+        return;
+      }
+      if (sel.node !== id) selectNode(id);
+      if (sel.edge) { sel.edge = null; drawEdges(); }
+      if (!editable) return;
+      const n = nodeById(id), sx = e.clientX, sy = e.clientY, ox = n.x, oy = n.y;
+      let moved = false;
+      nodeEl.classList.add("dragging"); busy(true);
+      const paint = onFrame(() => { nodeEl.style.left = n.x + "px"; nodeEl.style.top = n.y + "px"; moveEdgesOf(id); });
+      const mv = ev => {
+        const dx = (ev.clientX - sx) / B().view.zoom, dy = (ev.clientY - sy) / B().view.zoom;
+        if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+        moved = true;
+        const s = snapPos(n, ox + dx, oy + dy);
+        n.x = s.x; n.y = s.y;
+        drawGuides(s.guides);
+        paint();
+      };
+      const up = () => {
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        nodeEl.classList.remove("dragging"); busy(false); drawGuides([]);
+        if (moved) { nodeEl.style.left = n.x + "px"; nodeEl.style.top = n.y + "px"; moveEdgesOf(id); markDirty(); }
+      };
+      surf.setPointerCapture(e.pointerId);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      return;
+    }
+
+    if (edgeHit && editable) { sel.edge = edgeHit.dataset.edge; drawEdges(); openEdgePop(sel.edge, e.clientX, e.clientY); return; }
+
+    if (sel.edge) { sel.edge = null; drawEdges(); }       /* 배경 → 패닝 */
+    const sx = e.clientX, sy = e.clientY, v = B().view, px = v.panX, py = v.panY;
+    surf.classList.add("panning"); busy(true);
+    const mv = ev => { v.panX = px + (ev.clientX - sx); v.panY = py + (ev.clientY - sy); applyTransformSoon(); };
+    const up = () => {
+      surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+      surf.classList.remove("panning"); busy(false); markDirty();
+    };
+    surf.setPointerCapture(e.pointerId);
+    surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+  });
+
+  surf.addEventListener("dblclick", e => {
+    if (!canEdit()) return;
+    const wp = e.target.closest("[data-wp]");
+    if (wp && sel.edge) { edgeById(sel.edge).points.splice(+wp.dataset.wp, 1); markDirty(); drawEdges(); return; }
+    const n = e.target.closest("[data-node]");
+    if (n) editNode(n.dataset.node);
+  });
+
+  $("#flowMode").addEventListener("click", e => {
+    const b = e.target.closest("[data-mode]"); if (!b) return;
+    flowMode = b.dataset.mode; linkFrom = null;
+    $$("#flowMode .btn").forEach(x => x.classList.toggle("on", x === b));
+    surf.classList.toggle("linking", flowMode === "link");
+    paintSelection();
+  });
+  $("#btnAddNode").addEventListener("click", () => addNode());
+  $("#btnAutoLayout").addEventListener("click", autoLayout);
+  $("#btnFocus").addEventListener("click", () => {
+    const cur = state.ui.focus || "all";
+    openMenu(Object.entries(FOCUS).map(([k, v]) =>
+      '<button class="mi' + (k === cur ? " on" : "") + '" data-act="' + k + '">' + ico(v.ico, "xs") + v.name +
+      (k === "all" ? '<span class="cnt">기본</span>' : "") + "</button>").join(""), $("#btnFocus"), it => {
+        state.ui.focus = it.dataset.act;
+        syncFocusBtn(); markDirty(); renderFlow();
+      });
+  });
+  $("#nodeLayer").addEventListener("click", e => {
+    const b = e.target.closest("[data-nedit]");
+    if (b && canEdit()) { e.stopPropagation(); editNode(b.dataset.nedit); }
+  });
+  $("#btnSnap").addEventListener("click", () => {
+    state.ui.snap = !state.ui.snap;
+    $("#btnSnap").classList.toggle("on", state.ui.snap);
+    toast(state.ui.snap ? "자석 정렬 켜짐 — 다른 페이지의 가장자리·중심선에 달라붙습니다" : "자석 정렬 꺼짐");
+    markDirty();
+  });
+  $("#zIn").addEventListener("click", () => zoomTo(B().view.zoom * 1.15));
+  $("#zOut").addEventListener("click", () => zoomTo(B().view.zoom / 1.15));
+  $("#zFit").addEventListener("click", fitFlow);
+}
+function syncFocusBtn() {
+  const f = state.ui.focus || "all", meta = FOCUS[f] || FOCUS.all;
+  $("#focusName").textContent = meta.name;
+  $("#focusIco use").setAttribute("href", "#i-" + meta.ico);
+  $("#btnFocus").classList.toggle("on", f !== "all" && f !== "simple");
+  $("#btnSnap").classList.toggle("on", !!state.ui.snap);
+}
+
+function addEdge(from, to) {
+  if (B().edges.some(e => e.from === from && e.to === to)) { toast("이미 연결되어 있습니다"); paintSelection(); return; }
+  B().edges.push({
+    id: uid("e"), from, to, label: "", style: "solid", kind: "arrow",
+    route: "curve", hue: "none", width: 2, a1: "auto", a2: "auto", points: []
+  });
+  markDirty(); renderFlow();
+}
+
+/* ---------------- 연결선 설정 ---------------- */
+function openEdgePop(id, cx, cy) {
+  const e = edgeById(id); if (!e) return;
+  const seg = (key, opts, cur) => '<div class="seg wrap">' + Object.entries(opts).map(([k, v]) =>
+    '<button class="btn sm' + (cur === k ? " on" : "") + '" data-' + key + '="' + k + '">' + esc(typeof v === "string" ? v : v.name) + "</button>").join("") + "</div>";
+  const root = $("#popRoot");
+  root.innerHTML =
+    '<div class="popover glass wide">' +
+      '<div class="frow"><span class="lbl">연결 라벨</span><input class="field" id="epLabel" value="' + esc(e.label) + '" placeholder="예: 장바구니 담기"></div>' +
+      '<div class="frow"><span class="lbl">경로</span>' + seg("rt", ROUTE, e.route || "curve") + "</div>" +
+      '<div class="frow"><span class="lbl">선 · 굵기</span><div class="rowseg">' + seg("st", { solid: "실선", dashed: "점선" }, e.style) +
+        seg("wd", { 1: "가늘게", 2: "보통", 3: "굵게" }, String(e.width || 2)) + "</div></div>" +
+      '<div class="frow"><span class="lbl">화살표</span>' + seg("kd", { arrow: "단방향", both: "양방향", none: "없음" }, e.kind) + "</div>" +
+      '<div class="frow"><span class="lbl">화살촉 크기</span>' + seg("hd", HEADSZ, e.head || "m") + "</div>" +
+      '<div class="frow"><span class="lbl">색</span><div class="hues">' +
+        Object.entries(HUE).map(([k, h]) => '<button class="hue' + ((e.hue || "none") === k ? " on" : "") + '" data-hu="' + k + '" title="' + h.name + '" style="--h:' + h.c + '"></button>').join("") +
+      "</div></div>" +
+      '<div class="frow"><span class="lbl">연결점 — 출발</span>' + seg("a1", ANCHOR, e.a1 || "auto") + "</div>" +
+      '<div class="frow"><span class="lbl">연결점 — 도착</span>' + seg("a2", ANCHOR, e.a2 || "auto") + "</div>" +
+      '<p class="hint">선 위의 작은 점을 끌면 경로가 꺾입니다. 꺾임점을 더블클릭하면 지워집니다.</p>' +
+      '<div class="rowseg">' +
+        '<button class="btn sm" data-reset style="flex:1">' + ico("loop", "xs") + "경로 초기화</button>" +
+        '<button class="btn sm danger" data-del style="flex:1">' + ico("trash", "xs") + "삭제</button>" +
+        '<button class="btn sm primary" data-close style="flex:1">완료</button></div>' +
+    "</div>";
+  const pop = $(".popover", root);
+  pop.style.left = clamp(cx - 150, 8, Math.max(8, innerWidth - 320)) + "px";
+  pop.style.top = clamp(cy + 12, 8, Math.max(8, innerHeight - pop.offsetHeight - 12)) + "px";
+  $("#epLabel", pop).addEventListener("input", ev => { e.label = ev.target.value; markDirty(); drawEdges(); });
+  pop.addEventListener("click", ev => {
+    const setSeg = (k, prop, num) => {
+      const b = ev.target.closest("[data-" + k + "]"); if (!b) return;
+      e[prop] = num ? +b.dataset[k] : b.dataset[k];
+      $$("[data-" + k + "]", pop).forEach(x => x.classList.toggle("on", x === b));
+    };
+    if (ev.target.closest("[data-del]")) {
+      B().edges = B().edges.filter(x => x.id !== id);
+      root.innerHTML = ""; sel.edge = null; markDirty(); drawEdges(); return;
+    }
+    if (ev.target.closest("[data-reset]")) { e.points = []; e.a1 = "auto"; e.a2 = "auto"; markDirty(); drawEdges(); return; }
+    if (ev.target.closest("[data-close]")) { root.innerHTML = ""; sel.edge = null; drawEdges(); return; }
+    const hu = ev.target.closest("[data-hu]");
+    if (hu) { e.hue = hu.dataset.hu; $$("[data-hu]", pop).forEach(x => x.classList.toggle("on", x === hu)); }
+    setSeg("rt", "route"); setSeg("st", "style"); setSeg("kd", "kind"); setSeg("wd", "width", true); setSeg("hd", "head");
+    setSeg("a1", "a1"); setSeg("a2", "a2");
+    markDirty(); drawEdges();
+  });
+  const away = ev => {
+    if (!ev.target.closest(".popover") && !ev.target.closest("[data-edge]") && !ev.target.closest("[data-wp]") && !ev.target.closest("[data-add]")) {
+      root.innerHTML = ""; sel.edge = null; drawEdges();
+      document.removeEventListener("pointerdown", away);
+    }
+  };
+  setTimeout(() => document.addEventListener("pointerdown", away), 0);
+}
+
+/* ---------------- 노드 추가 · 편집 ---------------- */
+function addNode() {
+  const surf = $("#flowSurface").getBoundingClientRect(), v = B().view;
+  const n = {
+    id: uid("n"), kind: "page", name: "새 페이지", path: "", note: "",
+    x: Math.round((surf.width / 2 - v.panX) / v.zoom - 95),
+    y: Math.round((surf.height / 2 - v.panY) / v.zoom - 75),
+    shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H,
+    hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+  };
+  B().nodes.push(n); markDirty(); renderFlow(); selectNode(n.id); editNode(n.id);
+}
+function editNode(id) {
+  const n = nodeById(id); if (!n) return;
+  openForm({
+    title: "페이지 정보", icon: "map",
+    fields: [
+      { k: "name", label: "페이지 이름", ph: "예: 상품 상세" },
+      { k: "kind", label: "유형", type: "select", opts: KIND },
+      { k: "path", label: "경로 · 화면 ID", mono: true, ph: "/product/:id" },
+      { k: "hue", label: "색", type: "swatch" },
+      { k: "size", label: "카드 크기", type: "select", opts: NSIZE },
+      { k: "sharp", label: "각진 모서리로", type: "check" },
+      { k: "note", label: "메모", type: "textarea", ph: "이 화면에서 확인해야 할 것" }
+    ],
+    values: n,
+    onSave: v => {
+      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
+      markDirty(); renderFlow(); renderPanels();
+    },
+    onDelete: () => confirmDel('"' + n.name + '" 페이지를 삭제할까요?', () => {
+      B().nodes = B().nodes.filter(x => x.id !== id);
+      B().edges = B().edges.filter(e => e.from !== id && e.to !== id);
+      if (sel.node === id) sel.node = B().nodes.length ? B().nodes[0].id : null;
+      markDirty(); renderFlow(); selectNode(sel.node);
+    })
+  });
+}
+
+/* ---------------- 자동 정렬 ----------------
+   지금 자리를 기준점으로 삼아 흐름 순서대로 다시 세운다.
+   화면(zoom·pan)은 건드리지 않으므로 시야가 튀지 않고, 되돌리기를 제공한다. */
+function autoLayout() {
+  const nodes = B().nodes, edges = B().edges;
+  if (!nodes.length) return;
+  const prev = nodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
+  const ox = Math.min.apply(null, nodes.map(n => n.x));
+  const oy = Math.min.apply(null, nodes.map(n => n.y));
+
+  const parent = {}; nodes.forEach(n => parent[n.id] = n.id);
+  const find = a => parent[a] === a ? a : (parent[a] = find(parent[a]));
+  edges.forEach(e => { if (parent[e.from] && parent[e.to]) parent[find(e.from)] = find(e.to); });
+  const groups = {};
+  nodes.forEach(n => (groups[find(n.id)] = groups[find(n.id)] || []).push(n));
+
+  let cursorY = oy;
+  Object.keys(groups).forEach(key => {
+    const g = groups[key], ids = g.map(n => n.id);
+    const inner = edges.filter(e => ids.indexOf(e.from) >= 0 && ids.indexOf(e.to) >= 0 && e.from !== e.to);
+    const depth = {}; ids.forEach(id => depth[id] = 0);
+    for (let pass = 0; pass < ids.length + 2; pass++) {
+      let moved = false;
+      inner.forEach(e => { if (depth[e.to] < depth[e.from] + 1) { depth[e.to] = depth[e.from] + 1; moved = true; } });
+      if (!moved) break;
+    }
+    const cols = {};
+    g.forEach(n => (cols[depth[n.id]] = cols[depth[n.id]] || []).push(n));
+    const colKeys = Object.keys(cols).map(Number).sort((a, b) => a - b);
+    const order = {};
+    colKeys.forEach((c, ci) => {
+      cols[c].forEach((n, i) => {
+        if (!ci) { order[n.id] = i; return; }
+        const ps = inner.filter(e => e.to === n.id).map(e => order[e.from]).filter(v => v != null);
+        order[n.id] = ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : i + 0.5;
+      });
+      cols[c].sort((a, b) => order[a.id] - order[b.id]);
+      cols[c].forEach((n, i) => order[n.id] = i);
+    });
+    const rowH = [];
+    const maxRows = Math.max.apply(null, colKeys.map(c => cols[c].length));
+    for (let i = 0; i < maxRows; i++) {
+      rowH[i] = Math.max.apply(null, colKeys.map(c => cols[c][i] ? (NSZ[cols[c][i].id] ? NSZ[cols[c][i].id].h : 150) : 0).concat([110]));
+    }
+    let x = ox;
+    colKeys.forEach(c => {
+      let y = cursorY;
+      const colW = Math.max.apply(null, cols[c].map(n => NSZ[n.id] ? NSZ[n.id].w : nodeW(n)));
+      cols[c].forEach((n, i) => {
+        n.x = Math.round(x / GRID) * GRID;
+        n.y = Math.round(y / GRID) * GRID;
+        y += rowH[i] + 56;
+      });
+      x += colW + 78;
+    });
+    cursorY += rowH.reduce((a, b) => a + b + 56, 0) + 30;
+  });
+
+  markDirty(); renderFlow();
+  toast("흐름 순서대로 정렬했습니다", "ok", {
+    label: "되돌리기",
+    fn: () => { prev.forEach(p => { const n = nodeById(p.id); if (n) { n.x = p.x; n.y = p.y; } }); markDirty(); renderFlow(); }
+  });
+}
