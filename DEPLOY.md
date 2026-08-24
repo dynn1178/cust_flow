@@ -102,6 +102,23 @@ const SUPA_DEFAULT = {
 저장소에는 배포에 불필요한 파일을 빼는 `.vercelignore`(`parts/`, `supabase/`, `*.md`)와
 캐시 설정용 `vercel.json` 이 함께 들어 있습니다.
 
+### 로그인 후 엉뚱한 주소로 떨어진다면
+
+Supabase는 **Redirect URLs 허용 목록에 없는 주소를 무시하고 Site URL 로 보냅니다.**
+앱이 배포된 주소를 목록에 넣어야 원래 자리로 돌아옵니다.
+
+Supabase → Authentication → **URL Configuration**
+
+| 항목 | 넣을 값 |
+| --- | --- |
+| Site URL | 앱 주소 (예: `https://kuanlink.vercel.app`) |
+| Redirect URLs | `https://kuanlink.vercel.app/**` (하위 경로까지 한 번에 허용) |
+
+앱에도 보완 장치를 넣어 뒀습니다. 로그인 시작 시점의 주소를 기억해 두었다가,
+Supabase가 Site URL 로 떨궈도 **같은 사이트라면 원래 페이지로 자동 복귀**합니다
+(토큰은 이미 브라우저에 저장된 뒤라 다시 로그인할 필요가 없습니다).
+다만 Site URL 이 아예 다른 사이트를 가리키면 되돌릴 수 없으니 위 설정은 맞춰 두세요.
+
 ### 로그인했는데 다시 로그인 화면으로 돌아온다면
 
 Supabase → Authentication → **URL Configuration** 의 Site URL / Redirect URLs 에

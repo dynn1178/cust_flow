@@ -33,6 +33,15 @@ function initSplitters() {
   addEventListener("resize", () => { applySizes(); if (!stageZoom) renderStage(); });
 }
 
+/* 테마 — 기본은 라이트. 사용자가 고르면 그 선택을 기억한다(OS 설정보다 우선) */
+const THEME_KEY = "jta:theme";
+function initTheme() {
+  let t = null;
+  try { t = localStorage.getItem(THEME_KEY); } catch (e) {}
+  document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+}
+initTheme();
+
 /* 목록 뷰는 열 때만 그린다 — 탭 전환이 즉시 반응하도록 */
 function switchView(v) {
   $$(".view").forEach(s => s.classList.toggle("on", s.id === "view-" + v));
@@ -47,9 +56,10 @@ function initShell() {
   $("#docTitle").addEventListener("input", e => { state.title = e.target.value; markDirty(); });
   $("#btnShare").addEventListener("click", () => (supaOn() ? serverSave() : shareSave()));
   $("#btnTheme").addEventListener("click", () => {
-    const cur = document.documentElement.getAttribute("data-theme") ||
-      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+    const cur = document.documentElement.getAttribute("data-theme") || "light";
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
     drawEdges();
   });
   $("#btnStorage").addEventListener("click", openStorageModal);
@@ -168,7 +178,8 @@ async function boot() {
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */
   if (supaOn()) {
-    readCallback(); loadSession();
+    if (readCallback() === "redirect") return;   // 로그인 시작 지점으로 되돌아가는 중
+    loadSession();
     await fetchMe();
     applyRoleUI();
     let ok = false;

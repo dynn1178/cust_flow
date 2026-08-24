@@ -17,6 +17,7 @@ const SUPA_DEFAULT = {
 };
 const SUPA_KEY = "jta:supabase";
 const SESS = "jta:session";
+const BACK = "jta:back";        // 로그인 시작 지점 — 엉뚱한 데로 떨어지면 여기로 되돌린다
 const ROLE = {
   server_admin: { name: "서버관리자", c: "var(--bad)" },
   operator:     { name: "운영자",     c: "var(--accent)" },
@@ -50,6 +51,7 @@ function loadSession() {
   try { session = JSON.parse(localStorage.getItem(SESS) || "null"); } catch (e) { session = null; }
   return session;
 }
+function here() { return location.origin + location.pathname + location.search; }
 function readCallback() {                        // 로그인 후 되돌아온 주소의 #토큰
   const h = location.hash || "";
   if (h.indexOf("access_token=") < 0) return false;
@@ -60,23 +62,38 @@ function readCallback() {                        // 로그인 후 되돌아온 �
     expires_at: Date.now() + (Number(q.get("expires_in")) || 3600) * 1000
   });
   history.replaceState(null, "", location.pathname + location.search);
+
+  /* Supabase 는 Redirect URLs 허용 목록에 없는 주소를 무시하고 Site URL 로 보낸다.
+     토큰은 이미 이 브라우저에 저장했으니, 같은 사이트라면 원래 있던 페이지로 되돌린다. */
+  let back = null;
+  try { back = localStorage.getItem(BACK); localStorage.removeItem(BACK); } catch (e) {}
+  if (back && back.indexOf(location.origin) === 0 && back !== here()) {
+    location.replace(back);
+    return "redirect";
+  }
   return true;
 }
 async function ensureToken() {
   if (!session) return null;
   if (session.expires_at - Date.now() > 60000) return session.access_token;
   const c = supaCfg();
+  let r;
   try {
-    const r = await fetch(c.url + "/auth/v1/token?grant_type=refresh_token", {
+    r = await fetch(c.url + "/auth/v1/token?grant_type=refresh_token", {
       method: "POST",
       headers: { apikey: c.anon, "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: session.refresh_token })
     });
-    if (!r.ok) throw new Error("refresh");
-    const j = await r.json();
-    saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000 });
-    return session.access_token;
-  } catch (e) { saveSession(null); me = null; return null; }
+  } catch (e) {
+    return session.access_token;          // 네트워크 문제 — 세션은 그대로 두고 재시도에 맡긴다
+  }
+  if (!r.ok) {                            // 서버가 거절한 경우에만 로그아웃
+    if (r.status === 400 || r.status === 401 || r.status === 403) { saveSession(null); me = null; }
+    return null;
+  }
+  const j = await r.json();
+  saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000 });
+  return session.access_token;
 }
 async function sapi(path, opts) {
   const c = supaCfg(), token = await ensureToken();
@@ -94,8 +111,8 @@ async function sapi(path, opts) {
 
 /* ---------------- 로그인 · 프로필 ---------------- */
 function signIn() {
-  const c = supaCfg();
-  const back = location.origin + location.pathname;
+  const c = supaCfg(), back = here();
+  try { localStorage.setItem(BACK, back); } catch (e) {}
   location.href = c.url + "/auth/v1/authorize?provider=google&redirect_to=" + encodeURIComponent(back);
 }
 async function signOut() {
@@ -118,7 +135,11 @@ async function fetchMe() {
     }
     me = p ? { id: p.id, email: p.email, name: p.name || p.email, avatar: p.avatar, role: p.role }
            : { id: u.id, email: u.email, name: u.email, avatar: null, role: "viewer" };
-  } catch (e) { me = null; saveSession(null); }
+  } catch (e) {
+    me = null;
+    if (e && (e.status === 401 || e.status === 403)) saveSession(null);   // 만료·무효 토큰만 정리
+    else toast("서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.", "bad");
+  }
   return me;
 }
 

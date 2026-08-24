@@ -1,5 +1,5 @@
 -- ============================================================================
--- Journey Tag Atlas — Supabase 스키마
+-- Customer Journey Atlas — Supabase 스키마
 -- Supabase 대시보드 → SQL Editor 에 그대로 붙여넣고 Run 하세요. 여러 번 실행해도 안전합니다.
 --
 -- 이 스키마가 만드는 것은 전부 jta_ 접두사를 씁니다.

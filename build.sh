@@ -18,7 +18,7 @@ cat $HEAD $BODY > journey-atlas.html
   printf '%s\n' '<head>'
   printf '%s\n' '<meta charset="utf-8">'
   printf '%s\n' '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
-  printf '%s\n' '<meta name="color-scheme" content="light dark">'
+  printf '%s\n' '<meta name="color-scheme" content="light">'
   printf '%s\n' '<meta name="description" content="고객 여정 도식화 · Amplitude/Braze/GA4 태깅 · CRM 캠페인 통합 보드">'
   printf '%s\n' '<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%97%BA%EF%B8%8F%3C/text%3E%3C/svg%3E">'
   cat $HEAD

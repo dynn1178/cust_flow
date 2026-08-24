@@ -1,4 +1,4 @@
-<title>Journey Tag Atlas</title>
+<title>Customer Journey Atlas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap">
@@ -15,26 +15,14 @@
   --ok:#0f9a70; --warn:#c8830f; --bad:#d94559;
   --grid:rgba(19,26,44,.055);
   --aur-1:rgba(74,99,231,.24); --aur-2:rgba(124,77,219,.20); --aur-3:rgba(31,111,235,.16); --aur-4:rgba(242,98,46,.12);
+  color-scheme:light;
   --r-lg:20px; --r-md:14px; --r-sm:10px; --r-xs:7px;
   --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
   --f-mono:"IBM Plex Mono","SFMono-Regular",Consolas,monospace;
 }
-/* 다크는 무채색(블랙·그레이) 기준 */
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --bg:#0a0a0b; --bg-2:#121214; --bg-3:#18181b;
-    --ink:#ededf0; --ink-2:#a6a6ad; --ink-3:#74747c;
-    --glass:rgba(255,255,255,.055); --glass-2:rgba(255,255,255,.03); --glass-3:rgba(32,32,35,.92);
-    --stroke:rgba(255,255,255,.12); --stroke-2:rgba(255,255,255,.06);
-    --shadow:0 22px 50px -26px rgba(0,0,0,.95); --shadow-sm:0 8px 20px -14px rgba(0,0,0,.9);
-    --accent:#8494ff; --accent-ink:#0b0b0d; --accent-soft:rgba(132,148,255,.16);
-    --amp:#5c9dff; --braze:#ff8256; --ga4:#e5ab48; --camp:#a983f5;
-    --ok:#31c99a; --warn:#e0a83c; --bad:#ff6b7d;
-    --grid:rgba(255,255,255,.055);
-    --aur-1:rgba(255,255,255,.05); --aur-2:rgba(255,255,255,.035); --aur-3:rgba(255,255,255,.028); --aur-4:rgba(132,148,255,.05);
-  }
-}
+/* 기본은 라이트. 다크는 사용자가 토글했을 때만 (data-theme="dark") */
 :root[data-theme="dark"]{
+  color-scheme:dark;
   --bg:#0a0a0b; --bg-2:#121214; --bg-3:#18181b;
   --ink:#ededf0; --ink-2:#a6a6ad; --ink-3:#74747c;
   --glass:rgba(255,255,255,.055); --glass-2:rgba(255,255,255,.03); --glass-3:rgba(32,32,35,.92);
@@ -132,6 +120,9 @@ select.field{cursor:pointer}
 .app{height:100%; display:flex; flex-direction:column; gap:8px; padding:8px}
 .topbar{display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:var(--r-lg); flex:none; flex-wrap:wrap}
 .brand{display:flex; align-items:center; gap:9px}
+.brandname{font-size:13.5px; font-weight:700; letter-spacing:-.025em; white-space:nowrap; color:var(--ink)}
+.brandsep{width:1px; height:16px; background:var(--stroke); flex:none}
+@media (max-width:1360px){ .brandname,.brandsep{display:none} }
 .brand-mark{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
   background:linear-gradient(145deg,var(--accent),color-mix(in srgb,var(--camp) 70%,var(--accent)));
   color:#fff; box-shadow:var(--shadow-sm)}
@@ -469,7 +460,9 @@ tr:hover .rowacts{opacity:1}
 <div class="app">
   <header class="topbar glass">
     <div class="brand">
-      <div class="brand-mark"><svg class="ico"><use href="#i-route"/></svg></div>
+      <div class="brand-mark" title="Customer Journey Atlas"><svg class="ico"><use href="#i-route"/></svg></div>
+      <span class="brandname">Customer Journey Atlas</span>
+      <span class="brandsep"></span>
       <input id="docTitle" value="고객 여정 태그 맵" aria-label="문서 이름">
     </div>
     <button class="btn boardbtn" id="btnBoards" title="여정 보드 전환·추가·삭제">
@@ -3187,6 +3180,7 @@ const SUPA_DEFAULT = {
 };
 const SUPA_KEY = "jta:supabase";
 const SESS = "jta:session";
+const BACK = "jta:back";        // 로그인 시작 지점 — 엉뚱한 데로 떨어지면 여기로 되돌린다
 const ROLE = {
   server_admin: { name: "서버관리자", c: "var(--bad)" },
   operator:     { name: "운영자",     c: "var(--accent)" },
@@ -3220,6 +3214,7 @@ function loadSession() {
   try { session = JSON.parse(localStorage.getItem(SESS) || "null"); } catch (e) { session = null; }
   return session;
 }
+function here() { return location.origin + location.pathname + location.search; }
 function readCallback() {                        // 로그인 후 되돌아온 주소의 #토큰
   const h = location.hash || "";
   if (h.indexOf("access_token=") < 0) return false;
@@ -3230,23 +3225,38 @@ function readCallback() {                        // 로그인 후 되돌아온 �
     expires_at: Date.now() + (Number(q.get("expires_in")) || 3600) * 1000
   });
   history.replaceState(null, "", location.pathname + location.search);
+
+  /* Supabase 는 Redirect URLs 허용 목록에 없는 주소를 무시하고 Site URL 로 보낸다.
+     토큰은 이미 이 브라우저에 저장했으니, 같은 사이트라면 원래 있던 페이지로 되돌린다. */
+  let back = null;
+  try { back = localStorage.getItem(BACK); localStorage.removeItem(BACK); } catch (e) {}
+  if (back && back.indexOf(location.origin) === 0 && back !== here()) {
+    location.replace(back);
+    return "redirect";
+  }
   return true;
 }
 async function ensureToken() {
   if (!session) return null;
   if (session.expires_at - Date.now() > 60000) return session.access_token;
   const c = supaCfg();
+  let r;
   try {
-    const r = await fetch(c.url + "/auth/v1/token?grant_type=refresh_token", {
+    r = await fetch(c.url + "/auth/v1/token?grant_type=refresh_token", {
       method: "POST",
       headers: { apikey: c.anon, "Content-Type": "application/json" },
       body: JSON.stringify({ refresh_token: session.refresh_token })
     });
-    if (!r.ok) throw new Error("refresh");
-    const j = await r.json();
-    saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000 });
-    return session.access_token;
-  } catch (e) { saveSession(null); me = null; return null; }
+  } catch (e) {
+    return session.access_token;          // 네트워크 문제 — 세션은 그대로 두고 재시도에 맡긴다
+  }
+  if (!r.ok) {                            // 서버가 거절한 경우에만 로그아웃
+    if (r.status === 400 || r.status === 401 || r.status === 403) { saveSession(null); me = null; }
+    return null;
+  }
+  const j = await r.json();
+  saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000 });
+  return session.access_token;
 }
 async function sapi(path, opts) {
   const c = supaCfg(), token = await ensureToken();
@@ -3264,8 +3274,8 @@ async function sapi(path, opts) {
 
 /* ---------------- 로그인 · 프로필 ---------------- */
 function signIn() {
-  const c = supaCfg();
-  const back = location.origin + location.pathname;
+  const c = supaCfg(), back = here();
+  try { localStorage.setItem(BACK, back); } catch (e) {}
   location.href = c.url + "/auth/v1/authorize?provider=google&redirect_to=" + encodeURIComponent(back);
 }
 async function signOut() {
@@ -3288,7 +3298,11 @@ async function fetchMe() {
     }
     me = p ? { id: p.id, email: p.email, name: p.name || p.email, avatar: p.avatar, role: p.role }
            : { id: u.id, email: u.email, name: u.email, avatar: null, role: "viewer" };
-  } catch (e) { me = null; saveSession(null); }
+  } catch (e) {
+    me = null;
+    if (e && (e.status === 401 || e.status === 403)) saveSession(null);   // 만료·무효 토큰만 정리
+    else toast("서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.", "bad");
+  }
   return me;
 }
 
@@ -3542,6 +3556,15 @@ function initSplitters() {
   addEventListener("resize", () => { applySizes(); if (!stageZoom) renderStage(); });
 }
 
+/* 테마 — 기본은 라이트. 사용자가 고르면 그 선택을 기억한다(OS 설정보다 우선) */
+const THEME_KEY = "jta:theme";
+function initTheme() {
+  let t = null;
+  try { t = localStorage.getItem(THEME_KEY); } catch (e) {}
+  document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+}
+initTheme();
+
 /* 목록 뷰는 열 때만 그린다 — 탭 전환이 즉시 반응하도록 */
 function switchView(v) {
   $$(".view").forEach(s => s.classList.toggle("on", s.id === "view-" + v));
@@ -3556,9 +3579,10 @@ function initShell() {
   $("#docTitle").addEventListener("input", e => { state.title = e.target.value; markDirty(); });
   $("#btnShare").addEventListener("click", () => (supaOn() ? serverSave() : shareSave()));
   $("#btnTheme").addEventListener("click", () => {
-    const cur = document.documentElement.getAttribute("data-theme") ||
-      (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+    const cur = document.documentElement.getAttribute("data-theme") || "light";
+    const next = cur === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
     drawEdges();
   });
   $("#btnStorage").addEventListener("click", openStorageModal);
@@ -3677,7 +3701,8 @@ async function boot() {
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */
   if (supaOn()) {
-    readCallback(); loadSession();
+    if (readCallback() === "redirect") return;   // 로그인 시작 지점으로 되돌아가는 중
+    loadSession();
     await fetchMe();
     applyRoleUI();
     let ok = false;

@@ -1,4 +1,4 @@
-# Journey Tag Atlas
+# Customer Journey Atlas
 
 고객 여정 도식화 · Amplitude/Braze/GA4 태깅 · CRM 캠페인을 한 화면에서 관리하는 단일 파일 웹 도구.
 
