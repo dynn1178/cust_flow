@@ -483,17 +483,25 @@ function initCampView() {
    이 문서의 노드·레이어에 이미 걸려 있는 Cloudinary URL만 모아 보여준다 —
    업로드 태그(=페이지 이름)로 자동 분류되고, 문서에서 지운 이미지는 당연히 빠진다. */
 function fallbackName(url) { try { return decodeURIComponent(String(url).split("/").pop() || "image"); } catch (e) { return "image"; } }
+/* Blob을 파일명 없이 올렸던 예전 업로드는 Cloudinary가 문자 그대로 "blob"을
+   원본 파일명으로 돌려준다 — 뜻이 없으니 화면에는 페이지 이름으로 대신 보여준다.
+   새로 올리는 이미지는 cloudUpload()가 항상 페이지 이름 기반 파일명을 보내므로
+   이 문제가 생기지 않는다. */
+function displayFilename(rawName, url, pageName) {
+  if (rawName && rawName !== "blob") return rawName;
+  return pageName || fallbackName(url);
+}
 function allCloudImages() {
   const out = [];
   state.boards.forEach(b => b.nodes.forEach(n => {
     if (n.shot && n.shot.url) out.push({
       kind: "shot", url: n.shot.url, tag: n.name, node: n, board: b,
-      uploadedAt: n.shot.uploadedAt || null, filename: n.shot.filename || fallbackName(n.shot.url)
+      uploadedAt: n.shot.uploadedAt || null, filename: displayFilename(n.shot.filename, n.shot.url, n.name)
     });
     (n.layers || []).forEach(l => {
       if (l.kind === "image" && l.src && /^https?:/.test(l.src)) out.push({
         kind: "layer", url: l.src, tag: n.name, node: n, board: b, layer: l,
-        uploadedAt: l.uploadedAt || null, filename: l.filename || fallbackName(l.src)
+        uploadedAt: l.uploadedAt || null, filename: displayFilename(l.filename, l.src, n.name)
       });
     });
   }));

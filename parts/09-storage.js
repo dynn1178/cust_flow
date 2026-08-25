@@ -22,10 +22,15 @@ function cloudFolder(boardName) {
   return "crm/" + ym + "/" + safe;
 }
 function cloudTags(pageName) { return String(pageName || "page").replace(/,/g, " ").trim() || "page"; }
+/* Blob(파일이 아닌)을 FormData에 파일명 없이 append하면 브라우저가 문자 그대로
+   "blob"을 파일명으로 보낸다 — Cloudinary가 그걸 원본 파일명으로 그대로
+   돌려줘서 앨범에 의미 없는 "blob"이 뜨는 원인이었다. 항상 뜻이 있는 이름을
+   지정해서 보낸다(페이지 이름 기반). */
+function safeFilename(s) { return String(s || "image").replace(/["\r\n]/g, "").trim() || "image"; }
 async function cloudUpload(blob, opts) {
   const cfg = cloudCfg();
   const fd = new FormData();
-  fd.append("file", blob);
+  fd.append("file", blob, safeFilename(opts && opts.filename));
   fd.append("upload_preset", cfg.preset);
   if (opts && opts.folder) fd.append("folder", opts.folder);
   if (opts && opts.tags) fd.append("tags", opts.tags);
@@ -45,7 +50,7 @@ async function hostUploadAll(snap) {
   if (!cfg || !cfg.cloudName || !cfg.preset) return;
   const done = [];
   for (const u of snap.uploads) {
-    const meta = await cloudUpload(u.blob, { folder: cloudFolder(u.board && u.board.name), tags: cloudTags(u.node.name) });
+    const meta = await cloudUpload(u.blob, { folder: cloudFolder(u.board && u.board.name), tags: cloudTags(u.node.name), filename: u.node.name });
     snap.data.boards.forEach(b => b.nodes.forEach(n => {
       if (n.id === u.node.id) n.shot = { url: meta.url, w: u.node.shotW, h: u.node.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
     }));
@@ -62,7 +67,7 @@ async function hostUploadAll(snap) {
         if (l.kind !== "image" || !l.src || isCloudHosted(l.src)) continue;
         try {
           const blob = l.src.indexOf("data:") === 0 ? dataUrlToBlob(l.src) : await (await fetch(l.src)).blob();
-          const meta = await cloudUpload(blob, { folder: cloudFolder(b.name), tags: cloudTags(n.name) });
+          const meta = await cloudUpload(blob, { folder: cloudFolder(b.name), tags: cloudTags(n.name), filename: n.name + "-layer" });
           l.src = meta.url; l.uploadedAt = meta.uploadedAt; l.filename = meta.filename; l.publicId = meta.publicId;
           layerDone++;
         } catch (e) { /* 실패한 레이어는 인라인 그대로 남는다 */ }
@@ -131,7 +136,10 @@ async function convertTargetsToUrl(targets, onProgress) {
     const t = targets[i];
     try {
       const blob = t.src.indexOf("data:") === 0 ? dataUrlToBlob(t.src) : await (await fetch(t.src)).blob();
-      const meta = await cloudUpload(blob, { folder: cloudFolder(t.board.name), tags: cloudTags(t.node.name) });
+      const meta = await cloudUpload(blob, {
+        folder: cloudFolder(t.board.name), tags: cloudTags(t.node.name),
+        filename: t.kind === "shot" ? t.node.name : t.node.name + "-layer"
+      });
       if (t.kind === "shot") {
         t.node.shot = { url: meta.url, w: t.node.shotW, h: t.node.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
         t.node.shotData = null; t.node.shotDirty = false;

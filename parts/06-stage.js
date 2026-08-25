@@ -48,7 +48,7 @@ function layerMarkup(l, n, idx) {
     hit = '<polyline class="hit-line" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" stroke-linecap="round" stroke-linejoin="round"/>';
   }
   else if (l.kind === "image")
-    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none"/>';
+    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none" draggable="false"/>';
 
   let pin = "";
   if (l.campId) {
@@ -365,10 +365,15 @@ function initStage() {
   $("#sOut").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) / 1.2, .1, 4); renderStage(); });
   $("#sFit").addEventListener("click", () => { stageZoom = null; renderStage(); });
 
-  ["dragenter", "dragover"].forEach(t => wrap.addEventListener(t, e => { e.preventDefault(); wrap.classList.add("dragover"); }));
-  ["dragleave", "drop"].forEach(t => wrap.addEventListener(t, e => { e.preventDefault(); if (t === "dragleave" && wrap.contains(e.relatedTarget)) return; wrap.classList.remove("dragover"); }));
+  /* 실제 OS 파일 드래그일 때만 반응한다 — 레이어를 옮기다가(포인터 드래그) 우연히
+     브라우저 기본 이미지 드래그가 겹쳐도 드롭존이 잘못 뜨지 않도록 방어한다. */
+  const hasFiles = e => e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") >= 0;
+  ["dragenter", "dragover"].forEach(t => wrap.addEventListener(t, e => { if (!hasFiles(e)) return; e.preventDefault(); wrap.classList.add("dragover"); }));
+  wrap.addEventListener("dragleave", e => { if (wrap.contains(e.relatedTarget)) return; wrap.classList.remove("dragover"); });
   wrap.addEventListener("drop", e => {
-    if (!canEdit()) return;
+    wrap.classList.remove("dragover");
+    if (!canEdit() || !hasFiles(e)) return;
+    e.preventDefault();
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (f && /^image\//.test(f.type)) { const n = curNode(); n && shotSrc(n) ? addImageLayer(f) : setShot(f); }
   });

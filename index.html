@@ -189,10 +189,10 @@ select.field{cursor:pointer}
 .node.sel{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
 .node.dragging{cursor:grabbing; z-index:20}
 .node.link-src{border-color:var(--camp); box-shadow:0 0 0 2px color-mix(in srgb,var(--camp) 30%,transparent)}
-.node-thumb{height:86px; background:var(--glass-2); position:relative; display:grid; place-items:center; overflow:hidden;
+.node-thumb{height:129px; background:var(--glass-2); position:relative; display:grid; place-items:center; overflow:hidden;
   border-bottom:1px solid var(--stroke-2)}
-.node.size-s .node-thumb{height:66px}
-.node.size-l .node-thumb{height:110px}
+.node.size-s .node-thumb{height:99px}
+.node.size-l .node-thumb{height:165px}
 .node-thumb img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block}
 .node-thumb .ph{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--ink-3); font-size:10.5px}
 .node-thumb .ph .ico{width:18px;height:18px;opacity:.5}
@@ -1912,7 +1912,7 @@ function layerMarkup(l, n, idx) {
     hit = '<polyline class="hit-line" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" stroke-linecap="round" stroke-linejoin="round"/>';
   }
   else if (l.kind === "image")
-    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none"/>';
+    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none" draggable="false"/>';
 
   let pin = "";
   if (l.campId) {
@@ -2229,10 +2229,15 @@ function initStage() {
   $("#sOut").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) / 1.2, .1, 4); renderStage(); });
   $("#sFit").addEventListener("click", () => { stageZoom = null; renderStage(); });
 
-  ["dragenter", "dragover"].forEach(t => wrap.addEventListener(t, e => { e.preventDefault(); wrap.classList.add("dragover"); }));
-  ["dragleave", "drop"].forEach(t => wrap.addEventListener(t, e => { e.preventDefault(); if (t === "dragleave" && wrap.contains(e.relatedTarget)) return; wrap.classList.remove("dragover"); }));
+  /* 실제 OS 파일 드래그일 때만 반응한다 — 레이어를 옮기다가(포인터 드래그) 우연히
+     브라우저 기본 이미지 드래그가 겹쳐도 드롭존이 잘못 뜨지 않도록 방어한다. */
+  const hasFiles = e => e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") >= 0;
+  ["dragenter", "dragover"].forEach(t => wrap.addEventListener(t, e => { if (!hasFiles(e)) return; e.preventDefault(); wrap.classList.add("dragover"); }));
+  wrap.addEventListener("dragleave", e => { if (wrap.contains(e.relatedTarget)) return; wrap.classList.remove("dragover"); });
   wrap.addEventListener("drop", e => {
-    if (!canEdit()) return;
+    wrap.classList.remove("dragover");
+    if (!canEdit() || !hasFiles(e)) return;
+    e.preventDefault();
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (f && /^image\//.test(f.type)) { const n = curNode(); n && shotSrc(n) ? addImageLayer(f) : setShot(f); }
   });
@@ -2745,17 +2750,25 @@ function initCampView() {
    이 문서의 노드·레이어에 이미 걸려 있는 Cloudinary URL만 모아 보여준다 —
    업로드 태그(=페이지 이름)로 자동 분류되고, 문서에서 지운 이미지는 당연히 빠진다. */
 function fallbackName(url) { try { return decodeURIComponent(String(url).split("/").pop() || "image"); } catch (e) { return "image"; } }
+/* Blob을 파일명 없이 올렸던 예전 업로드는 Cloudinary가 문자 그대로 "blob"을
+   원본 파일명으로 돌려준다 — 뜻이 없으니 화면에는 페이지 이름으로 대신 보여준다.
+   새로 올리는 이미지는 cloudUpload()가 항상 페이지 이름 기반 파일명을 보내므로
+   이 문제가 생기지 않는다. */
+function displayFilename(rawName, url, pageName) {
+  if (rawName && rawName !== "blob") return rawName;
+  return pageName || fallbackName(url);
+}
 function allCloudImages() {
   const out = [];
   state.boards.forEach(b => b.nodes.forEach(n => {
     if (n.shot && n.shot.url) out.push({
       kind: "shot", url: n.shot.url, tag: n.name, node: n, board: b,
-      uploadedAt: n.shot.uploadedAt || null, filename: n.shot.filename || fallbackName(n.shot.url)
+      uploadedAt: n.shot.uploadedAt || null, filename: displayFilename(n.shot.filename, n.shot.url, n.name)
     });
     (n.layers || []).forEach(l => {
       if (l.kind === "image" && l.src && /^https?:/.test(l.src)) out.push({
         kind: "layer", url: l.src, tag: n.name, node: n, board: b, layer: l,
-        uploadedAt: l.uploadedAt || null, filename: l.filename || fallbackName(l.src)
+        uploadedAt: l.uploadedAt || null, filename: displayFilename(l.filename, l.src, n.name)
       });
     });
   }));
@@ -2849,10 +2862,15 @@ function cloudFolder(boardName) {
   return "crm/" + ym + "/" + safe;
 }
 function cloudTags(pageName) { return String(pageName || "page").replace(/,/g, " ").trim() || "page"; }
+/* Blob(파일이 아닌)을 FormData에 파일명 없이 append하면 브라우저가 문자 그대로
+   "blob"을 파일명으로 보낸다 — Cloudinary가 그걸 원본 파일명으로 그대로
+   돌려줘서 앨범에 의미 없는 "blob"이 뜨는 원인이었다. 항상 뜻이 있는 이름을
+   지정해서 보낸다(페이지 이름 기반). */
+function safeFilename(s) { return String(s || "image").replace(/["\r\n]/g, "").trim() || "image"; }
 async function cloudUpload(blob, opts) {
   const cfg = cloudCfg();
   const fd = new FormData();
-  fd.append("file", blob);
+  fd.append("file", blob, safeFilename(opts && opts.filename));
   fd.append("upload_preset", cfg.preset);
   if (opts && opts.folder) fd.append("folder", opts.folder);
   if (opts && opts.tags) fd.append("tags", opts.tags);
@@ -2872,7 +2890,7 @@ async function hostUploadAll(snap) {
   if (!cfg || !cfg.cloudName || !cfg.preset) return;
   const done = [];
   for (const u of snap.uploads) {
-    const meta = await cloudUpload(u.blob, { folder: cloudFolder(u.board && u.board.name), tags: cloudTags(u.node.name) });
+    const meta = await cloudUpload(u.blob, { folder: cloudFolder(u.board && u.board.name), tags: cloudTags(u.node.name), filename: u.node.name });
     snap.data.boards.forEach(b => b.nodes.forEach(n => {
       if (n.id === u.node.id) n.shot = { url: meta.url, w: u.node.shotW, h: u.node.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
     }));
@@ -2889,7 +2907,7 @@ async function hostUploadAll(snap) {
         if (l.kind !== "image" || !l.src || isCloudHosted(l.src)) continue;
         try {
           const blob = l.src.indexOf("data:") === 0 ? dataUrlToBlob(l.src) : await (await fetch(l.src)).blob();
-          const meta = await cloudUpload(blob, { folder: cloudFolder(b.name), tags: cloudTags(n.name) });
+          const meta = await cloudUpload(blob, { folder: cloudFolder(b.name), tags: cloudTags(n.name), filename: n.name + "-layer" });
           l.src = meta.url; l.uploadedAt = meta.uploadedAt; l.filename = meta.filename; l.publicId = meta.publicId;
           layerDone++;
         } catch (e) { /* 실패한 레이어는 인라인 그대로 남는다 */ }
@@ -2958,7 +2976,10 @@ async function convertTargetsToUrl(targets, onProgress) {
     const t = targets[i];
     try {
       const blob = t.src.indexOf("data:") === 0 ? dataUrlToBlob(t.src) : await (await fetch(t.src)).blob();
-      const meta = await cloudUpload(blob, { folder: cloudFolder(t.board.name), tags: cloudTags(t.node.name) });
+      const meta = await cloudUpload(blob, {
+        folder: cloudFolder(t.board.name), tags: cloudTags(t.node.name),
+        filename: t.kind === "shot" ? t.node.name : t.node.name + "-layer"
+      });
       if (t.kind === "shot") {
         t.node.shot = { url: meta.url, w: t.node.shotW, h: t.node.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
         t.node.shotData = null; t.node.shotDirty = false;
