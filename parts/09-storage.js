@@ -59,9 +59,9 @@ async function hostUploadAll(snap) {
   for (const b of snap.data.boards) {
     for (const n of b.nodes) {
       for (const l of (n.layers || [])) {
-        if (l.kind !== "image" || !l.src || l.src.indexOf("data:") !== 0) continue;
+        if (l.kind !== "image" || !l.src || isCloudHosted(l.src)) continue;
         try {
-          const blob = dataUrlToBlob(l.src);
+          const blob = l.src.indexOf("data:") === 0 ? dataUrlToBlob(l.src) : await (await fetch(l.src)).blob();
           const meta = await cloudUpload(blob, { folder: cloudFolder(b.name), tags: cloudTags(n.name) });
           l.src = meta.url; l.uploadedAt = meta.uploadedAt; l.filename = meta.filename; l.publicId = meta.publicId;
           layerDone++;
@@ -96,17 +96,31 @@ function openCloudModal() {
   });
 }
 
+/* ---------------- 호스팅 제공업체 식별 ----------------
+   "이미 지금 쓰는 이미지 호스팅에 올라간 URL인가?"를 판단하는 지점을
+   한 곳에 모아 둔다. 판단 기준은 "이 URL이 Cloudinary인가"가 아니라
+   "이 URL이 진짜 최종 목적지(우리가 쓰는 호스팅)인가"이므로, Supabase
+   서명 URL·구버전 파일 참조·다른 업체 URL·data: 인라인 등 그게 무엇이든
+   전부 "아직 우리 호스팅이 아님 → 변환 대상"으로 취급한다.
+
+   ⚠️ 이미지 호스팅 업체를 Cloudinary에서 다른 곳으로 바꾸면, 여기와
+   cloudUpload()(업로드 엔드포인트·응답 파싱)·cloudFolder()/cloudTags()
+   (그 업체의 폴더·태그 규칙)·openCloudModal()(설정 입력 필드)까지
+   같이 그 업체 사양에 맞춰 고쳐야 한다. */
+function isCloudHosted(url) {
+  return /^https?:\/\/res\.cloudinary\.com\//.test(String(url || ""));
+}
+
 /* ---------------- 이미지 일괄 URL 변환 ----------------
-   이미 등록된 화면 이미지·이미지 레이어 중 URL이 아닌 것들을 모아
-   Cloudinary에 한꺼번에 올린다. Supabase 서버 모드는 자체 비공개
-   버킷(서명 URL)을 이미 쓰고 있어 대상에서 제외한다. */
+   이미 등록된 화면 이미지·이미지 레이어 중 지금 쓰는 호스팅(Cloudinary)에
+   있지 않은 것들을 모아 한꺼번에 올린다. */
 function unhostedTargets() {
   const targets = [];
   state.boards.forEach(b => b.nodes.forEach(n => {
     const src = shotSrc(n);
-    if (src && !(n.shot && n.shot.url)) targets.push({ kind: "shot", node: n, board: b, src });
+    if (src && !isCloudHosted(src)) targets.push({ kind: "shot", node: n, board: b, src });
     (n.layers || []).forEach(l => {
-      if (l.kind === "image" && l.src && l.src.indexOf("data:") === 0) targets.push({ kind: "layer", node: n, layer: l, board: b, src: l.src });
+      if (l.kind === "image" && l.src && !isCloudHosted(l.src)) targets.push({ kind: "layer", node: n, layer: l, board: b, src: l.src });
     });
   }));
   return targets;

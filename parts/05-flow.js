@@ -169,6 +169,7 @@ function drawEdges() {
   B().edges.forEach(e => { const rec = edgeEl(e); seen[e.id] = 1; styleEdge(e, rec); geomEdge(e, rec); });
   Object.keys(EDGE_EL).forEach(id => { if (!seen[id]) { EDGE_EL[id].g.remove(); delete EDGE_EL[id]; } });
   drawEdgeHandles();
+  updateFlowSelTools();
 }
 function moveEdgesOf(nodeId) {
   B().edges.forEach(e => { if (e.from === nodeId || e.to === nodeId) { const rec = EDGE_EL[e.id]; if (rec) geomEdge(e, rec); } });
@@ -293,6 +294,17 @@ function paintSelection() {
     el.classList.toggle("sel", el.dataset.node === sel.node);
     el.classList.toggle("link-src", el.dataset.node === linkFrom);
   });
+  updateFlowSelTools();
+}
+/* 선택된 페이지·연결선의 설정을 우하단에서 항상 열 수 있게 — 작은 버튼이나
+   얇은 선을 다시 정확히 클릭할 필요 없도록 스테이지의 "텍스트 수정"과 같은 역할 */
+function updateFlowSelTools() {
+  const bar = $("#flowSelTools");
+  if (!bar) return;
+  if (!canEdit()) { bar.style.display = "none"; return; }
+  if (sel.edge) { bar.style.display = ""; $("#flowSelToolsLabel").textContent = "선 설정"; }
+  else if (sel.node) { bar.style.display = ""; $("#flowSelToolsLabel").textContent = "페이지 설정"; }
+  else bar.style.display = "none";
 }
 function renderFlow() { renderNodes(); drawEdges(); }
 
@@ -522,6 +534,10 @@ function initFlow() {
   $("#zIn").addEventListener("click", () => zoomTo(B().view.zoom * 1.15));
   $("#zOut").addEventListener("click", () => zoomTo(B().view.zoom / 1.15));
   $("#zFit").addEventListener("click", fitFlow);
+  $("#btnFlowEdit").addEventListener("click", () => {
+    if (sel.edge) { const r = $("#btnFlowEdit").getBoundingClientRect(); openEdgePop(sel.edge, r.left, r.top); }
+    else if (sel.node) editNode(sel.node);
+  });
 }
 function syncFocusBtn() {
   const f = state.ui.focus || "all", meta = FOCUS[f] || FOCUS.all;

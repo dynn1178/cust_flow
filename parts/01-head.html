@@ -238,11 +238,12 @@ select.field{cursor:pointer}
   align-items:flex-end; pointer-events:none; opacity:0; transition:opacity .15s}
 .node:hover .thumb-acts,.thumb-acts:focus-within{opacity:1}
 .node-thumb .pick{padding:0; border:0; background:transparent; cursor:pointer; pointer-events:auto; min-width:0}
-.node-thumb .pick span{display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; color:var(--ink);
-  background:var(--glass-3); border:1px solid var(--stroke); border-radius:99px; padding:3px 8px; box-shadow:var(--shadow-sm);
+.node-thumb .pick span{display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink);
+  background:var(--glass-3); border:1px solid var(--stroke); border-radius:99px; padding:6px 12px; box-shadow:var(--shadow-sm);
   white-space:nowrap; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px)}
+.node-thumb .pick span .ico{width:15px; height:15px}
 .node-thumb .pick:hover span{border-color:var(--accent); color:var(--accent)}
-.node.size-s .node-thumb .pick span{font-size:10px; padding:3px 6px}
+.node.size-s .node-thumb .pick span{font-size:11.5px; padding:5px 10px}
 .port{pointer-events:none; position:absolute; width:13px; height:13px; border-radius:99px; background:var(--bg-3);
   border:2px solid var(--accent); opacity:0; transition:opacity .15s,transform .15s; cursor:crosshair; z-index:5}
 .node:hover .port,.node.sel .port{opacity:1; pointer-events:auto}
@@ -254,6 +255,7 @@ select.field{cursor:pointer}
 .flow-zoom{position:absolute; bottom:10px; right:10px; display:flex; gap:4px; z-index:30; padding:5px;
   border-radius:var(--r-md); align-items:center}
 .zoomval{font-family:var(--f-mono); font-size:11px; color:var(--ink-2); min-width:38px; text-align:center}
+.flow-seltools{position:absolute; bottom:54px; right:10px; z-index:30; padding:5px; border-radius:var(--r-md)}
 .splitter-h{height:9px; flex:none; cursor:row-resize; display:grid; place-items:center; border-radius:99px; touch-action:none}
 .splitter-h::after{content:""; width:54px; height:3px; border-radius:99px; background:var(--stroke); transition:background .16s,width .16s}
 .splitter-h:hover::after{background:var(--accent); width:80px}

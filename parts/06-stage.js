@@ -22,22 +22,31 @@ function bbox(l) {
 }
 function layerMarkup(l, n, idx) {
   const c = l.color || "#e0483f", sw = l.stroke || 3;
-  let s = "";
-  if (l.kind === "rect") s = '<rect class="shape" x="' + Math.min(l.x, l.x + l.w) + '" y="' + Math.min(l.y, l.y + l.h) + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" rx="6" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
-  else if (l.kind === "ellipse") s = '<ellipse class="shape" cx="' + (l.x + l.w / 2) + '" cy="' + (l.y + l.h / 2) + '" rx="' + Math.abs(l.w / 2) + '" ry="' + Math.abs(l.h / 2) + '" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
-  else if (l.kind === "arrow") {
+  let s = "", hit = "";     // hit = 클릭하기 쉽도록 얹는 투명 히트 영역(보이는 도형보다 넓게)
+  if (l.kind === "rect") {
+    const x = Math.min(l.x, l.x + l.w), y = Math.min(l.y, l.y + l.h), w = Math.abs(l.w), h = Math.abs(l.h);
+    s = '<rect class="shape" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="6" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
+    hit = '<rect class="hit-area" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="6"/>';
+  } else if (l.kind === "ellipse") {
+    const cx = l.x + l.w / 2, cy = l.y + l.h / 2, rx = Math.abs(l.w / 2), ry = Math.abs(l.h / 2);
+    s = '<ellipse class="shape" cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
+    hit = '<ellipse class="hit-area" cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '"/>';
+  } else if (l.kind === "arrow") {
     const x2 = l.x + l.w, y2 = l.y + l.h, a = Math.atan2(l.h, l.w), hl = 13 + sw * 2;
     const p1 = [x2 - hl * Math.cos(a - 0.42), y2 - hl * Math.sin(a - 0.42)], p2 = [x2 - hl * Math.cos(a + 0.42), y2 - hl * Math.sin(a + 0.42)];
     s = '<line class="shape" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round"/>' +
         '<polygon points="' + x2 + "," + y2 + " " + p1.join(",") + " " + p2.join(",") + '" fill="' + c + '"/>';
+    hit = '<line class="hit-line" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '"/>';
   } else if (l.kind === "text") {
     const outline = l.outline !== false;    /* 명시적으로 꺼야만 사라지는 기본 켜짐(흰 외곽선/그림자) */
     s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '"' +
       (outline ? ' stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke"' : "") +
       ">" + esc(l.text || "텍스트") + "</text>";
   }
-  else if (l.kind === "pen")
+  else if (l.kind === "pen") {
     s = '<polyline class="shape" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" fill="none" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
+    hit = '<polyline class="hit-line" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
   else if (l.kind === "image")
     s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none"/>';
 
@@ -48,7 +57,12 @@ function layerMarkup(l, n, idx) {
     pin = '<g class="pin" data-pin="' + l.campId + '" transform="translate(' + b.x + "," + b.y + ')">' +
       '<circle r="11" fill="' + col + '"/><text>' + (idx + 1) + "</text></g>";
   }
-  return '<g class="lyr" data-layer="' + l.id + '">' + s + pin + "</g>";
+  let editBtn = "";
+  if (l.kind === "text" && canEdit()) {
+    editBtn = '<g class="lyr-editbtn" data-edit-layer="' + l.id + '" transform="translate(' + (l.x - 4) + "," + (l.y - 26) + ')">' +
+      '<circle cx="11" cy="11" r="11"/><svg x="3" y="3" width="16" height="16" viewBox="0 0 24 24"><use href="#i-edit"/></svg></g>';
+  }
+  return '<g class="lyr" data-layer="' + l.id + '">' + s + hit + pin + editBtn + "</g>";
 }
 /* 텍스트는 글꼴·언어에 따라 폭이 크게 달라져 추정치(bbox)가 부정확하다.
    실제 DOM에 그려진 뒤 getBBox()로 재는 편이 항상 정확하다. */
@@ -225,6 +239,13 @@ function initStage() {
 
   doc.addEventListener("pointerdown", e => {
     const n = curNode(); if (!n || !canEdit()) return;
+    const editBtn = e.target.closest("[data-edit-layer]");
+    if (editBtn) {                                       /* 텍스트 레이어 위 편집 버튼 — 어떤 도구든 항상 동작 */
+      e.preventDefault(); e.stopPropagation();
+      const l = n.layers.find(x => x.id === editBtn.dataset.editLayer);
+      if (l) editTextLayer(n, l);
+      return;
+    }
     const p = toDoc(e);
     const handle = e.target.closest("[data-handle]");
     const lyrEl = e.target.closest("[data-layer]");

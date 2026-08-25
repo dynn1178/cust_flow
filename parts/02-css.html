@@ -47,6 +47,12 @@
 #layerSvg .pin{cursor:pointer}
 #layerSvg .pin circle{stroke:var(--bg-3); stroke-width:2}
 #layerSvg .pin text{font:700 10px var(--f-mono); fill:#fff; text-anchor:middle; dominant-baseline:central; pointer-events:none}
+#layerSvg .hit-area{fill:transparent; stroke:none; pointer-events:fill}
+#layerSvg .hit-line{fill:none; stroke:transparent; stroke-width:16; pointer-events:stroke}
+#layerSvg .lyr-editbtn{opacity:0; transition:opacity .12s; cursor:pointer}
+#layerSvg .lyr:hover .lyr-editbtn{opacity:1}
+#layerSvg .lyr-editbtn circle{fill:var(--glass-3); stroke:var(--stroke); stroke-width:1; vector-effect:non-scaling-stroke}
+#layerSvg .lyr-editbtn svg{stroke:var(--ink); fill:none; stroke-width:2}
 .stage-empty{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
 .stage-tools{display:flex; align-items:center; gap:5px; flex-wrap:wrap}
 .tool-sep{width:1px; height:20px; background:var(--stroke); margin:0 2px}

@@ -246,11 +246,12 @@ select.field{cursor:pointer}
   align-items:flex-end; pointer-events:none; opacity:0; transition:opacity .15s}
 .node:hover .thumb-acts,.thumb-acts:focus-within{opacity:1}
 .node-thumb .pick{padding:0; border:0; background:transparent; cursor:pointer; pointer-events:auto; min-width:0}
-.node-thumb .pick span{display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:600; color:var(--ink);
-  background:var(--glass-3); border:1px solid var(--stroke); border-radius:99px; padding:3px 8px; box-shadow:var(--shadow-sm);
+.node-thumb .pick span{display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink);
+  background:var(--glass-3); border:1px solid var(--stroke); border-radius:99px; padding:6px 12px; box-shadow:var(--shadow-sm);
   white-space:nowrap; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px)}
+.node-thumb .pick span .ico{width:15px; height:15px}
 .node-thumb .pick:hover span{border-color:var(--accent); color:var(--accent)}
-.node.size-s .node-thumb .pick span{font-size:10px; padding:3px 6px}
+.node.size-s .node-thumb .pick span{font-size:11.5px; padding:5px 10px}
 .port{pointer-events:none; position:absolute; width:13px; height:13px; border-radius:99px; background:var(--bg-3);
   border:2px solid var(--accent); opacity:0; transition:opacity .15s,transform .15s; cursor:crosshair; z-index:5}
 .node:hover .port,.node.sel .port{opacity:1; pointer-events:auto}
@@ -262,6 +263,7 @@ select.field{cursor:pointer}
 .flow-zoom{position:absolute; bottom:10px; right:10px; display:flex; gap:4px; z-index:30; padding:5px;
   border-radius:var(--r-md); align-items:center}
 .zoomval{font-family:var(--f-mono); font-size:11px; color:var(--ink-2); min-width:38px; text-align:center}
+.flow-seltools{position:absolute; bottom:54px; right:10px; z-index:30; padding:5px; border-radius:var(--r-md)}
 .splitter-h{height:9px; flex:none; cursor:row-resize; display:grid; place-items:center; border-radius:99px; touch-action:none}
 .splitter-h::after{content:""; width:54px; height:3px; border-radius:99px; background:var(--stroke); transition:background .16s,width .16s}
 .splitter-h:hover::after{background:var(--accent); width:80px}
@@ -317,6 +319,12 @@ select.field{cursor:pointer}
 #layerSvg .pin{cursor:pointer}
 #layerSvg .pin circle{stroke:var(--bg-3); stroke-width:2}
 #layerSvg .pin text{font:700 10px var(--f-mono); fill:#fff; text-anchor:middle; dominant-baseline:central; pointer-events:none}
+#layerSvg .hit-area{fill:transparent; stroke:none; pointer-events:fill}
+#layerSvg .hit-line{fill:none; stroke:transparent; stroke-width:16; pointer-events:stroke}
+#layerSvg .lyr-editbtn{opacity:0; transition:opacity .12s; cursor:pointer}
+#layerSvg .lyr:hover .lyr-editbtn{opacity:1}
+#layerSvg .lyr-editbtn circle{fill:var(--glass-3); stroke:var(--stroke); stroke-width:1; vector-effect:non-scaling-stroke}
+#layerSvg .lyr-editbtn svg{stroke:var(--ink); fill:none; stroke-width:2}
 .stage-empty{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
 .stage-tools{display:flex; align-items:center; gap:5px; flex-wrap:wrap}
 .tool-sep{width:1px; height:20px; background:var(--stroke); margin:0 2px}
@@ -525,6 +533,9 @@ tr:hover .rowacts{opacity:1}
         <span class="zoomval" id="zVal">100%</span>
         <button class="btn icon sm" id="zIn"><svg class="ico xs"><use href="#i-zin"/></svg></button>
         <button class="btn icon sm" id="zFit" title="화면 맞춤"><svg class="ico xs"><use href="#i-fit"/></svg></button>
+      </div>
+      <div class="flow-seltools glass" id="flowSelTools" style="display:none">
+        <button class="btn sm" id="btnFlowEdit"><svg class="ico xs"><use href="#i-edit"/></svg><span id="flowSelToolsLabel">설정</span></button>
       </div>
     </div>
 
@@ -1303,6 +1314,7 @@ function drawEdges() {
   B().edges.forEach(e => { const rec = edgeEl(e); seen[e.id] = 1; styleEdge(e, rec); geomEdge(e, rec); });
   Object.keys(EDGE_EL).forEach(id => { if (!seen[id]) { EDGE_EL[id].g.remove(); delete EDGE_EL[id]; } });
   drawEdgeHandles();
+  updateFlowSelTools();
 }
 function moveEdgesOf(nodeId) {
   B().edges.forEach(e => { if (e.from === nodeId || e.to === nodeId) { const rec = EDGE_EL[e.id]; if (rec) geomEdge(e, rec); } });
@@ -1427,6 +1439,17 @@ function paintSelection() {
     el.classList.toggle("sel", el.dataset.node === sel.node);
     el.classList.toggle("link-src", el.dataset.node === linkFrom);
   });
+  updateFlowSelTools();
+}
+/* 선택된 페이지·연결선의 설정을 우하단에서 항상 열 수 있게 — 작은 버튼이나
+   얇은 선을 다시 정확히 클릭할 필요 없도록 스테이지의 "텍스트 수정"과 같은 역할 */
+function updateFlowSelTools() {
+  const bar = $("#flowSelTools");
+  if (!bar) return;
+  if (!canEdit()) { bar.style.display = "none"; return; }
+  if (sel.edge) { bar.style.display = ""; $("#flowSelToolsLabel").textContent = "선 설정"; }
+  else if (sel.node) { bar.style.display = ""; $("#flowSelToolsLabel").textContent = "페이지 설정"; }
+  else bar.style.display = "none";
 }
 function renderFlow() { renderNodes(); drawEdges(); }
 
@@ -1656,6 +1679,10 @@ function initFlow() {
   $("#zIn").addEventListener("click", () => zoomTo(B().view.zoom * 1.15));
   $("#zOut").addEventListener("click", () => zoomTo(B().view.zoom / 1.15));
   $("#zFit").addEventListener("click", fitFlow);
+  $("#btnFlowEdit").addEventListener("click", () => {
+    if (sel.edge) { const r = $("#btnFlowEdit").getBoundingClientRect(); openEdgePop(sel.edge, r.left, r.top); }
+    else if (sel.node) editNode(sel.node);
+  });
 }
 function syncFocusBtn() {
   const f = state.ui.focus || "all", meta = FOCUS[f] || FOCUS.all;
@@ -1859,22 +1886,31 @@ function bbox(l) {
 }
 function layerMarkup(l, n, idx) {
   const c = l.color || "#e0483f", sw = l.stroke || 3;
-  let s = "";
-  if (l.kind === "rect") s = '<rect class="shape" x="' + Math.min(l.x, l.x + l.w) + '" y="' + Math.min(l.y, l.y + l.h) + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" rx="6" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
-  else if (l.kind === "ellipse") s = '<ellipse class="shape" cx="' + (l.x + l.w / 2) + '" cy="' + (l.y + l.h / 2) + '" rx="' + Math.abs(l.w / 2) + '" ry="' + Math.abs(l.h / 2) + '" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
-  else if (l.kind === "arrow") {
+  let s = "", hit = "";     // hit = 클릭하기 쉽도록 얹는 투명 히트 영역(보이는 도형보다 넓게)
+  if (l.kind === "rect") {
+    const x = Math.min(l.x, l.x + l.w), y = Math.min(l.y, l.y + l.h), w = Math.abs(l.w), h = Math.abs(l.h);
+    s = '<rect class="shape" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="6" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
+    hit = '<rect class="hit-area" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="6"/>';
+  } else if (l.kind === "ellipse") {
+    const cx = l.x + l.w / 2, cy = l.y + l.h / 2, rx = Math.abs(l.w / 2), ry = Math.abs(l.h / 2);
+    s = '<ellipse class="shape" cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '" fill="' + (l.fill || "none") + '" stroke="' + c + '" stroke-width="' + sw + '"/>';
+    hit = '<ellipse class="hit-area" cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '"/>';
+  } else if (l.kind === "arrow") {
     const x2 = l.x + l.w, y2 = l.y + l.h, a = Math.atan2(l.h, l.w), hl = 13 + sw * 2;
     const p1 = [x2 - hl * Math.cos(a - 0.42), y2 - hl * Math.sin(a - 0.42)], p2 = [x2 - hl * Math.cos(a + 0.42), y2 - hl * Math.sin(a + 0.42)];
     s = '<line class="shape" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round"/>' +
         '<polygon points="' + x2 + "," + y2 + " " + p1.join(",") + " " + p2.join(",") + '" fill="' + c + '"/>';
+    hit = '<line class="hit-line" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '"/>';
   } else if (l.kind === "text") {
     const outline = l.outline !== false;    /* 명시적으로 꺼야만 사라지는 기본 켜짐(흰 외곽선/그림자) */
     s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '"' +
       (outline ? ' stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke"' : "") +
       ">" + esc(l.text || "텍스트") + "</text>";
   }
-  else if (l.kind === "pen")
+  else if (l.kind === "pen") {
     s = '<polyline class="shape" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" fill="none" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
+    hit = '<polyline class="hit-line" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
   else if (l.kind === "image")
     s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none"/>';
 
@@ -1885,7 +1921,12 @@ function layerMarkup(l, n, idx) {
     pin = '<g class="pin" data-pin="' + l.campId + '" transform="translate(' + b.x + "," + b.y + ')">' +
       '<circle r="11" fill="' + col + '"/><text>' + (idx + 1) + "</text></g>";
   }
-  return '<g class="lyr" data-layer="' + l.id + '">' + s + pin + "</g>";
+  let editBtn = "";
+  if (l.kind === "text" && canEdit()) {
+    editBtn = '<g class="lyr-editbtn" data-edit-layer="' + l.id + '" transform="translate(' + (l.x - 4) + "," + (l.y - 26) + ')">' +
+      '<circle cx="11" cy="11" r="11"/><svg x="3" y="3" width="16" height="16" viewBox="0 0 24 24"><use href="#i-edit"/></svg></g>';
+  }
+  return '<g class="lyr" data-layer="' + l.id + '">' + s + hit + pin + editBtn + "</g>";
 }
 /* 텍스트는 글꼴·언어에 따라 폭이 크게 달라져 추정치(bbox)가 부정확하다.
    실제 DOM에 그려진 뒤 getBBox()로 재는 편이 항상 정확하다. */
@@ -2062,6 +2103,13 @@ function initStage() {
 
   doc.addEventListener("pointerdown", e => {
     const n = curNode(); if (!n || !canEdit()) return;
+    const editBtn = e.target.closest("[data-edit-layer]");
+    if (editBtn) {                                       /* 텍스트 레이어 위 편집 버튼 — 어떤 도구든 항상 동작 */
+      e.preventDefault(); e.stopPropagation();
+      const l = n.layers.find(x => x.id === editBtn.dataset.editLayer);
+      if (l) editTextLayer(n, l);
+      return;
+    }
     const p = toDoc(e);
     const handle = e.target.closest("[data-handle]");
     const lyrEl = e.target.closest("[data-layer]");
@@ -2838,9 +2886,9 @@ async function hostUploadAll(snap) {
   for (const b of snap.data.boards) {
     for (const n of b.nodes) {
       for (const l of (n.layers || [])) {
-        if (l.kind !== "image" || !l.src || l.src.indexOf("data:") !== 0) continue;
+        if (l.kind !== "image" || !l.src || isCloudHosted(l.src)) continue;
         try {
-          const blob = dataUrlToBlob(l.src);
+          const blob = l.src.indexOf("data:") === 0 ? dataUrlToBlob(l.src) : await (await fetch(l.src)).blob();
           const meta = await cloudUpload(blob, { folder: cloudFolder(b.name), tags: cloudTags(n.name) });
           l.src = meta.url; l.uploadedAt = meta.uploadedAt; l.filename = meta.filename; l.publicId = meta.publicId;
           layerDone++;
@@ -2875,17 +2923,31 @@ function openCloudModal() {
   });
 }
 
+/* ---------------- 호스팅 제공업체 식별 ----------------
+   "이미 지금 쓰는 이미지 호스팅에 올라간 URL인가?"를 판단하는 지점을
+   한 곳에 모아 둔다. 판단 기준은 "이 URL이 Cloudinary인가"가 아니라
+   "이 URL이 진짜 최종 목적지(우리가 쓰는 호스팅)인가"이므로, Supabase
+   서명 URL·구버전 파일 참조·다른 업체 URL·data: 인라인 등 그게 무엇이든
+   전부 "아직 우리 호스팅이 아님 → 변환 대상"으로 취급한다.
+
+   ⚠️ 이미지 호스팅 업체를 Cloudinary에서 다른 곳으로 바꾸면, 여기와
+   cloudUpload()(업로드 엔드포인트·응답 파싱)·cloudFolder()/cloudTags()
+   (그 업체의 폴더·태그 규칙)·openCloudModal()(설정 입력 필드)까지
+   같이 그 업체 사양에 맞춰 고쳐야 한다. */
+function isCloudHosted(url) {
+  return /^https?:\/\/res\.cloudinary\.com\//.test(String(url || ""));
+}
+
 /* ---------------- 이미지 일괄 URL 변환 ----------------
-   이미 등록된 화면 이미지·이미지 레이어 중 URL이 아닌 것들을 모아
-   Cloudinary에 한꺼번에 올린다. Supabase 서버 모드는 자체 비공개
-   버킷(서명 URL)을 이미 쓰고 있어 대상에서 제외한다. */
+   이미 등록된 화면 이미지·이미지 레이어 중 지금 쓰는 호스팅(Cloudinary)에
+   있지 않은 것들을 모아 한꺼번에 올린다. */
 function unhostedTargets() {
   const targets = [];
   state.boards.forEach(b => b.nodes.forEach(n => {
     const src = shotSrc(n);
-    if (src && !(n.shot && n.shot.url)) targets.push({ kind: "shot", node: n, board: b, src });
+    if (src && !isCloudHosted(src)) targets.push({ kind: "shot", node: n, board: b, src });
     (n.layers || []).forEach(l => {
-      if (l.kind === "image" && l.src && l.src.indexOf("data:") === 0) targets.push({ kind: "layer", node: n, layer: l, board: b, src: l.src });
+      if (l.kind === "image" && l.src && !isCloudHosted(l.src)) targets.push({ kind: "layer", node: n, layer: l, board: b, src: l.src });
     });
   }));
   return targets;
