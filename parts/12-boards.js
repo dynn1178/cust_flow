@@ -46,8 +46,6 @@ function openBoardMenu() {
     '<button class="mi" data-act="add">' + ico("plus", "xs") + "새 보드 추가</button>" +
     '<button class="mi" data-act="rename">' + ico("edit", "xs") + "이름 변경</button>" +
     '<button class="mi" data-act="dup">' + ico("copy", "xs") + "이 보드 복제</button>" +
-    '<button class="mi" data-act="import">' + ico("up", "xs") + "보드 불러오기(JSON)</button>" +
-    '<button class="mi" data-act="export">' + ico("down", "xs") + "이 보드 내보내기(JSON)</button>" +
     (state.boards.length > 1 ? '<button class="mi" data-act="del" style="color:var(--bad)">' + ico("trash", "xs") + "이 보드 삭제</button>" : "")
     : '<div class="sepline"></div><div class="mi" style="cursor:default">' + ico("lock", "xs") + "보기 전용입니다</div>";
   openMenu(list + acts, $("#btnBoards"), it => {
@@ -96,33 +94,6 @@ function openBoardMenu() {
         syncBoardName(); applyTransform(); renderFlow(); renderStage(); renderPanels();
         markDirty();
       });
-    }
-    if (a === "export") {
-      const b = JSON.parse(JSON.stringify(B()));
-      b.nodes.forEach(n => { const s = shotSrc(n); if (s && s.indexOf("data:") === 0) n.shot = s; delete n.shotData; delete n.shotDirty; });
-      saveFile((B().name || "board").replace(/[\\/:*?"<>|]/g, "") + ".board.json", JSON.stringify({ jtaBoard: 1, board: b }, null, 2), "application/json");
-    }
-    if (a === "import") {
-      const inp = $("#jsonPick"); inp.value = "";
-      inp.onchange = () => {
-        const f = inp.files && inp.files[0]; if (!f) return;
-        const fr = new FileReader();
-        fr.onload = () => {
-          try {
-            const raw = JSON.parse(fr.result);
-            const b = raw.board || (raw.nodes ? raw : (raw.boards || [])[0]);
-            if (!b || !b.nodes) throw new Error("형식이 아닙니다");
-            const board = normalizeBoard(b);
-            board.id = uid("b");
-            board.nodes.forEach(n => { if (typeof n.shot === "string") { n.shotData = n.shot; n.shot = null; n.shotDirty = true; } });
-            state.boards.push(board);
-            switchBoard(state.boards.length - 1); syncBoardName();
-            toast('"' + board.name + '" 보드를 불러왔습니다', "ok");
-          } catch (err) { toast("보드 JSON을 읽지 못했습니다", "bad"); }
-        };
-        fr.readAsText(f);
-      };
-      inp.click();
     }
   });
 }

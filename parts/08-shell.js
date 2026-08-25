@@ -48,6 +48,7 @@ function switchView(v) {
   $$("#viewTabs .btn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   if (v === "tags") renderTagView();
   if (v === "camps") renderCampView();
+  if (v === "album") renderAlbumView();
   if (v === "map") { applySizes(); applyTransform(); if (!stageZoom) renderStage(); }
 }
 
@@ -161,6 +162,7 @@ function normalize(s) {
   ["zoom", "panX", "panY", "sel", "fitted"].forEach(k => delete s.ui[k]);
   s.title = s.title || "고객 여정 태그 맵";
   s.updatedAt = s.updatedAt || 0;
+  s.cloud = s.cloud || null;          // 이미지 호스팅(Cloudinary) 설정 — 문서에 같이 저장돼 모두에게 적용된다
   s.v = 2;
   return s;
 }
@@ -172,7 +174,7 @@ function renderAll() {
 }
 
 async function boot() {
-  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initShell(); initSplitters(); initImport(); initBoards(); initAuth();
+  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initAlbumView(); initShell(); initSplitters(); initImport(); initBoards(); initAuth();
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */
   if (supaOn()) {

@@ -257,7 +257,7 @@ function buildSnapshot() {
       if (raw) {
         const blob = dataUrlToBlob(raw);
         const ref = "img/" + n.id + "-" + Date.now().toString(36) + "." + extOf(blob.type);
-        uploads.push({ ref, blob, node: n });
+        uploads.push({ ref, blob, node: n, board: b });
         c.shot = { ref, w: n.shotW, h: n.shotH };
       } else if (n.shot && n.shot.path) c.shot = { path: n.shot.path, w: n.shot.w, h: n.shot.h };  // 서버 저장소
       else if (n.shot && n.shot.url) c.shot = { url: n.shot.url, w: n.shot.w, h: n.shot.h };
@@ -285,7 +285,7 @@ function snapshotBytes(s) {
 
 async function shareSave() {
   const api = await claudeApi();
-  if (!api) { toast("이 화면에서는 공유 저장을 쓸 수 없습니다. JSON 내보내기나 폴더 연결을 사용하세요.", "bad"); return; }
+  if (!api) { toast("이 화면에서는 공유 저장을 쓸 수 없습니다. JSON 내보내기를 사용하세요.", "bad"); return; }
   const btn = $("#btnShare"); btn.disabled = true;
   setSaveChip("dirty", "저장 중…");
   const snap = buildSnapshot();
@@ -337,6 +337,16 @@ async function saveFile(filename, text, mime) {
     const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
     if (dl) { await dl.save({ filename, data: text }); toast(filename + " 저장 완료", "ok"); return; }
   } catch (e) { /* 아래 폴백 */ }
+  try {                                      // 일반 브라우저(배포본·로컬 파일)에서는 표준 다운로드가 항상 된다
+    const blob = new Blob([text], { type: (mime || "application/octet-stream") + ";charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.style.display = "none";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast(filename + " 저장 완료", "ok");
+    return;
+  } catch (e) { /* Artifact 프리뷰처럼 다운로드 자체가 막힌 화면에서만 여기로 온다 */ }
   try { await navigator.clipboard.writeText(text); toast("다운로드가 막혀 있어 클립보드에 복사했습니다.", "ok"); }
   catch (e) { toast("파일을 내보낼 수 없습니다.", "bad"); }
 }
@@ -426,4 +436,25 @@ function confirmDel(msg, fn) {
     if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal();
     if (e.target.closest("[data-ok]")) { closeModal(); fn(); }
   });
+}
+/* 취소 버튼 없는 진행바 모달 — 이미지 업로드처럼 닫을 수 없는(중간에 끊으면 데이터가 애매해지는) 작업에 쓴다 */
+function openProgressModal(title) {
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass" style="width:min(420px,100%)" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("up") + "<h3>" + esc(title) + "</h3></div>" +
+      '<div class="modal-body">' +
+        '<div class="pbar"><div class="pbar-fill" id="pbarFill" style="width:0%"></div></div>' +
+        '<p class="hint" id="pbarText">준비 중…</p>' +
+      "</div>" +
+    "</div></div>";
+  return {
+    update(done, total) {
+      const pct = total ? Math.round(done / total * 100) : 0;
+      const fill = $("#pbarFill"), text = $("#pbarText");
+      if (fill) fill.style.width = pct + "%";
+      if (text) text.textContent = done + " / " + total + "개 업로드 중… (" + pct + "%)";
+    },
+    close() { closeModal(); }
+  };
 }

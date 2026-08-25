@@ -2,8 +2,8 @@
 /* ========================================================================
    좌: CRM 캠페인 · 우: 태깅 설정 · 목록 뷰(모든 보드 통합)
    ======================================================================== */
-const viewStale = { tags: true, camps: true };
-function invalidateViews() { viewStale.tags = true; viewStale.camps = true; }
+const viewStale = { tags: true, camps: true, album: true };
+function invalidateViews() { viewStale.tags = true; viewStale.camps = true; viewStale.album = true; }
 
 function platChip(p) { return '<span class="chip" style="--c:' + PLAT[p].c + '">' + ico(PLAT[p].ico, "xs") + PLAT[p].name + "</span>"; }
 function chanChip(c) { const h = CHAN[c] || CHAN.push; return '<span class="chip" style="--c:' + h.c + '">' + ico(h.ico, "xs") + h.name + "</span>"; }
@@ -475,5 +475,91 @@ function initCampView() {
     const q = s => '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"';
     const body = allCamps().map(({ c, n, b }) => [b.name, n.name, c.name, (CHAN[c.chan] || CHAN.push).name, c.segment, c.timing, CSTATUS[c.status], c.extId, c.landing, c.note].map(q).join(","));
     saveFile("crm-campaigns.csv", "﻿" + [head.map(q).join(",")].concat(body).join("\r\n"), "text/csv");
+  });
+}
+
+/* ---------------- 앨범 뷰 — 문서에 등록된 Cloudinary 이미지 모아보기 ----------------
+   Cloudinary Admin API(계정 전체 조회)는 API Secret이 필요해 쓰지 않는다. 대신
+   이 문서의 노드·레이어에 이미 걸려 있는 Cloudinary URL만 모아 보여준다 —
+   업로드 태그(=페이지 이름)로 자동 분류되고, 문서에서 지운 이미지는 당연히 빠진다. */
+function fallbackName(url) { try { return decodeURIComponent(String(url).split("/").pop() || "image"); } catch (e) { return "image"; } }
+function allCloudImages() {
+  const out = [];
+  state.boards.forEach(b => b.nodes.forEach(n => {
+    if (n.shot && n.shot.url) out.push({
+      kind: "shot", url: n.shot.url, tag: n.name, node: n, board: b,
+      uploadedAt: n.shot.uploadedAt || null, filename: n.shot.filename || fallbackName(n.shot.url)
+    });
+    (n.layers || []).forEach(l => {
+      if (l.kind === "image" && l.src && /^https?:/.test(l.src)) out.push({
+        kind: "layer", url: l.src, tag: n.name, node: n, board: b, layer: l,
+        uploadedAt: l.uploadedAt || null, filename: l.filename || fallbackName(l.src)
+      });
+    });
+  }));
+  return out;
+}
+const albumFilter = { board: "all", tag: "all", q: "", sort: "new", group: true };
+function albumTagOptions(all, cur) {
+  const names = Array.from(new Set(all.map(x => x.tag))).sort((a, b) => a.localeCompare(b, "ko"));
+  return '<option value="all">모든 태그</option>' + names.map(n => '<option value="' + esc(n) + '"' + (cur === n ? " selected" : "") + ">" + esc(n) + "</option>").join("");
+}
+function albumCard(x) {
+  return '<div class="acard" data-goto="' + x.node.id + '" data-bi="' + state.boards.indexOf(x.board) + '">' +
+    '<img src="' + esc(x.url) + '" alt="" loading="lazy" draggable="false">' +
+    '<div class="a-meta">' +
+      '<div class="a-name">' + esc(x.filename) + "</div>" +
+      '<div class="a-sub">' + esc(x.board.name) + " · " + esc(x.tag) + (x.uploadedAt ? " · " + timeAgo(new Date(x.uploadedAt).getTime()) : "") + "</div>" +
+    "</div></div>";
+}
+function renderAlbumView(force) {
+  if (!force && !viewStale.album) return;
+  viewStale.album = false;
+  const all = allCloudImages();
+  $("#albumBoardFilter").innerHTML = boardOptions(albumFilter.board);
+  if (!all.some(x => x.tag === albumFilter.tag)) albumFilter.tag = "all";
+  $("#albumTagFilter").innerHTML = albumTagOptions(all, albumFilter.tag);
+
+  const rows = all.filter(x =>
+    (albumFilter.board === "all" || state.boards[+albumFilter.board] === x.board) &&
+    (albumFilter.tag === "all" || x.tag === albumFilter.tag) &&
+    (!albumFilter.q || (x.filename + " " + x.tag + " " + x.board.name).toLowerCase().includes(albumFilter.q))
+  );
+  const byDate = (a, b) => (a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0) - (b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0);
+  if (albumFilter.sort === "new") rows.sort((a, b) => byDate(b, a));
+  else if (albumFilter.sort === "old") rows.sort(byDate);
+  else rows.sort((a, b) => a.filename.localeCompare(b.filename, "ko"));
+
+  $("#albumStats").innerHTML =
+    ['<div class="stat" style="--c:var(--accent)"><span class="n">' + all.length + '</span><span class="t">전체 이미지</span></div>',
+     '<div class="stat" style="--c:var(--camp)"><span class="n">' + new Set(all.map(x => x.tag)).size + '</span><span class="t">태그(페이지) 수</span></div>',
+     '<div class="stat" style="--c:var(--ok)"><span class="n">' + rows.length + '</span><span class="t">현재 조건에 맞는 이미지</span></div>'].join("");
+
+  const body = $("#albumBody");
+  if (!rows.length) { body.innerHTML = '<div class="empty">' + ico("image") + "<div>조건에 맞는 이미지가 없습니다<br>Cloudinary로 변환된 이미지만 여기 모입니다</div></div>"; return; }
+  if (albumFilter.group) {
+    const groups = {};
+    rows.forEach(x => (groups[x.tag] = groups[x.tag] || []).push(x));
+    body.innerHTML = Object.keys(groups).sort((a, b) => a.localeCompare(b, "ko")).map(tag =>
+      '<h3 class="album-group-title">' + esc(tag) + ' <span class="hint">(' + groups[tag].length + ")</span></h3>" +
+      '<div class="grid-cards">' + groups[tag].map(albumCard).join("") + "</div>"
+    ).join("");
+  } else {
+    body.innerHTML = '<div class="grid-cards">' + rows.map(albumCard).join("") + "</div>";
+  }
+}
+function initAlbumView() {
+  $("#albumBoardFilter").addEventListener("change", e => { albumFilter.board = e.target.value; renderAlbumView(true); });
+  $("#albumTagFilter").addEventListener("change", e => { albumFilter.tag = e.target.value; renderAlbumView(true); });
+  $("#albumSort").addEventListener("change", e => { albumFilter.sort = e.target.value; renderAlbumView(true); });
+  $("#albumSearch").addEventListener("input", e => { albumFilter.q = e.target.value.toLowerCase().trim(); renderAlbumView(true); });
+  $("#btnAlbumGroup").addEventListener("click", () => {
+    albumFilter.group = !albumFilter.group;
+    $("#btnAlbumGroup").classList.toggle("on", albumFilter.group);
+    renderAlbumView(true);
+  });
+  $("#albumBody").addEventListener("click", e => {
+    const g = e.target.closest("[data-goto]");
+    if (g && g.dataset.bi != null) jumpTo(+g.dataset.bi, g.dataset.goto);
   });
 }

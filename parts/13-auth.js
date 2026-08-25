@@ -186,6 +186,15 @@ async function serverSave() {
   if (!me) { toast("먼저 구글 계정으로 로그인하세요", "bad"); return; }
   if (!isStaff()) { toast("편집 권한이 없습니다. 서버관리자에게 운영자 권한을 요청하세요.", "bad"); return; }
   const c = supaCfg();
+  if (cloudCfg()) {                              // Cloudinary가 연결돼 있으면 URL 없는 이미지부터 변환
+    const targets = unhostedTargets();
+    if (targets.length) {
+      const prog = openProgressModal("이미지 " + targets.length + "개를 URL로 변환하는 중");
+      const r = await convertTargetsToUrl(targets, (d, t) => prog.update(d, t));
+      prog.close();
+      if (r.failed) toast(r.failed + "개 이미지는 변환에 실패해 원본 그대로 저장합니다", "bad");
+    }
+  }
   setSaveChip("dirty", "저장 중…");
   const snap = buildSnapshot();
   try {
@@ -261,13 +270,22 @@ async function openMembersModal() {
       '<div class="modal-body">' +
         '<p class="hint">권한은 서버에서 강제됩니다(브라우저를 고쳐도 우회되지 않습니다).<br>' +
         '<b>서버관리자</b> 모든 권한 + 권한 지정·양도 · <b>운영자</b> 권한 지정만 제외한 모든 편집 · <b>일반회원</b> 열람만(편집·다운로드·저장 불가)</p>' +
-        '<div class="bulk">' + (rows.length ? rows.map(row).join("") : '<div class="empty">아직 가입한 사람이 없습니다</div>') + "</div>" +
+        '<input class="field" id="memberSearch" placeholder="이름 · 이메일 · 등급 검색" style="margin-bottom:8px">' +
+        '<div class="bulk" id="memberList">' + (rows.length ? rows.map(row).join("") : '<div class="empty">아직 가입한 사람이 없습니다</div>') + "</div>" +
         (canGrant ? '<p class="hint">역할을 바꾸면 즉시 저장됩니다. 서버관리자를 양도하려면 상대를 <b>서버관리자</b>로 올린 뒤 본인을 <b>운영자</b>로 내리세요.</p>'
                   : '<p class="hint">역할 변경은 서버관리자만 할 수 있습니다.</p>') +
       "</div>" +
       '<div class="modal-foot"><div class="spacer"></div><button class="btn primary" data-x>닫기</button></div>' +
     "</div></div>";
   root.addEventListener("click", e => { if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal(); });
+  $("#memberSearch", root).addEventListener("input", e => {
+    const q = e.target.value.toLowerCase().trim();
+    const filtered = q ? rows.filter(p => {
+      const r = ROLE[p.role] || ROLE.viewer;
+      return (p.name || "").toLowerCase().includes(q) || (p.email || "").toLowerCase().includes(q) || r.name.toLowerCase().includes(q);
+    }) : rows;
+    $("#memberList", root).innerHTML = filtered.length ? filtered.map(row).join("") : '<div class="empty">조건에 맞는 회원이 없습니다</div>';
+  });
   root.addEventListener("change", async e => {
     const s = e.target.closest("[data-role]"); if (!s) return;
     const id = s.dataset.role, role = s.value;

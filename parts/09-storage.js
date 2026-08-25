@@ -1,45 +1,53 @@
 
 /* ========================================================================
    저장 위치 — Artifact 공유본 · 서버(Supabase) · JSON 파일
-   이미지 호스팅(선택)을 연결하면 화면 이미지·이미지 레이어를 외부 저장소에
-   올리고 JSON에는 URL만 남긴다. 이미 등록된 이미지도 "일괄 URL 변환"으로
-   나중에 한꺼번에 바꿀 수 있다.
+   이미지 호스팅(Cloudinary)을 연결하면 화면 이미지·이미지 레이어를
+   Cloudinary에 올리고 JSON에는 URL만 남긴다. 이미 등록된 이미지도
+   "일괄 URL 변환"으로 나중에 한꺼번에 바꿀 수 있다.
    ======================================================================== */
 
-/* ---------------- 이미지 호스팅(선택) ----------------
-   업로드 엔드포인트를 지정하면 화면 이미지·이미지 레이어를 그쪽에 올리고
-   JSON에는 URL만 남긴다. 설정값(토큰 포함)은 공유되는 JSON이 아니라
-   이 브라우저에만 저장한다. */
-const HOST_KEY = "jta:imghost";
-function hostCfg() { try { return JSON.parse(localStorage.getItem(HOST_KEY) || "null"); } catch (e) { return null; } }
-function setHostCfg(c) { try { c ? localStorage.setItem(HOST_KEY, JSON.stringify(c)) : localStorage.removeItem(HOST_KEY); } catch (e) {} }
-function dig(obj, path) { return String(path || "").split(".").reduce((o, k) => (o == null ? o : o[k]), obj); }
-async function hostUpload(blob, filename) {
-  const cfg = hostCfg();
+/* ---------------- 이미지 호스팅 (Cloudinary · Unsigned Upload Preset) ----------------
+   API Key/Secret은 쓰지 않는다 — 브라우저 코드에 넣으면 이 화면에 접근하는
+   누구나 개발자도구로 꺼내볼 수 있어 사실상 공개되기 때문. Cloudinary 콘솔에서
+   Signing Mode를 Unsigned로 만든 업로드 프리셋 하나만 있으면 Cloud name과
+   프리셋 이름만으로 안전하게 업로드할 수 있고 폴더·태그 지정도 그대로 된다.
+   설정값은 문서(state.cloud)에 저장한다 — Supabase 연결 정보와 달리 문서를
+   불러온 뒤에만 쓰이므로, 한 번 저장해 두면 다른 사람이 같은 문서를 열었을 때도
+   그대로 적용된다(브라우저마다 따로 연결할 필요가 없다). */
+function cloudCfg() { return state.cloud || null; }
+function setCloudCfg(c) { state.cloud = c; markDirty(); }
+function cloudFolder(boardName) {
+  const d = new Date(), ym = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  const safe = String(boardName || "board").replace(/[\/\\]+/g, "-").trim() || "board";
+  return "crm/" + ym + "/" + safe;
+}
+function cloudTags(pageName) { return String(pageName || "page").replace(/,/g, " ").trim() || "page"; }
+async function cloudUpload(blob, opts) {
+  const cfg = cloudCfg();
   const fd = new FormData();
-  fd.append(cfg.field || "image", blob, filename);
-  const headers = {};
-  if (cfg.auth) headers.Authorization = cfg.auth;
+  fd.append("file", blob);
+  fd.append("upload_preset", cfg.preset);
+  if (opts && opts.folder) fd.append("folder", opts.folder);
+  if (opts && opts.tags) fd.append("tags", opts.tags);
   let res;
   try {
-    res = await fetch(cfg.url, { method: "POST", headers, body: fd });
+    res = await fetch("https://api.cloudinary.com/v1_1/" + cfg.cloudName + "/image/upload", { method: "POST", body: fd });
   } catch (err) {
-    throw new Error("이미지 호스팅에 접속하지 못했습니다. (Artifact 화면 안에서는 외부 업로드가 차단됩니다)");
+    throw new Error("Cloudinary에 접속하지 못했습니다. (Artifact 화면 안에서는 외부 업로드가 차단됩니다)");
   }
-  if (!res.ok) throw new Error("이미지 업로드 실패 " + res.status);
   const j = await res.json().catch(() => null);
-  const url = j ? dig(j, cfg.path || "data.link") : null;
-  if (!url) throw new Error("응답에서 " + (cfg.path || "data.link") + " 경로를 찾지 못했습니다");
-  return url;
+  if (!res.ok) throw new Error((j && j.error && j.error.message) || ("업로드 실패 " + res.status));
+  if (!j || !j.secure_url) throw new Error("응답에서 URL을 찾지 못했습니다");
+  return { url: j.secure_url, publicId: j.public_id, filename: j.original_filename || "", uploadedAt: j.created_at || new Date().toISOString() };
 }
 async function hostUploadAll(snap) {
-  const cfg = hostCfg();
-  if (!cfg || !cfg.url) return;
+  const cfg = cloudCfg();
+  if (!cfg || !cfg.cloudName || !cfg.preset) return;
   const done = [];
   for (const u of snap.uploads) {
-    const url = await hostUpload(u.blob, u.ref.slice(4));
+    const meta = await cloudUpload(u.blob, { folder: cloudFolder(u.board && u.board.name), tags: cloudTags(u.node.name) });
     snap.data.boards.forEach(b => b.nodes.forEach(n => {
-      if (n.id === u.node.id) n.shot = { url, w: u.node.shotW, h: u.node.shotH };
+      if (n.id === u.node.id) n.shot = { url: meta.url, w: u.node.shotW, h: u.node.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
     }));
     const i = snap.used.indexOf(u.ref);
     if (i >= 0) snap.used.splice(i, 1);
@@ -54,73 +62,84 @@ async function hostUploadAll(snap) {
         if (l.kind !== "image" || !l.src || l.src.indexOf("data:") !== 0) continue;
         try {
           const blob = dataUrlToBlob(l.src);
-          l.src = await hostUpload(blob, l.id + "." + extOf(blob.type));
+          const meta = await cloudUpload(blob, { folder: cloudFolder(b.name), tags: cloudTags(n.name) });
+          l.src = meta.url; l.uploadedAt = meta.uploadedAt; l.filename = meta.filename; l.publicId = meta.publicId;
           layerDone++;
         } catch (e) { /* 실패한 레이어는 인라인 그대로 남는다 */ }
       }
     }
   }
-  if (done.length || layerDone) toast("이미지 " + (done.length + layerDone) + "개를 호스팅에 올렸습니다", "ok");
+  if (done.length || layerDone) toast("이미지 " + (done.length + layerDone) + "개를 Cloudinary에 올렸습니다", "ok");
 }
-function openHostModal() {
-  const c = hostCfg() || { url: "", field: "image", auth: "", path: "data.link" };
+function openCloudModal() {
+  const c = cloudCfg() || { cloudName: "", preset: "" };
   openForm({
-    title: "이미지 호스팅", icon: "up", okText: "저장",
-    deleteText: hostCfg() ? "설정 삭제" : null,
-    note: "화면 이미지·이미지 레이어를 외부 저장소에 올리고 JSON에는 URL만 남깁니다. 사내 S3·R2 업로더나 imgur 같은 서비스를 쓸 수 있습니다.<br>" +
-      "<b>주의</b> — ① Artifact 화면 안에서는 보안 정책상 외부 업로드·표시가 모두 막히므로 내려받은 파일이나 자체 호스팅에서만 동작합니다. " +
-      "② 공개 호스팅에 올린 이미지는 URL만 알면 누구나 볼 수 있으니 사내 화면 캡처에는 권장하지 않습니다. " +
-      "③ 토큰은 이 브라우저에만 저장되고 공유 JSON에는 들어가지 않습니다.",
+    title: "이미지 호스팅 (Cloudinary)", icon: "up", okText: "저장",
+    deleteText: cloudCfg() ? "설정 삭제" : null,
+    note: "화면 이미지·이미지 레이어를 Cloudinary에 올리고 JSON에는 URL만 남깁니다.<br>" +
+      "Cloudinary 콘솔 → <b>Settings → Upload → Upload presets → Add upload preset</b>에서 " +
+      "Signing Mode를 <b>Unsigned</b>로 만든 프리셋 이름을 적으세요. API Key·Secret은 필요 없습니다 " +
+      "(브라우저 코드에 넣으면 노출되므로 쓰지 않습니다).<br>" +
+      "업로드 시 <span class=\"mono\">crm/연도-월/보드이름</span> 폴더에 담기고, 페이지 이름이 태그로 붙습니다.<br>" +
+      "이 설정은 이 문서에 같이 저장되므로, <b>공유 저장/서버 저장을 한 번 눌러야</b> 다른 사람이 열었을 때도 그대로 적용됩니다.",
     fields: [
-      { k: "url", label: "업로드 URL (POST · multipart)", mono: true, ph: "https://api.imgur.com/3/image" },
-      { k: "field", label: "파일 필드 이름", mono: true, ph: "image" },
-      { k: "auth", label: "Authorization 헤더", mono: true, ph: "Client-ID xxxxxxxx" },
-      { k: "path", label: "응답에서 URL 위치", mono: true, ph: "data.link" }
+      { k: "cloudName", label: "Cloud name", mono: true, ph: "pspfcgbn" },
+      { k: "preset", label: "Upload preset (Unsigned)", mono: true, ph: "예: jta-unsigned" }
     ],
     values: c,
     onSave: v => {
-      if (!v.url) { setHostCfg(null); return toast("이미지 호스팅을 껐습니다"); }
-      setHostCfg({ url: v.url, field: v.field || "image", auth: v.auth, path: v.path || "data.link" });
-      toast("이미지 호스팅을 설정했습니다. 다음 저장부터 적용됩니다.", "ok");
+      if (!v.cloudName || !v.preset) { setCloudCfg(null); return toast("이미지 호스팅을 껐습니다. 저장해야 다른 사람에게도 반영됩니다."); }
+      setCloudCfg({ cloudName: v.cloudName.trim(), preset: v.preset.trim() });
+      toast("Cloudinary를 연결했습니다. 저장해야 다른 사람에게도 적용됩니다.", "ok");
     },
-    onDelete: hostCfg() ? () => { setHostCfg(null); toast("설정을 지웠습니다"); } : null
+    onDelete: cloudCfg() ? () => { setCloudCfg(null); toast("설정을 지웠습니다. 저장해야 다른 사람에게도 반영됩니다."); } : null
   });
 }
 
 /* ---------------- 이미지 일괄 URL 변환 ----------------
    이미 등록된 화면 이미지·이미지 레이어 중 URL이 아닌 것들을 모아
-   이미지 호스팅에 한꺼번에 올린다. Supabase 서버 모드는 자체 비공개
+   Cloudinary에 한꺼번에 올린다. Supabase 서버 모드는 자체 비공개
    버킷(서명 URL)을 이미 쓰고 있어 대상에서 제외한다. */
 function unhostedTargets() {
   const targets = [];
   state.boards.forEach(b => b.nodes.forEach(n => {
     const src = shotSrc(n);
-    if (src && !(n.shot && n.shot.url)) targets.push({ kind: "shot", node: n, src });
+    if (src && !(n.shot && n.shot.url)) targets.push({ kind: "shot", node: n, board: b, src });
     (n.layers || []).forEach(l => {
-      if (l.kind === "image" && l.src && l.src.indexOf("data:") === 0) targets.push({ kind: "layer", node: n, layer: l, src: l.src });
+      if (l.kind === "image" && l.src && l.src.indexOf("data:") === 0) targets.push({ kind: "layer", node: n, layer: l, board: b, src: l.src });
     });
   }));
   return targets;
 }
-async function convertAllImagesToUrl() {
-  const cfg = hostCfg();
-  if (!cfg || !cfg.url) { toast("먼저 이미지 호스팅을 설정하세요", "bad"); openHostModal(); return; }
-  const targets = unhostedTargets();
-  if (!targets.length) { toast("URL로 바꿀 이미지가 없습니다 — 이미 모두 URL 형식입니다", "ok"); return; }
-  toast("이미지 " + targets.length + "개를 URL로 바꾸는 중…");
+async function convertTargetsToUrl(targets, onProgress) {
   let done = 0, failed = 0;
-  for (const t of targets) {
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i];
     try {
       const blob = t.src.indexOf("data:") === 0 ? dataUrlToBlob(t.src) : await (await fetch(t.src)).blob();
-      const name = (t.kind === "shot" ? t.node.id : t.layer.id) + "." + extOf(blob.type);
-      const url = await hostUpload(blob, name);
-      if (t.kind === "shot") { t.node.shot = { url, w: t.node.shotW, h: t.node.shotH }; t.node.shotData = null; t.node.shotDirty = false; }
-      else t.layer.src = url;
+      const meta = await cloudUpload(blob, { folder: cloudFolder(t.board.name), tags: cloudTags(t.node.name) });
+      if (t.kind === "shot") {
+        t.node.shot = { url: meta.url, w: t.node.shotW, h: t.node.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
+        t.node.shotData = null; t.node.shotDirty = false;
+      } else {
+        t.layer.src = meta.url; t.layer.uploadedAt = meta.uploadedAt; t.layer.filename = meta.filename; t.layer.publicId = meta.publicId;
+      }
       done++;
     } catch (e) { failed++; }
+    if (onProgress) onProgress(i + 1, targets.length);
   }
+  return { done, failed };
+}
+async function convertAllImagesToUrl() {
+  const cfg = cloudCfg();
+  if (!cfg || !cfg.cloudName || !cfg.preset) { toast("먼저 이미지 호스팅(Cloudinary)을 설정하세요", "bad"); openCloudModal(); return; }
+  const targets = unhostedTargets();
+  if (!targets.length) { toast("URL로 바꿀 이미지가 없습니다 — 이미 모두 URL 형식입니다", "ok"); return; }
+  const prog = openProgressModal("이미지 " + targets.length + "개를 URL로 변환하는 중");
+  const r = await convertTargetsToUrl(targets, (d, t) => prog.update(d, t));
+  prog.close();
   markDirty(); renderFlow(); renderStage(); renderPanels();
-  toast(done + "개를 URL로 바꿨습니다" + (failed ? " · 실패 " + failed : "") + " — 공유 저장을 눌러야 다른 사람에게도 반영됩니다.", failed ? "bad" : "ok");
+  toast(r.done + "개를 URL로 바꿨습니다" + (r.failed ? " · 실패 " + r.failed : "") + " — 저장해야 다른 사람에게도 반영됩니다.", r.failed ? "bad" : "ok");
 }
 
 /* ---------------- 저장소 UI ---------------- */
@@ -143,13 +162,15 @@ function openStorageModal() {
       '<button class="btn sm" data-act="export">' + ico("down", "xs") + 'JSON 내보내기</button>' +
       '<button class="btn sm" data-act="import">' + ico("up", "xs") + 'JSON 불러오기</button></div>' +
       '<p class="hint">이미지는 JSON 안에 함께 담깁니다. 파일 하나로 백업하거나 다른 사람에게 넘길 때 쓰세요.</p></div>' +
-    '<div class="frow"><span class="lbl">서버 (Supabase)</span>' +
-      '<button class="btn sm" data-act="server">' + ico("share", "xs") + (supa ? "연결됨 — " + esc(supaCfg().url.replace("https://", "")) : "구글 로그인·회원 권한 켜기") + "</button>" +
-      '<p class="hint">Supabase 프로젝트를 연결하면 구글 로그인과 서버관리자·운영자·일반회원 권한이 켜집니다. 배포한 사이트에서만 동작합니다.</p></div>' +
-    '<div class="frow"><span class="lbl">이미지 호스팅 (고급)</span><div style="display:flex; gap:6px; flex-wrap:wrap">' +
-      '<button class="btn sm" data-act="host">' + ico("up", "xs") + (hostCfg() ? "설정됨 — " + esc(hostCfg().url.slice(0, 40)) : "업로드 서버 연결") + "</button>" +
+    (myRole() === "server_admin"
+      ? '<div class="frow"><span class="lbl">서버 (Supabase)</span>' +
+        '<button class="btn sm" data-act="server">' + ico("share", "xs") + (supa ? "연결됨 — " + esc(supaCfg().url.replace("https://", "")) : "구글 로그인·회원 권한 켜기") + "</button>" +
+        '<p class="hint">Supabase 프로젝트를 연결하면 구글 로그인과 서버관리자·운영자·일반회원 권한이 켜집니다. 배포한 사이트에서만 동작합니다.</p></div>'
+      : "") +
+    '<div class="frow"><span class="lbl">이미지 호스팅 (Cloudinary)</span><div style="display:flex; gap:6px; flex-wrap:wrap">' +
+      '<button class="btn sm" data-act="host">' + ico("up", "xs") + (cloudCfg() ? "설정됨 — " + esc(cloudCfg().cloudName) : "Cloudinary 연결") + "</button>" +
       '<button class="btn sm" data-act="urlize">' + ico("loop", "xs") + "일괄 URL 변환</button></div>" +
-      '<p class="hint">화면 이미지·이미지 레이어를 외부 저장소에 올리고 JSON에는 URL만 남깁니다. 지금 URL이 아닌 이미지 <b>' + unhosted + "개</b>. Artifact 화면 안에서는 차단되며, 내려받은 파일이나 자체 호스팅에서만 동작합니다.</p></div>";
+      '<p class="hint">화면 이미지·이미지 레이어를 Cloudinary에 올리고 JSON에는 URL만 남깁니다. 연결해 두면 서버 저장 때도 자동으로 적용됩니다. 지금 URL이 아닌 이미지 <b>' + unhosted + "개</b>. Artifact 화면 안에서는 차단되며, 내려받은 파일이나 자체 호스팅에서만 동작합니다.</p></div>";
 
   const root = modalHost();
   root.innerHTML =
@@ -166,7 +187,7 @@ function openStorageModal() {
     closeModal();
     if (act === "export") exportJson();
     if (act === "import") importJson();
-    if (act === "host") openHostModal();
+    if (act === "host") openCloudModal();
     if (act === "urlize") convertAllImagesToUrl();
     if (act === "server") openServerModal();
   });
