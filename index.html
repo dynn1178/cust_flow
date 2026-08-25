@@ -1864,6 +1864,7 @@ function renderStageFoot(n, L) {
     html += '<span class="tool-sep"></span><span style="color:var(--ink-2)">선택: ' + LKIND(L) + "</span>";
     if (camp) html += '<span class="chip" style="--c:' + CHAN[camp.chan].c + '">' + ico("mega", "xs") + esc(camp.name) + "</span>";
     html += '<div class="spacer"></div>' +
+      (L.kind === "text" ? '<button class="btn sm" data-lact="edittext">' + ico("edit", "xs") + "텍스트 수정</button>" : "") +
       '<button class="btn sm" data-lact="front">앞으로</button><button class="btn sm" data-lact="back">뒤로</button>' +
       '<button class="btn sm danger" data-lact="del">' + ico("trash", "xs") + "삭제</button>";
   } else {
@@ -1872,6 +1873,22 @@ function renderStageFoot(n, L) {
   $("#stageFoot").innerHTML = html;
 }
 function LKIND(l) { return { rect: "사각형", ellipse: "원", arrow: "화살표", text: "텍스트", pen: "펜", image: "이미지" }[l.kind] || l.kind; }
+function editTextLayer(n, l) {
+  if (!canEdit()) return;
+  openForm({
+    title: "텍스트 레이어 수정", icon: "text", okText: "저장",
+    fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }],
+    values: { text: l.text || "", size: String(l.size || 18) },
+    onSave: v => {
+      l.text = v.text || "텍스트"; l.size = Number(v.size) || 18;
+      markDirty(); renderFlow(); renderStage(); renderPanels();
+    },
+    onDelete: () => confirmDel("이 텍스트 레이어를 삭제할까요?", () => {
+      n.layers = n.layers.filter(x => x.id !== l.id); sel.layer = null;
+      markDirty(); renderFlow(); renderStage(); renderPanels();
+    })
+  });
+}
 
 /* ---------------- 이미지 처리 ---------------- */
 let webpOk = null;
@@ -2028,10 +2045,17 @@ function initStage() {
     const n = curNode(), i = n.layers.findIndex(x => x.id === sel.layer);
     if (i < 0) return;
     const l = n.layers[i];
+    if (b.dataset.lact === "edittext") return editTextLayer(n, l);
     if (b.dataset.lact === "del") { n.layers.splice(i, 1); sel.layer = null; }
     if (b.dataset.lact === "front") { n.layers.splice(i, 1); n.layers.push(l); }
     if (b.dataset.lact === "back") { n.layers.splice(i, 1); n.layers.unshift(l); }
     markDirty(); renderFlow(); renderStage(); renderPanels();
+  });
+  doc.addEventListener("dblclick", e => {
+    const n = curNode(); if (!n || !canEdit()) return;
+    const lyrEl = e.target.closest("[data-layer]"); if (!lyrEl) return;
+    const l = n.layers.find(x => x.id === lyrEl.dataset.layer);
+    if (l && l.kind === "text") editTextLayer(n, l);
   });
 
   $("#layerTools").addEventListener("click", e => {
