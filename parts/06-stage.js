@@ -30,8 +30,12 @@ function layerMarkup(l, n, idx) {
     const p1 = [x2 - hl * Math.cos(a - 0.42), y2 - hl * Math.sin(a - 0.42)], p2 = [x2 - hl * Math.cos(a + 0.42), y2 - hl * Math.sin(a + 0.42)];
     s = '<line class="shape" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round"/>' +
         '<polygon points="' + x2 + "," + y2 + " " + p1.join(",") + " " + p2.join(",") + '" fill="' + c + '"/>';
-  } else if (l.kind === "text")
-    s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '" stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke">' + esc(l.text || "텍스트") + "</text>";
+  } else if (l.kind === "text") {
+    const outline = l.outline !== false;    /* 명시적으로 꺼야만 사라지는 기본 켜짐(흰 외곽선/그림자) */
+    s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '"' +
+      (outline ? ' stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke"' : "") +
+      ">" + esc(l.text || "텍스트") + "</text>";
+  }
   else if (l.kind === "pen")
     s = '<polyline class="shape" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" fill="none" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
   else if (l.kind === "image")
@@ -46,18 +50,27 @@ function layerMarkup(l, n, idx) {
   }
   return '<g class="lyr" data-layer="' + l.id + '">' + s + pin + "</g>";
 }
+/* 텍스트는 글꼴·언어에 따라 폭이 크게 달라져 추정치(bbox)가 부정확하다.
+   실제 DOM에 그려진 뒤 getBBox()로 재는 편이 항상 정확하다. */
+function measureBbox(svg, l) {
+  if (l.kind === "text") {
+    const el = svg.querySelector('[data-layer="' + l.id + '"] text');
+    if (el) { try { const r = el.getBBox(); return { x: r.x, y: r.y, w: r.width, h: r.height }; } catch (e) {} }
+  }
+  return bbox(l);
+}
 function renderLayers() {
   const n = curNode(), svg = $("#layerSvg");
   if (!n || !svg) return;
   const s = stageScale(n);
+  svg.innerHTML = (n.layers || []).map((l, i) => layerMarkup(l, n, i)).join("");
   const L = (n.layers || []).find(x => x.id === sel.layer);
-  let selUI = "";
   if (L) {
-    const b = bbox(L), hs = 6 / s;
-    selUI = '<rect class="selbox" x="' + (b.x - 3) + '" y="' + (b.y - 3) + '" width="' + (b.w + 6) + '" height="' + (b.h + 6) + '"/>' +
-      (L.kind === "pen" ? "" : '<rect class="handle" data-handle="1" x="' + (b.x + b.w - hs) + '" y="' + (b.y + b.h - hs) + '" width="' + hs * 2 + '" height="' + hs * 2 + '" rx="' + hs * 0.5 + '"/>');
+    const b = measureBbox(svg, L), hs = 6 / s;
+    svg.insertAdjacentHTML("beforeend",
+      '<rect class="selbox" x="' + (b.x - 3) + '" y="' + (b.y - 3) + '" width="' + (b.w + 6) + '" height="' + (b.h + 6) + '"/>' +
+      (L.kind === "pen" ? "" : '<rect class="handle" data-handle="1" x="' + (b.x + b.w - hs) + '" y="' + (b.y + b.h - hs) + '" width="' + hs * 2 + '" height="' + hs * 2 + '" rx="' + hs * 0.5 + '"/>'));
   }
-  svg.innerHTML = (n.layers || []).map((l, i) => layerMarkup(l, n, i)).join("") + selUI;
 }
 const paintLayers = onFrame(renderLayers);
 
@@ -110,10 +123,10 @@ function editTextLayer(n, l) {
   if (!canEdit()) return;
   openForm({
     title: "텍스트 레이어 수정", icon: "text", okText: "저장",
-    fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }],
-    values: { text: l.text || "", size: String(l.size || 18) },
+    fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }, { k: "outline", label: "그림자 효과(흰 테두리)", type: "check" }],
+    values: { text: l.text || "", size: String(l.size || 18), outline: l.outline !== false },
     onSave: v => {
-      l.text = v.text || "텍스트"; l.size = Number(v.size) || 18;
+      l.text = v.text || "텍스트"; l.size = Number(v.size) || 18; l.outline = !!v.outline;
       markDirty(); renderFlow(); renderStage(); renderPanels();
     },
     onDelete: () => confirmDel("이 텍스트 레이어를 삭제할까요?", () => {
@@ -179,10 +192,21 @@ async function addImageLayer(file) {
     markDirty(); renderFlow(); renderStage(); renderPanels();
   } catch (e) { toast("이미지를 읽지 못했습니다", "bad"); }
 }
-function removeShot() {
-  const n = curNode(); if (!n) return;
+function removeShot(node) {
+  const n = node || curNode(); if (!n) return;
   n.shotData = null; n.shot = null; n.thumb = null; n.shotW = DOC_W; n.shotH = DOC_H; n.shotDirty = false;
-  markDirty(); renderFlow(); renderStage();
+  markDirty(); renderFlow(); if (n.id === sel.node) renderStage();
+}
+/* 화면 이미지 올리기/교체/삭제 — 노드 카드의 "설정"과 스테이지 카메라 버튼이 함께 쓴다 */
+function openShotModal(n) {
+  if (n && shotSrc(n)) {
+    openForm({
+      title: "화면 이미지", icon: "image", okText: "새 이미지 올리기",
+      fields: [], note: "현재 등록된 화면을 교체하거나 삭제합니다. 레이어는 그대로 유지됩니다.",
+      values: {}, onSave: () => pickFile(f => setShot(f, n)),
+      onDelete: () => confirmDel("이 화면의 이미지를 삭제할까요?", () => removeShot(n))
+    });
+  } else pickFile(f => setShot(f, n));
 }
 function pickFile(cb) {
   const inp = $("#filePick");
@@ -210,10 +234,10 @@ function initStage() {
       if (layerTool === "text") {
         openForm({
           title: "텍스트 레이어", icon: "text",
-          fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }],
-          values: { text: "", size: "18" },
+          fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }, { k: "outline", label: "그림자 효과(흰 테두리)", type: "check" }],
+          values: { text: "", size: "18", outline: true },
           onSave: v => {
-            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, campId: null });
+            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, outline: !!v.outline, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, campId: null });
             sel.layer = n.layers[n.layers.length - 1].id;
             setTool("select"); markDirty(); renderFlow(); renderStage(); renderPanels();
           }
@@ -221,8 +245,8 @@ function initStage() {
         return;
       }
       const l = layerTool === "pen"
-        ? { id: uid("l"), kind: "pen", points: [[p.x, p.y]], color: drawColor, stroke: 4, campId: null }
-        : { id: uid("l"), kind: layerTool, x: p.x, y: p.y, w: 0, h: 0, color: drawColor, stroke: 3, fill: "none", campId: null };
+        ? { id: uid("l"), kind: "pen", points: [[p.x, p.y]], color: drawColor, stroke: drawStroke, campId: null }
+        : { id: uid("l"), kind: layerTool, x: p.x, y: p.y, w: 0, h: 0, color: drawColor, stroke: drawStroke, fill: "none", campId: null };
       n.layers.push(l); sel.layer = l.id;
       const mv = ev => {
         const q = toDoc(ev);
@@ -231,13 +255,13 @@ function initStage() {
         paintLayers();
       };
       const up = () => {
-        doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up);
+        doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up);
         if (l.kind !== "pen" && Math.abs(l.w) < 6 && Math.abs(l.h) < 6) { n.layers = n.layers.filter(x => x.id !== l.id); sel.layer = null; }
         if (l.kind === "pen" && l.points.length < 3) { n.layers = n.layers.filter(x => x.id !== l.id); sel.layer = null; }
         setTool("select"); markDirty(); renderFlow(); renderStage(); renderPanels();
       };
       doc.setPointerCapture(e.pointerId);
-      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up); doc.addEventListener("pointercancel", up);
       return;
     }
 
@@ -245,9 +269,9 @@ function initStage() {
       e.preventDefault();
       const l = n.layers.find(x => x.id === sel.layer);
       const mv = ev => { const q = toDoc(ev); l.w = q.x - l.x; l.h = q.y - l.y; paintLayers(); };
-      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); markDirty(); renderLayers(); };
+      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up); markDirty(); renderLayers(); };
       doc.setPointerCapture(e.pointerId);
-      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up); doc.addEventListener("pointercancel", up);
       return;
     }
 
@@ -265,9 +289,9 @@ function initStage() {
         else { l.x = orig.x + dx; l.y = orig.y + dy; }
         paintLayers();
       };
-      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); if (moved) { markDirty(); renderLayers(); } };
+      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up); if (moved) { markDirty(); renderLayers(); } };
       doc.setPointerCapture(e.pointerId);
-      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up); doc.addEventListener("pointercancel", up);
       return;
     }
     if (sel.layer) { sel.layer = null; renderLayers(); renderStageFoot(n, null); renderPanels(); }
@@ -303,17 +327,18 @@ function initStage() {
     if (L) { L.color = drawColor; markDirty(); renderLayers(); }
   });
 
-  $("#btnShot").addEventListener("click", () => {
-    const n = curNode();
-    if (n && shotSrc(n)) {
-      openForm({
-        title: "화면 이미지", icon: "image", okText: "새 이미지 올리기",
-        fields: [], note: "현재 등록된 화면을 교체하거나 삭제합니다. 레이어는 그대로 유지됩니다.",
-        values: {}, onSave: () => pickFile(setShot),
-        onDelete: () => confirmDel("이 화면의 이미지를 삭제할까요?", removeShot)
-      });
-    } else pickFile(setShot);
+  const STROKES = { 2: "얇게", 3: "보통", 6: "굵게" };
+  $("#strokeSeg").innerHTML = Object.entries(STROKES).map(([w, name]) =>
+    '<button class="btn sm' + (+w === drawStroke ? " on" : "") + '" data-sw="' + w + '" title="' + name + '">' + name + "</button>").join("");
+  $("#strokeSeg").addEventListener("click", e => {
+    const b = e.target.closest("[data-sw]"); if (!b) return;
+    drawStroke = +b.dataset.sw;
+    $$("#strokeSeg .btn").forEach(x => x.classList.toggle("on", x === b));
+    const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
+    if (L && "stroke" in L) { L.stroke = drawStroke; markDirty(); renderLayers(); }
   });
+
+  $("#btnShot").addEventListener("click", () => openShotModal(curNode()));
   $("#btnLayerImg").addEventListener("click", () => pickFile(addImageLayer));
   $("#sIn").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) * 1.2, .1, 4); renderStage(); });
   $("#sOut").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) / 1.2, .1, 4); renderStage(); });

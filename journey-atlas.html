@@ -152,7 +152,7 @@ select.field{cursor:pointer}
 .flow-grid{position:absolute; inset:0;
   background-image:radial-gradient(circle at 1px 1px,var(--grid) 1px,transparent 0);
   background-size:22px 22px; pointer-events:none}
-#flowSurface{position:absolute; inset:0; cursor:grab; touch-action:none}
+#flowSurface{position:absolute; inset:0; cursor:grab; touch-action:none; user-select:none}
 #flowSurface.panning{cursor:grabbing}
 #flowSurface.linking{cursor:crosshair}
 #flowWorld{position:absolute; top:0; left:0; transform-origin:0 0; width:0; height:0}
@@ -171,7 +171,7 @@ select.field{cursor:pointer}
 .node{
   position:absolute; width:190px; border-radius:var(--r-md); overflow:hidden; cursor:grab;
   background:var(--glass-3); border:1px solid var(--stroke); box-shadow:var(--shadow-sm);
-  contain:layout style; transition:box-shadow .15s,border-color .15s;
+  contain:layout style; transition:box-shadow .15s,border-color .15s; user-select:none;
 }
 .node.size-s{width:150px} .node.size-m{width:190px} .node.size-l{width:240px}
 .node.sharp{border-radius:5px}
@@ -188,27 +188,27 @@ select.field{cursor:pointer}
 .node-thumb img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block}
 .node-thumb .ph{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--ink-3); font-size:10.5px}
 .node-thumb .ph .ico{width:18px;height:18px;opacity:.5}
-.node-kind{position:absolute; top:6px; left:6px; height:18px; padding:0 7px; border-radius:99px; font-size:10px;
+.node-kind{position:absolute; top:6px; left:6px; height:18px; padding:0 7px; border-radius:99px; font-size:max(10px,calc(10px / var(--zoom,1)));
   font-weight:600; display:flex; align-items:center; background:var(--glass-3); border:1px solid var(--stroke);
   color:var(--ink-2)}
 .node.hued .node-kind{color:color-mix(in srgb,var(--nc) 70%,var(--ink)); border-color:color-mix(in srgb,var(--nc) 40%,transparent)}
 .node-main{padding:9px 10px 10px; display:flex; flex-direction:column; gap:6px}
-.node-name{font-size:14.5px; font-weight:700; letter-spacing:-.022em; line-height:1.24; word-break:keep-all; color:var(--ink)}
-.node.size-s .node-name{font-size:13px}
-.node.size-l .node-name{font-size:16.5px}
+.node-name{font-size:max(14.5px,calc(14.5px / var(--zoom,1))); font-weight:700; letter-spacing:-.022em; line-height:1.24; word-break:keep-all; color:var(--ink)}
+.node.size-s .node-name{font-size:max(13px,calc(13px / var(--zoom,1)))}
+.node.size-l .node-name{font-size:max(16.5px,calc(16.5px / var(--zoom,1)))}
 .node-path{font-family:var(--f-mono); font-size:10px; color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:-4px}
 .node-badges{display:flex; flex-wrap:wrap; gap:4px}
 .bdg{display:inline-flex; align-items:center; gap:4px; height:23px; padding:0 7px; border-radius:7px;
   font-size:11px; font-weight:600; font-family:var(--f-mono);
   background:color-mix(in srgb,var(--c) 15%,transparent); color:color-mix(in srgb,var(--c) 78%,var(--ink));
   border:1px solid color-mix(in srgb,var(--c) 28%,transparent)}
-.bdg b{font-size:14px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums}
+.bdg b{font-size:max(14px,calc(14px / var(--zoom,1))); font-weight:700; line-height:1; font-variant-numeric:tabular-nums}
 .bdg .ico{width:12px;height:12px;stroke-width:2.1}
 .bdg.big{height:27px; padding:0 10px; border-radius:8px}
-.bdg.big b{font-size:17px}
+.bdg.big b{font-size:max(17px,calc(17px / var(--zoom,1)))}
 .bdg.big .ico{width:14px;height:14px}
-.node.size-s .bdg{height:21px} .node.size-s .bdg b{font-size:12.5px}
-.node.size-l .bdg b{font-size:15.5px}
+.node.size-s .bdg{height:21px} .node.size-s .bdg b{font-size:max(12.5px,calc(12.5px / var(--zoom,1)))}
+.node.size-l .bdg b{font-size:max(15.5px,calc(15.5px / var(--zoom,1)))}
 
 /* 보기 모드 — 페이지 이름 아래에 해당 항목만 크게 */
 .node-focus{display:flex; flex-direction:column; gap:4px; padding-top:7px; border-top:1px dashed var(--stroke-2)}
@@ -537,6 +537,7 @@ tr:hover .rowacts{opacity:1}
               <button class="btn sm" data-tool="pen" title="펜"><svg class="ico xs"><use href="#i-pen"/></svg></button>
             </div>
             <div class="swatches edit-only" id="swatches"></div>
+            <div class="seg edit-only" id="strokeSeg"></div>
             <div class="tool-sep edit-only"></div>
             <button class="btn icon sm edit-only" id="btnShot" title="스크린샷 올리기"><svg class="ico xs"><use href="#i-camera"/></svg></button>
             <button class="btn icon sm edit-only" id="btnLayerImg" title="이미지 레이어 추가"><svg class="ico xs"><use href="#i-copy"/></svg></button>
@@ -787,6 +788,7 @@ let sel = { node: "n2", edge: null, layer: null };
 let stageZoom = null;            // null = 영역 맞춤
 let layerTool = "select";
 let drawColor = SWATCH[0];
+let drawStroke = 3;
 let dirty = false, saveAvail = false;
 let savedRefs = [];              // 마지막 저장 시점에 쓰이던 이미지 파일 목록
 const DRAFT_KEY = "draft:" + location.pathname;
@@ -1003,6 +1005,9 @@ function openForm(opt) {
     }
     if (f.type === "check")
       return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
+    if (f.type === "action")
+      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><button type="button" class="btn sm" data-action="' + f.k + '">' +
+        (f.icon ? ico(f.icon, "xs") : "") + esc(f.actionLabel || f.label) + "</button></div>";
     return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><input class="field' + (f.mono ? " mono" : "") + '" data-k="' + f.k + '" value="' + esc(v || "") + '" placeholder="' + esc(f.ph || "") + '"></div>';
   }).join("");
 
@@ -1028,6 +1033,8 @@ function openForm(opt) {
   root.addEventListener("click", e => {
     const t = e.target;
     if (t.closest("[data-x]") || t.classList.contains("scrim")) return closeModal();
+    const act = t.closest("[data-action]");
+    if (act && opt.onAction) { opt.onAction(act.dataset.action); return; }
     const hue = t.closest(".hue");
     if (hue) { $$(".hue", hue.parentNode).forEach(h => h.classList.toggle("on", h === hue)); return; }
     if (t.closest("[data-addkv]")) {
@@ -1302,10 +1309,8 @@ function nodeHtml(n) {
   const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async" draggable="false">'
                     : '<div class="ph">' + ico("image") + "<span>화면 미등록</span></div>") +
     '<div class="thumb-acts edit-only">' +
-      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양 바꾸기" tabindex="-1"><span>' +
+      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양·화면 바꾸기" tabindex="-1"><span>' +
       ico("edit", "xs") + "설정</span></button>" +
-      '<button class="pick" data-pick="' + n.id + '" title="이 페이지의 화면 올리기" tabindex="-1"><span>' +
-      ico("camera", "xs") + (th ? "교체" : "화면") + "</span></button>" +
     "</div>";
 
   let body = "";
@@ -1366,6 +1371,7 @@ function settleTransform() {
 function applyTransform(live) {
   const v = B().view, w = $("#flowWorld");
   clearTimeout(settleTimer);
+  w.style.setProperty("--zoom", v.zoom);   /* 카드 글씨가 축소 배율만큼 작아지지 않도록 CSS에서 보정 */
   if (live) {
     w.style.willChange = "transform";
     w.style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
@@ -1444,6 +1450,7 @@ function initFlow() {
   }, { passive: false });
 
   surf.addEventListener("pointerdown", e => {
+    if (e.target.closest("[data-nedit]")) return;   /* 카드 안 버튼 위에서는 드래그를 준비하지 않는다 */
     const r = surf.getBoundingClientRect();
     const wp = e.target.closest("[data-wp]"), add = e.target.closest("[data-add]");
     const port = e.target.closest("[data-port]");
@@ -1463,11 +1470,11 @@ function initFlow() {
       });
       const mv = ev => paint(toWorld(ev, r));
       const up = () => {
-        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
         markDirty(); geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
       };
       surf.setPointerCapture(e.pointerId);
-      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
       return;
     }
 
@@ -1480,14 +1487,15 @@ function initFlow() {
       const paint = onFrame(p => ghost.setAttribute("d", "M " + c0.x + " " + c0.y + " L " + p.x + " " + p.y));
       const mv = ev => paint(toWorld(ev, r));
       const up = ev => {
-        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
         ghost.style.display = "none";
+        if (ev.type !== "pointerup") return;              /* 취소된 경우 연결을 만들지 않는다 */
         const tgt = document.elementFromPoint(ev.clientX, ev.clientY);
         const tn = tgt && tgt.closest("[data-node]");
         if (tn) addEdge(from, tn.dataset.node);
       };
       surf.setPointerCapture(e.pointerId);
-      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
       return;
     }
 
@@ -1516,12 +1524,12 @@ function initFlow() {
         paint();
       };
       const up = () => {
-        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
         nodeEl.classList.remove("dragging"); busy(false); drawGuides([]);
         if (moved) { nodeEl.style.left = n.x + "px"; nodeEl.style.top = n.y + "px"; moveEdgesOf(id); markDirty(); }
       };
       surf.setPointerCapture(e.pointerId);
-      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
       return;
     }
 
@@ -1532,11 +1540,11 @@ function initFlow() {
     surf.classList.add("panning"); busy(true);
     const mv = ev => { v.panX = px + (ev.clientX - sx); v.panY = py + (ev.clientY - sy); applyTransformSoon(); };
     const up = () => {
-      surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+      surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
       surf.classList.remove("panning"); busy(false); markDirty();
     };
     surf.setPointerCapture(e.pointerId);
-    surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+    surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
   });
 
   surf.addEventListener("dblclick", e => {
@@ -1567,7 +1575,7 @@ function initFlow() {
   });
   $("#nodeLayer").addEventListener("click", e => {
     const b = e.target.closest("[data-nedit]");
-    if (b && canEdit()) { e.stopPropagation(); editNode(b.dataset.nedit); }
+    if (b && canEdit()) { e.stopPropagation(); if (sel.node !== b.dataset.nedit) selectNode(b.dataset.nedit); editNode(b.dataset.nedit); }
   });
   $("#btnSnap").addEventListener("click", () => {
     state.ui.snap = !state.ui.snap;
@@ -1675,6 +1683,7 @@ function editNode(id) {
       { k: "hue", label: "색", type: "swatch" },
       { k: "size", label: "카드 크기", type: "select", opts: NSIZE },
       { k: "sharp", label: "각진 모서리로", type: "check" },
+      { k: "shot", label: "화면 이미지", type: "action", icon: "camera", actionLabel: shotSrc(n) ? "화면 교체·삭제" : "화면 올리기" },
       { k: "note", label: "메모", type: "textarea", ph: "이 화면에서 확인해야 할 것" }
     ],
     values: n,
@@ -1682,6 +1691,7 @@ function editNode(id) {
       Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
       markDirty(); renderFlow(); renderPanels();
     },
+    onAction: k => { if (k === "shot") { closeModal(); openShotModal(n); } },
     onDelete: () => confirmDel('"' + n.name + '" 페이지를 삭제할까요?', () => {
       B().nodes = B().nodes.filter(x => x.id !== id);
       B().edges = B().edges.filter(e => e.from !== id && e.to !== id);
@@ -1787,8 +1797,12 @@ function layerMarkup(l, n, idx) {
     const p1 = [x2 - hl * Math.cos(a - 0.42), y2 - hl * Math.sin(a - 0.42)], p2 = [x2 - hl * Math.cos(a + 0.42), y2 - hl * Math.sin(a + 0.42)];
     s = '<line class="shape" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round"/>' +
         '<polygon points="' + x2 + "," + y2 + " " + p1.join(",") + " " + p2.join(",") + '" fill="' + c + '"/>';
-  } else if (l.kind === "text")
-    s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '" stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke">' + esc(l.text || "텍스트") + "</text>";
+  } else if (l.kind === "text") {
+    const outline = l.outline !== false;    /* 명시적으로 꺼야만 사라지는 기본 켜짐(흰 외곽선/그림자) */
+    s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '"' +
+      (outline ? ' stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke"' : "") +
+      ">" + esc(l.text || "텍스트") + "</text>";
+  }
   else if (l.kind === "pen")
     s = '<polyline class="shape" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" fill="none" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
   else if (l.kind === "image")
@@ -1803,18 +1817,27 @@ function layerMarkup(l, n, idx) {
   }
   return '<g class="lyr" data-layer="' + l.id + '">' + s + pin + "</g>";
 }
+/* 텍스트는 글꼴·언어에 따라 폭이 크게 달라져 추정치(bbox)가 부정확하다.
+   실제 DOM에 그려진 뒤 getBBox()로 재는 편이 항상 정확하다. */
+function measureBbox(svg, l) {
+  if (l.kind === "text") {
+    const el = svg.querySelector('[data-layer="' + l.id + '"] text');
+    if (el) { try { const r = el.getBBox(); return { x: r.x, y: r.y, w: r.width, h: r.height }; } catch (e) {} }
+  }
+  return bbox(l);
+}
 function renderLayers() {
   const n = curNode(), svg = $("#layerSvg");
   if (!n || !svg) return;
   const s = stageScale(n);
+  svg.innerHTML = (n.layers || []).map((l, i) => layerMarkup(l, n, i)).join("");
   const L = (n.layers || []).find(x => x.id === sel.layer);
-  let selUI = "";
   if (L) {
-    const b = bbox(L), hs = 6 / s;
-    selUI = '<rect class="selbox" x="' + (b.x - 3) + '" y="' + (b.y - 3) + '" width="' + (b.w + 6) + '" height="' + (b.h + 6) + '"/>' +
-      (L.kind === "pen" ? "" : '<rect class="handle" data-handle="1" x="' + (b.x + b.w - hs) + '" y="' + (b.y + b.h - hs) + '" width="' + hs * 2 + '" height="' + hs * 2 + '" rx="' + hs * 0.5 + '"/>');
+    const b = measureBbox(svg, L), hs = 6 / s;
+    svg.insertAdjacentHTML("beforeend",
+      '<rect class="selbox" x="' + (b.x - 3) + '" y="' + (b.y - 3) + '" width="' + (b.w + 6) + '" height="' + (b.h + 6) + '"/>' +
+      (L.kind === "pen" ? "" : '<rect class="handle" data-handle="1" x="' + (b.x + b.w - hs) + '" y="' + (b.y + b.h - hs) + '" width="' + hs * 2 + '" height="' + hs * 2 + '" rx="' + hs * 0.5 + '"/>'));
   }
-  svg.innerHTML = (n.layers || []).map((l, i) => layerMarkup(l, n, i)).join("") + selUI;
 }
 const paintLayers = onFrame(renderLayers);
 
@@ -1867,10 +1890,10 @@ function editTextLayer(n, l) {
   if (!canEdit()) return;
   openForm({
     title: "텍스트 레이어 수정", icon: "text", okText: "저장",
-    fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }],
-    values: { text: l.text || "", size: String(l.size || 18) },
+    fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }, { k: "outline", label: "그림자 효과(흰 테두리)", type: "check" }],
+    values: { text: l.text || "", size: String(l.size || 18), outline: l.outline !== false },
     onSave: v => {
-      l.text = v.text || "텍스트"; l.size = Number(v.size) || 18;
+      l.text = v.text || "텍스트"; l.size = Number(v.size) || 18; l.outline = !!v.outline;
       markDirty(); renderFlow(); renderStage(); renderPanels();
     },
     onDelete: () => confirmDel("이 텍스트 레이어를 삭제할까요?", () => {
@@ -1936,10 +1959,21 @@ async function addImageLayer(file) {
     markDirty(); renderFlow(); renderStage(); renderPanels();
   } catch (e) { toast("이미지를 읽지 못했습니다", "bad"); }
 }
-function removeShot() {
-  const n = curNode(); if (!n) return;
+function removeShot(node) {
+  const n = node || curNode(); if (!n) return;
   n.shotData = null; n.shot = null; n.thumb = null; n.shotW = DOC_W; n.shotH = DOC_H; n.shotDirty = false;
-  markDirty(); renderFlow(); renderStage();
+  markDirty(); renderFlow(); if (n.id === sel.node) renderStage();
+}
+/* 화면 이미지 올리기/교체/삭제 — 노드 카드의 "설정"과 스테이지 카메라 버튼이 함께 쓴다 */
+function openShotModal(n) {
+  if (n && shotSrc(n)) {
+    openForm({
+      title: "화면 이미지", icon: "image", okText: "새 이미지 올리기",
+      fields: [], note: "현재 등록된 화면을 교체하거나 삭제합니다. 레이어는 그대로 유지됩니다.",
+      values: {}, onSave: () => pickFile(f => setShot(f, n)),
+      onDelete: () => confirmDel("이 화면의 이미지를 삭제할까요?", () => removeShot(n))
+    });
+  } else pickFile(f => setShot(f, n));
 }
 function pickFile(cb) {
   const inp = $("#filePick");
@@ -1967,10 +2001,10 @@ function initStage() {
       if (layerTool === "text") {
         openForm({
           title: "텍스트 레이어", icon: "text",
-          fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }],
-          values: { text: "", size: "18" },
+          fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }, { k: "outline", label: "그림자 효과(흰 테두리)", type: "check" }],
+          values: { text: "", size: "18", outline: true },
           onSave: v => {
-            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, campId: null });
+            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, outline: !!v.outline, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, campId: null });
             sel.layer = n.layers[n.layers.length - 1].id;
             setTool("select"); markDirty(); renderFlow(); renderStage(); renderPanels();
           }
@@ -1978,8 +2012,8 @@ function initStage() {
         return;
       }
       const l = layerTool === "pen"
-        ? { id: uid("l"), kind: "pen", points: [[p.x, p.y]], color: drawColor, stroke: 4, campId: null }
-        : { id: uid("l"), kind: layerTool, x: p.x, y: p.y, w: 0, h: 0, color: drawColor, stroke: 3, fill: "none", campId: null };
+        ? { id: uid("l"), kind: "pen", points: [[p.x, p.y]], color: drawColor, stroke: drawStroke, campId: null }
+        : { id: uid("l"), kind: layerTool, x: p.x, y: p.y, w: 0, h: 0, color: drawColor, stroke: drawStroke, fill: "none", campId: null };
       n.layers.push(l); sel.layer = l.id;
       const mv = ev => {
         const q = toDoc(ev);
@@ -1988,13 +2022,13 @@ function initStage() {
         paintLayers();
       };
       const up = () => {
-        doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up);
+        doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up);
         if (l.kind !== "pen" && Math.abs(l.w) < 6 && Math.abs(l.h) < 6) { n.layers = n.layers.filter(x => x.id !== l.id); sel.layer = null; }
         if (l.kind === "pen" && l.points.length < 3) { n.layers = n.layers.filter(x => x.id !== l.id); sel.layer = null; }
         setTool("select"); markDirty(); renderFlow(); renderStage(); renderPanels();
       };
       doc.setPointerCapture(e.pointerId);
-      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up); doc.addEventListener("pointercancel", up);
       return;
     }
 
@@ -2002,9 +2036,9 @@ function initStage() {
       e.preventDefault();
       const l = n.layers.find(x => x.id === sel.layer);
       const mv = ev => { const q = toDoc(ev); l.w = q.x - l.x; l.h = q.y - l.y; paintLayers(); };
-      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); markDirty(); renderLayers(); };
+      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up); markDirty(); renderLayers(); };
       doc.setPointerCapture(e.pointerId);
-      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up); doc.addEventListener("pointercancel", up);
       return;
     }
 
@@ -2022,9 +2056,9 @@ function initStage() {
         else { l.x = orig.x + dx; l.y = orig.y + dy; }
         paintLayers();
       };
-      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); if (moved) { markDirty(); renderLayers(); } };
+      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up); if (moved) { markDirty(); renderLayers(); } };
       doc.setPointerCapture(e.pointerId);
-      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up);
+      doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up); doc.addEventListener("pointercancel", up);
       return;
     }
     if (sel.layer) { sel.layer = null; renderLayers(); renderStageFoot(n, null); renderPanels(); }
@@ -2060,17 +2094,18 @@ function initStage() {
     if (L) { L.color = drawColor; markDirty(); renderLayers(); }
   });
 
-  $("#btnShot").addEventListener("click", () => {
-    const n = curNode();
-    if (n && shotSrc(n)) {
-      openForm({
-        title: "화면 이미지", icon: "image", okText: "새 이미지 올리기",
-        fields: [], note: "현재 등록된 화면을 교체하거나 삭제합니다. 레이어는 그대로 유지됩니다.",
-        values: {}, onSave: () => pickFile(setShot),
-        onDelete: () => confirmDel("이 화면의 이미지를 삭제할까요?", removeShot)
-      });
-    } else pickFile(setShot);
+  const STROKES = { 2: "얇게", 3: "보통", 6: "굵게" };
+  $("#strokeSeg").innerHTML = Object.entries(STROKES).map(([w, name]) =>
+    '<button class="btn sm' + (+w === drawStroke ? " on" : "") + '" data-sw="' + w + '" title="' + name + '">' + name + "</button>").join("");
+  $("#strokeSeg").addEventListener("click", e => {
+    const b = e.target.closest("[data-sw]"); if (!b) return;
+    drawStroke = +b.dataset.sw;
+    $$("#strokeSeg .btn").forEach(x => x.classList.toggle("on", x === b));
+    const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
+    if (L && "stroke" in L) { L.stroke = drawStroke; markDirty(); renderLayers(); }
   });
+
+  $("#btnShot").addEventListener("click", () => openShotModal(curNode()));
   $("#btnLayerImg").addEventListener("click", () => pickFile(addImageLayer));
   $("#sIn").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) * 1.2, .1, 4); renderStage(); });
   $("#sOut").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) / 1.2, .1, 4); renderStage(); });
@@ -2918,18 +2953,10 @@ function openBulkModal(files) {
 
 /* ---------------- 노드 버튼 ----------------
    캔버스에 파일을 끌어다 놓는 등록은 없앴다 — 노드 이동(포인터 드래그)과
-   브라우저 네이티브 파일 드래그가 겹쳐 충돌했기 때문. 카메라 버튼·화면 일괄
-   등록·Ctrl+V·스테이지 드롭으로도 등록 경로가 충분하다. */
+   브라우저 네이티브 파일 드래그가 겹쳐 충돌했기 때문. 화면 등록은 노드의
+   "설정" 버튼(화면 이미지) · 화면 일괄 등록 · Ctrl+V · 스테이지 드롭으로 한다. */
 function initImport() {
   $("#btnBulk").addEventListener("click", () => openBulkModal([]));
-
-  $("#nodeLayer").addEventListener("click", e => {
-    const b = e.target.closest("[data-pick]");
-    if (!b) return;
-    e.stopPropagation();
-    const id = b.dataset.pick;
-    pickFile(f => setShot(f, nodeById(id)));
-  });
 }
 
 /* ========================================================================

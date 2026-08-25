@@ -153,6 +153,7 @@ let sel = { node: "n2", edge: null, layer: null };
 let stageZoom = null;            // null = 영역 맞춤
 let layerTool = "select";
 let drawColor = SWATCH[0];
+let drawStroke = 3;
 let dirty = false, saveAvail = false;
 let savedRefs = [];              // 마지막 저장 시점에 쓰이던 이미지 파일 목록
 const DRAFT_KEY = "draft:" + location.pathname;
@@ -369,6 +370,9 @@ function openForm(opt) {
     }
     if (f.type === "check")
       return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
+    if (f.type === "action")
+      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><button type="button" class="btn sm" data-action="' + f.k + '">' +
+        (f.icon ? ico(f.icon, "xs") : "") + esc(f.actionLabel || f.label) + "</button></div>";
     return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><input class="field' + (f.mono ? " mono" : "") + '" data-k="' + f.k + '" value="' + esc(v || "") + '" placeholder="' + esc(f.ph || "") + '"></div>';
   }).join("");
 
@@ -394,6 +398,8 @@ function openForm(opt) {
   root.addEventListener("click", e => {
     const t = e.target;
     if (t.closest("[data-x]") || t.classList.contains("scrim")) return closeModal();
+    const act = t.closest("[data-action]");
+    if (act && opt.onAction) { opt.onAction(act.dataset.action); return; }
     const hue = t.closest(".hue");
     if (hue) { $$(".hue", hue.parentNode).forEach(h => h.classList.toggle("on", h === hue)); return; }
     if (t.closest("[data-addkv]")) {

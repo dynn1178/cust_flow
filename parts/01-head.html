@@ -152,7 +152,7 @@ select.field{cursor:pointer}
 .flow-grid{position:absolute; inset:0;
   background-image:radial-gradient(circle at 1px 1px,var(--grid) 1px,transparent 0);
   background-size:22px 22px; pointer-events:none}
-#flowSurface{position:absolute; inset:0; cursor:grab; touch-action:none}
+#flowSurface{position:absolute; inset:0; cursor:grab; touch-action:none; user-select:none}
 #flowSurface.panning{cursor:grabbing}
 #flowSurface.linking{cursor:crosshair}
 #flowWorld{position:absolute; top:0; left:0; transform-origin:0 0; width:0; height:0}
@@ -171,7 +171,7 @@ select.field{cursor:pointer}
 .node{
   position:absolute; width:190px; border-radius:var(--r-md); overflow:hidden; cursor:grab;
   background:var(--glass-3); border:1px solid var(--stroke); box-shadow:var(--shadow-sm);
-  contain:layout style; transition:box-shadow .15s,border-color .15s;
+  contain:layout style; transition:box-shadow .15s,border-color .15s; user-select:none;
 }
 .node.size-s{width:150px} .node.size-m{width:190px} .node.size-l{width:240px}
 .node.sharp{border-radius:5px}
@@ -188,27 +188,27 @@ select.field{cursor:pointer}
 .node-thumb img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block}
 .node-thumb .ph{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--ink-3); font-size:10.5px}
 .node-thumb .ph .ico{width:18px;height:18px;opacity:.5}
-.node-kind{position:absolute; top:6px; left:6px; height:18px; padding:0 7px; border-radius:99px; font-size:10px;
+.node-kind{position:absolute; top:6px; left:6px; height:18px; padding:0 7px; border-radius:99px; font-size:max(10px,calc(10px / var(--zoom,1)));
   font-weight:600; display:flex; align-items:center; background:var(--glass-3); border:1px solid var(--stroke);
   color:var(--ink-2)}
 .node.hued .node-kind{color:color-mix(in srgb,var(--nc) 70%,var(--ink)); border-color:color-mix(in srgb,var(--nc) 40%,transparent)}
 .node-main{padding:9px 10px 10px; display:flex; flex-direction:column; gap:6px}
-.node-name{font-size:14.5px; font-weight:700; letter-spacing:-.022em; line-height:1.24; word-break:keep-all; color:var(--ink)}
-.node.size-s .node-name{font-size:13px}
-.node.size-l .node-name{font-size:16.5px}
+.node-name{font-size:max(14.5px,calc(14.5px / var(--zoom,1))); font-weight:700; letter-spacing:-.022em; line-height:1.24; word-break:keep-all; color:var(--ink)}
+.node.size-s .node-name{font-size:max(13px,calc(13px / var(--zoom,1)))}
+.node.size-l .node-name{font-size:max(16.5px,calc(16.5px / var(--zoom,1)))}
 .node-path{font-family:var(--f-mono); font-size:10px; color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:-4px}
 .node-badges{display:flex; flex-wrap:wrap; gap:4px}
 .bdg{display:inline-flex; align-items:center; gap:4px; height:23px; padding:0 7px; border-radius:7px;
   font-size:11px; font-weight:600; font-family:var(--f-mono);
   background:color-mix(in srgb,var(--c) 15%,transparent); color:color-mix(in srgb,var(--c) 78%,var(--ink));
   border:1px solid color-mix(in srgb,var(--c) 28%,transparent)}
-.bdg b{font-size:14px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums}
+.bdg b{font-size:max(14px,calc(14px / var(--zoom,1))); font-weight:700; line-height:1; font-variant-numeric:tabular-nums}
 .bdg .ico{width:12px;height:12px;stroke-width:2.1}
 .bdg.big{height:27px; padding:0 10px; border-radius:8px}
-.bdg.big b{font-size:17px}
+.bdg.big b{font-size:max(17px,calc(17px / var(--zoom,1)))}
 .bdg.big .ico{width:14px;height:14px}
-.node.size-s .bdg{height:21px} .node.size-s .bdg b{font-size:12.5px}
-.node.size-l .bdg b{font-size:15.5px}
+.node.size-s .bdg{height:21px} .node.size-s .bdg b{font-size:max(12.5px,calc(12.5px / var(--zoom,1)))}
+.node.size-l .bdg b{font-size:max(15.5px,calc(15.5px / var(--zoom,1)))}
 
 /* 보기 모드 — 페이지 이름 아래에 해당 항목만 크게 */
 .node-focus{display:flex; flex-direction:column; gap:4px; padding-top:7px; border-top:1px dashed var(--stroke-2)}

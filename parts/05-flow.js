@@ -245,10 +245,8 @@ function nodeHtml(n) {
   const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async" draggable="false">'
                     : '<div class="ph">' + ico("image") + "<span>화면 미등록</span></div>") +
     '<div class="thumb-acts edit-only">' +
-      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양 바꾸기" tabindex="-1"><span>' +
+      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양·화면 바꾸기" tabindex="-1"><span>' +
       ico("edit", "xs") + "설정</span></button>" +
-      '<button class="pick" data-pick="' + n.id + '" title="이 페이지의 화면 올리기" tabindex="-1"><span>' +
-      ico("camera", "xs") + (th ? "교체" : "화면") + "</span></button>" +
     "</div>";
 
   let body = "";
@@ -309,6 +307,7 @@ function settleTransform() {
 function applyTransform(live) {
   const v = B().view, w = $("#flowWorld");
   clearTimeout(settleTimer);
+  w.style.setProperty("--zoom", v.zoom);   /* 카드 글씨가 축소 배율만큼 작아지지 않도록 CSS에서 보정 */
   if (live) {
     w.style.willChange = "transform";
     w.style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
@@ -387,6 +386,7 @@ function initFlow() {
   }, { passive: false });
 
   surf.addEventListener("pointerdown", e => {
+    if (e.target.closest("[data-nedit]")) return;   /* 카드 안 버튼 위에서는 드래그를 준비하지 않는다 */
     const r = surf.getBoundingClientRect();
     const wp = e.target.closest("[data-wp]"), add = e.target.closest("[data-add]");
     const port = e.target.closest("[data-port]");
@@ -406,11 +406,11 @@ function initFlow() {
       });
       const mv = ev => paint(toWorld(ev, r));
       const up = () => {
-        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
         markDirty(); geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
       };
       surf.setPointerCapture(e.pointerId);
-      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
       return;
     }
 
@@ -423,14 +423,15 @@ function initFlow() {
       const paint = onFrame(p => ghost.setAttribute("d", "M " + c0.x + " " + c0.y + " L " + p.x + " " + p.y));
       const mv = ev => paint(toWorld(ev, r));
       const up = ev => {
-        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
         ghost.style.display = "none";
+        if (ev.type !== "pointerup") return;              /* 취소된 경우 연결을 만들지 않는다 */
         const tgt = document.elementFromPoint(ev.clientX, ev.clientY);
         const tn = tgt && tgt.closest("[data-node]");
         if (tn) addEdge(from, tn.dataset.node);
       };
       surf.setPointerCapture(e.pointerId);
-      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
       return;
     }
 
@@ -459,12 +460,12 @@ function initFlow() {
         paint();
       };
       const up = () => {
-        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
         nodeEl.classList.remove("dragging"); busy(false); drawGuides([]);
         if (moved) { nodeEl.style.left = n.x + "px"; nodeEl.style.top = n.y + "px"; moveEdgesOf(id); markDirty(); }
       };
       surf.setPointerCapture(e.pointerId);
-      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
       return;
     }
 
@@ -475,11 +476,11 @@ function initFlow() {
     surf.classList.add("panning"); busy(true);
     const mv = ev => { v.panX = px + (ev.clientX - sx); v.panY = py + (ev.clientY - sy); applyTransformSoon(); };
     const up = () => {
-      surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up);
+      surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
       surf.classList.remove("panning"); busy(false); markDirty();
     };
     surf.setPointerCapture(e.pointerId);
-    surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up);
+    surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
   });
 
   surf.addEventListener("dblclick", e => {
@@ -510,7 +511,7 @@ function initFlow() {
   });
   $("#nodeLayer").addEventListener("click", e => {
     const b = e.target.closest("[data-nedit]");
-    if (b && canEdit()) { e.stopPropagation(); editNode(b.dataset.nedit); }
+    if (b && canEdit()) { e.stopPropagation(); if (sel.node !== b.dataset.nedit) selectNode(b.dataset.nedit); editNode(b.dataset.nedit); }
   });
   $("#btnSnap").addEventListener("click", () => {
     state.ui.snap = !state.ui.snap;
@@ -618,6 +619,7 @@ function editNode(id) {
       { k: "hue", label: "색", type: "swatch" },
       { k: "size", label: "카드 크기", type: "select", opts: NSIZE },
       { k: "sharp", label: "각진 모서리로", type: "check" },
+      { k: "shot", label: "화면 이미지", type: "action", icon: "camera", actionLabel: shotSrc(n) ? "화면 교체·삭제" : "화면 올리기" },
       { k: "note", label: "메모", type: "textarea", ph: "이 화면에서 확인해야 할 것" }
     ],
     values: n,
@@ -625,6 +627,7 @@ function editNode(id) {
       Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
       markDirty(); renderFlow(); renderPanels();
     },
+    onAction: k => { if (k === "shot") { closeModal(); openShotModal(n); } },
     onDelete: () => confirmDel('"' + n.name + '" 페이지를 삭제할까요?', () => {
       B().nodes = B().nodes.filter(x => x.id !== id);
       B().edges = B().edges.filter(e => e.from !== id && e.to !== id);

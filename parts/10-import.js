@@ -157,16 +157,8 @@ function openBulkModal(files) {
 
 /* ---------------- 노드 버튼 ----------------
    캔버스에 파일을 끌어다 놓는 등록은 없앴다 — 노드 이동(포인터 드래그)과
-   브라우저 네이티브 파일 드래그가 겹쳐 충돌했기 때문. 카메라 버튼·화면 일괄
-   등록·Ctrl+V·스테이지 드롭으로도 등록 경로가 충분하다. */
+   브라우저 네이티브 파일 드래그가 겹쳐 충돌했기 때문. 화면 등록은 노드의
+   "설정" 버튼(화면 이미지) · 화면 일괄 등록 · Ctrl+V · 스테이지 드롭으로 한다. */
 function initImport() {
   $("#btnBulk").addEventListener("click", () => openBulkModal([]));
-
-  $("#nodeLayer").addEventListener("click", e => {
-    const b = e.target.closest("[data-pick]");
-    if (!b) return;
-    e.stopPropagation();
-    const id = b.dataset.pick;
-    pickFile(f => setShot(f, nodeById(id)));
-  });
 }
