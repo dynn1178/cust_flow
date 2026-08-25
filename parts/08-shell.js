@@ -53,7 +53,6 @@ function switchView(v) {
 
 function initShell() {
   $("#viewTabs").addEventListener("click", e => { const b = e.target.closest("[data-view]"); if (b) switchView(b.dataset.view); });
-  $("#docTitle").addEventListener("input", e => { state.title = e.target.value; markDirty(); });
   $("#btnShare").addEventListener("click", () => (supaOn() ? serverSave() : shareSave()));
   $("#btnTheme").addEventListener("click", () => {
     const cur = document.documentElement.getAttribute("data-theme") || "light";
@@ -166,7 +165,6 @@ function normalize(s) {
   return s;
 }
 function renderAll() {
-  $("#docTitle").value = state.title;
   syncBoardName(); syncFocusBtn();
   applySizes(); applyTransform(); renderFlow();
   if (!B().nodes.some(n => n.id === sel.node)) sel.node = (B().nodes[0] || {}).id || null;
@@ -194,17 +192,14 @@ async function boot() {
   const api = await claudeApi();
   saveAvail = !!api;
 
-  const restored = await restoreFolder();             // 1) 폴더 연결이 있으면 폴더가 원본
-  if (restored === true) { updateStorageUI(); initLock(); return; }
-
-  let remote = null;                                  // 2) Artifact 공유본
+  let remote = null;                                  // 1) Artifact 공유본
   if (location.protocol !== "file:" && window.claude) {   // 자체 호스팅에서는 없는 파일이라 요청하지 않는다
     try {
       const r = await fetch("data/journey.json", { cache: "no-store" });
       if (r.ok) remote = normalize(await r.json());
     } catch (e) { /* 아직 저장 전 */ }
   }
-  let draft = null;                                   // 3) 저장 안 된 로컬 초안
+  let draft = null;                                   // 2) 저장 안 된 로컬 초안
   try { draft = await idbGet(DRAFT_KEY); } catch (e) {}
 
   if (remote) {

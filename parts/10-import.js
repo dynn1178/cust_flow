@@ -63,7 +63,7 @@ function openBulkModal(files) {
   const opt = (v, label, on) => '<option value="' + v + '"' + (on ? " selected" : "") + ">" + esc(label) + "</option>";
   const rowHtml = r =>
     '<div class="brow" data-row="' + r.i + '">' +
-      '<img src="' + (r.thumb || "") + '" alt="">' +
+      '<img src="' + (r.thumb || "") + '" alt="" draggable="false">' +
       '<div class="fn">' + esc(r.file.name) + "<em>" + Math.round(r.file.size / 1024) + "KB</em></div>" +
       '<select class="field" data-target="' + r.i + '">' +
         opt("__new__", "+ 새 페이지로 추가", r.target === "__new__") +
@@ -155,54 +155,12 @@ function openBulkModal(files) {
   });
 }
 
-/* ---------------- 캔버스 드래그&드롭 · 노드 버튼 ---------------- */
+/* ---------------- 노드 버튼 ----------------
+   캔버스에 파일을 끌어다 놓는 등록은 없앴다 — 노드 이동(포인터 드래그)과
+   브라우저 네이티브 파일 드래그가 겹쳐 충돌했기 때문. 카메라 버튼·화면 일괄
+   등록·Ctrl+V·스테이지 드롭으로도 등록 경로가 충분하다. */
 function initImport() {
-  const flow = $("#flowPane"), surf = $("#flowSurface");
   $("#btnBulk").addEventListener("click", () => openBulkModal([]));
-  const editable = () => canEdit();
-
-  const nodeUnder = ev => {
-    const el = document.elementFromPoint(ev.clientX, ev.clientY);
-    return el && el.closest ? el.closest("[data-node]") : null;
-  };
-  let hot = null;
-  const setHot = el => {
-    if (hot === el) return;
-    if (hot) hot.classList.remove("drop-on");
-    hot = el; if (hot) hot.classList.add("drop-on");
-  };
-  const hasFiles = e => e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") >= 0;
-
-  ["dragenter", "dragover"].forEach(t => surf.addEventListener(t, e => {
-    if (!hasFiles(e) || !editable()) return;
-    e.preventDefault();
-    flow.classList.add("dragover");
-    setHot(nodeUnder(e));
-  }));
-  surf.addEventListener("dragleave", e => {
-    if (surf.contains(e.relatedTarget)) return;
-    flow.classList.remove("dragover"); setHot(null);
-  });
-  surf.addEventListener("drop", async e => {
-    if (!hasFiles(e) || !editable()) return;
-    e.preventDefault();
-    flow.classList.remove("dragover");
-    const target = hot; setHot(null);
-    const files = Array.prototype.slice.call(e.dataTransfer.files || []).filter(f => /^image\//.test(f.type));
-    if (!files.length) return;
-    if (files.length > 1) return openBulkModal(files);          // 여러 장이면 매칭 화면으로
-    let node = target ? nodeById(target.dataset.node) : null;
-    if (!node) {                                               // 빈 곳 → 그 자리에 새 페이지
-      const r = surf.getBoundingClientRect();
-      node = addNodeFor(baseName(files[0]), {
-        x: (e.clientX - r.left - state.ui.panX) / state.ui.zoom - 93,
-        y: (e.clientY - r.top - state.ui.panY) / state.ui.zoom - 75
-      });
-    }
-    try { await setShot(files[0], node, true); } catch (err) { toast("이미지를 읽지 못했습니다", "bad"); }
-    markDirty(); renderFlow(); selectNode(node.id);
-    toast(target ? node.name + " 화면을 등록했습니다" : "새 페이지 " + node.name + " 를 만들었습니다", "ok");
-  });
 
   $("#nodeLayer").addEventListener("click", e => {
     const b = e.target.closest("[data-pick]");

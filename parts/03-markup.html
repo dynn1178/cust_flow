@@ -52,8 +52,6 @@
     <div class="brand">
       <div class="brand-mark" title="Customer Journey Atlas"><svg class="ico"><use href="#i-route"/></svg></div>
       <span class="brandname">Customer Journey Atlas</span>
-      <span class="brandsep"></span>
-      <input id="docTitle" value="고객 여정 태그 맵" aria-label="문서 이름">
     </div>
     <button class="btn boardbtn" id="btnBoards" title="여정 보드 전환·추가·삭제">
       <svg class="ico"><use href="#i-map"/></svg><span class="bn" id="boardName">보드</span><svg class="ico xs"><use href="#i-chev"/></svg>
@@ -89,7 +87,6 @@
           <div id="nodeLayer"></div>
         </div>
       </div>
-      <div class="flow-drop">이미지를 페이지 위에 놓으면 그 화면으로 등록되고<br>빈 곳에 놓으면 새 페이지가 만들어집니다</div>
       <div class="flow-tools glass">
         <button class="btn sm edit-only" id="btnAddNode"><svg class="ico xs"><use href="#i-plus"/></svg>페이지 추가</button>
         <div class="seg edit-only" id="flowMode">
@@ -193,6 +190,8 @@
           <option value="todo">작업 예정</option><option value="deprecated">폐기</option>
         </select>
         <input class="field" id="tagSearch" placeholder="이벤트명 · 속성 검색" style="flex:1; min-width:150px">
+        <button class="btn edit-only staff-only" id="btnTagBulk" title="CSV 파일로 태그 일괄 등록"><svg class="ico"><use href="#i-up"/></svg>일괄 업로드</button>
+        <button class="btn staff-only" id="btnTagTemplate" title="업로드용 샘플 CSV 내려받기"><svg class="ico"><use href="#i-down"/></svg>샘플 양식</button>
         <button class="btn staff-only" id="btnTagCsv"><svg class="ico"><use href="#i-down"/></svg>CSV</button>
       </div>
       <div class="statgrid" id="tagStats"></div>
@@ -212,6 +211,8 @@
         </select>
         <input class="field" id="campSearch" placeholder="캠페인명 · 세그먼트 검색" style="flex:1; min-width:150px">
         <div class="spacer"></div>
+        <button class="btn edit-only staff-only" id="btnCampBulk" title="CSV 파일로 캠페인 일괄 등록"><svg class="ico"><use href="#i-up"/></svg>일괄 업로드</button>
+        <button class="btn staff-only" id="btnCampTemplate" title="업로드용 샘플 CSV 내려받기"><svg class="ico"><use href="#i-down"/></svg>샘플 양식</button>
         <button class="btn staff-only" id="btnCampCsv"><svg class="ico"><use href="#i-down"/></svg>CSV</button>
       </div>
       <div class="statgrid" id="campStats"></div>
@@ -228,3 +229,5 @@
 <input type="file" id="filesPick" accept="image/*" multiple style="display:none">
 <input type="file" id="dirPick" webkitdirectory directory style="display:none">
 <input type="file" id="jsonPick" accept="application/json,.json" style="display:none">
+<input type="file" id="tagCsvPick" accept=".csv,text/csv" style="display:none">
+<input type="file" id="campCsvPick" accept=".csv,text/csv" style="display:none">

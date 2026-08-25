@@ -12,6 +12,170 @@ function acts(kind, id) {
     '</button><button class="btn icon sm danger" data-' + kind + '-del="' + id + '" title="삭제">' + ico("trash", "xs") + "</button></div>";
 }
 
+/* ---------------- 태그/캠페인 CSV 일괄 업로드 · 샘플 양식 ----------------
+   기존 CSV 내보내기(btnTagCsv/btnCampCsv)와 같은 컬럼·따옴표 규칙을 써서
+   왕복 호환되게 만든다. */
+function csvQ(s) { return '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"'; }
+function csvLine(arr) { return arr.map(csvQ).join(","); }
+function parseCsv(text) {
+  text = String(text || "").replace(/^﻿/, "");
+  const rows = []; let row = [], field = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\r") { /* \n 에서 행을 닫는다 */ }
+    else if (c === "\n") { row.push(field); rows.push(row); row = []; field = ""; }
+    else field += c;
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows.filter(r => r.length > 1 || (r[0] || "").trim() !== "");
+}
+function keyByLabel(map, label, fallback) {
+  const s = String(label == null ? "" : label).trim();
+  if (!s) return fallback;
+  if (map[s]) return s;
+  const hit = Object.entries(map).find(([, v]) => (typeof v === "string" ? v : v.name) === s);
+  return hit ? hit[0] : fallback;
+}
+function parsePropsStr(s) {
+  return String(s || "").split(" / ").map(x => x.trim()).filter(Boolean).map(x => {
+    const i = x.indexOf("=");
+    return i < 0 ? { k: x, v: "" } : { k: x.slice(0, i).trim(), v: x.slice(i + 1).trim() };
+  });
+}
+function resolveBoard(name) {
+  const s = String(name || "").trim();
+  if (!s) return B();
+  return state.boards.find(b => b.name === s) || B();
+}
+function addNodeInBoard(b, name, path) {
+  let maxY = 0, minX = 60;
+  b.nodes.forEach(n => { maxY = Math.max(maxY, n.y + (NSZ[n.id] ? NSZ[n.id].h : 150)); minX = Math.min(minX, n.x); });
+  const n = {
+    id: uid("n"), kind: "page", name: name || "새 페이지", path: path || "", note: "",
+    x: Math.round(minX), y: Math.round(b.nodes.length ? maxY + 60 : 90), shot: null, shotData: null, thumb: null,
+    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+  };
+  b.nodes.push(n);
+  return n;
+}
+function resolveNode(b, name, path) {
+  const s = String(name || "").trim() || "새 페이지";
+  return b.nodes.find(n => n.name === s) || addNodeInBoard(b, s, path);
+}
+function readTextFile(file, cb) {
+  const fr = new FileReader();
+  fr.onload = () => cb(String(fr.result || ""));
+  fr.onerror = () => toast("파일을 읽지 못했습니다", "bad");
+  fr.readAsText(file);
+}
+function bulkPreviewModal(opt) {
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass" style="width:min(560px,100%)" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("up") + "<h3>" + esc(opt.title) + '</h3><button class="btn icon sm" data-x>' + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' +
+        '<p class="hint">' + opt.rows.length + "개 행을 찾았습니다" + (opt.newPages ? " · 새 페이지 " + opt.newPages + "개가 생성됩니다" : "") + ".</p>" +
+        '<div class="bulk">' + opt.rows.slice(0, 60).map(r => '<div class="brow"><div class="fn">' + r + "</div></div>").join("") +
+        (opt.rows.length > 60 ? '<div class="bulkbar">외 ' + (opt.rows.length - 60) + "개 더</div>" : "") + "</div>" +
+      "</div>" +
+      '<div class="modal-foot"><div class="spacer"></div><button class="btn" data-x>취소</button>' +
+        '<button class="btn primary" data-run>' + opt.rows.length + "개 가져오기</button></div>" +
+    "</div></div>";
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
+    if (e.target.closest("[data-run]")) { closeModal(); opt.onRun(); }
+  });
+}
+function tagCsvTemplate() {
+  const head = ["보드", "페이지", "경로", "플랫폼", "이벤트", "트리거", "위치", "속성", "상태", "메모"];
+  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "home_viewed", "화면 노출", "",
+    "user_type=guest | member", "적용됨", "세션 첫 화면 진입 시 1회"];
+  saveFile("tag-upload-template.csv", "﻿" + [csvLine(head), csvLine(example)].join("\r\n"), "text/csv");
+}
+function openTagBulkModal(file) {
+  readTextFile(file, text => {
+    const rows = parseCsv(text);
+    const data = rows.slice(1);
+    if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
+    const parsed = data.map(r => {
+      const [boardName, pageName, path, platLabel, event, triggerLabel, selector, propsStr, statusLabel, note] = r;
+      return {
+        boardName: boardName || "", pageName: (pageName || "새 페이지").trim(), path: path || "",
+        tag: {
+          platform: keyByLabel(PLAT, platLabel, "amplitude"), event: event || "unnamed_event",
+          trigger: keyByLabel(TRIGGER, triggerLabel, "custom"), selector: selector || "",
+          props: parsePropsStr(propsStr), status: keyByLabel(TSTATUS, statusLabel, "todo"), note: note || ""
+        }
+      };
+    });
+    let newPages = 0;
+    const seen = new Set();
+    parsed.forEach(p => {
+      const b = resolveBoard(p.boardName), key = b.id + "::" + p.pageName;
+      if (!b.nodes.some(n => n.name === p.pageName) && !seen.has(key)) { newPages++; seen.add(key); }
+    });
+    bulkPreviewModal({
+      title: "태그 일괄 업로드", rows: parsed.map(p => esc(p.pageName) + "<em>" + esc((PLAT[p.tag.platform] || PLAT.amplitude).name) + " · " + esc(p.tag.event) + "</em>"),
+      newPages,
+      onRun: () => {
+        parsed.forEach(p => {
+          const b = resolveBoard(p.boardName), node = resolveNode(b, p.pageName, p.path);
+          node.tags.push(Object.assign({ id: uid("t") }, p.tag));
+        });
+        markDirty(); renderFlow(); renderPanels(); renderTagView(true);
+        toast(parsed.length + "개 태그를 등록했습니다" + (newPages ? " · 새 페이지 " + newPages + "개" : ""), "ok");
+      }
+    });
+  });
+}
+function campCsvTemplate() {
+  const head = ["보드", "페이지", "캠페인명", "채널", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
+  const example = [B().name, (B().nodes[0] || {}).name || "홈", "장바구니 이탈 리마인드", "앱 푸시",
+    "Cart Updated 후 4시간 미결제", "4시간 지연 발송", "운영중", "BRZ-PUSH-2871", "/cart", "1일 1회 · 야간 발송 제외"];
+  saveFile("campaign-upload-template.csv", "﻿" + [csvLine(head), csvLine(example)].join("\r\n"), "text/csv");
+}
+function openCampBulkModal(file) {
+  readTextFile(file, text => {
+    const rows = parseCsv(text);
+    const data = rows.slice(1);
+    if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
+    const parsed = data.map(r => {
+      const [boardName, pageName, name, chanLabel, segment, timing, statusLabel, extId, landing, note] = r;
+      return {
+        boardName: boardName || "", pageName: (pageName || "새 페이지").trim(),
+        camp: {
+          name: name || "이름 없는 캠페인", chan: keyByLabel(CHAN, chanLabel, "push"),
+          segment: segment || "", timing: timing || "", status: keyByLabel(CSTATUS, statusLabel, "draft"),
+          extId: extId || "", landing: landing || "", note: note || ""
+        }
+      };
+    });
+    let newPages = 0;
+    const seen = new Set();
+    parsed.forEach(p => {
+      const b = resolveBoard(p.boardName), key = b.id + "::" + p.pageName;
+      if (!b.nodes.some(n => n.name === p.pageName) && !seen.has(key)) { newPages++; seen.add(key); }
+    });
+    bulkPreviewModal({
+      title: "캠페인 일괄 업로드", rows: parsed.map(p => esc(p.pageName) + "<em>" + esc((CHAN[p.camp.chan] || CHAN.push).name) + " · " + esc(p.camp.name) + "</em>"),
+      newPages,
+      onRun: () => {
+        parsed.forEach(p => {
+          const b = resolveBoard(p.boardName), node = resolveNode(b, p.pageName, "");
+          node.camps.push(Object.assign({ id: uid("c") }, p.camp));
+        });
+        markDirty(); renderFlow(); renderPanels(); renderCampView(true);
+        toast(parsed.length + "개 캠페인을 등록했습니다" + (newPages ? " · 새 페이지 " + newPages + "개" : ""), "ok");
+      }
+    });
+  });
+}
+
 /* ---------------- 우측: 태깅 ---------------- */
 function renderTagPanel() {
   const n = curNode(), box = $("#tagList");
@@ -227,6 +391,13 @@ function initTagView() {
   $("#tagNodeFilter").addEventListener("change", e => { tagFilter.node = e.target.value; renderTagView(true); });
   $("#tagStatusFilter").addEventListener("change", e => { tagFilter.status = e.target.value; renderTagView(true); });
   $("#tagSearch").addEventListener("input", e => { tagFilter.q = e.target.value.toLowerCase().trim(); renderTagView(true); });
+  $("#btnTagTemplate").addEventListener("click", tagCsvTemplate);
+  $("#btnTagBulk").addEventListener("click", () => {
+    if (!canEdit()) return;
+    const inp = $("#tagCsvPick"); inp.value = "";
+    inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) openTagBulkModal(f); };
+    inp.click();
+  });
   $("#tagTable").addEventListener("click", e => {
     const ed = e.target.closest("[data-trow-edit]");
     if (ed) { jumpTo(+ed.dataset.bi, ed.dataset.node); editTag(ed.dataset.trowEdit); return; }
@@ -288,6 +459,13 @@ function initCampView() {
   $("#campBoardFilter").addEventListener("change", e => { campFilter.board = e.target.value; renderCampView(true); });
   $("#campStatusFilter").addEventListener("change", e => { campFilter.status = e.target.value; renderCampView(true); });
   $("#campSearch").addEventListener("input", e => { campFilter.q = e.target.value.toLowerCase().trim(); renderCampView(true); });
+  $("#btnCampTemplate").addEventListener("click", campCsvTemplate);
+  $("#btnCampBulk").addEventListener("click", () => {
+    if (!canEdit()) return;
+    const inp = $("#campCsvPick"); inp.value = "";
+    inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) openCampBulkModal(f); };
+    inp.click();
+  });
   $("#campGrid").addEventListener("click", e => {
     const g = e.target.closest("[data-goto]");
     if (g && g.dataset.bi != null) jumpTo(+g.dataset.bi, g.dataset.goto);

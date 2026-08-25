@@ -242,7 +242,7 @@ function nodeHtml(n) {
   }
 
   const th = thumbSrc(n);
-  const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async">'
+  const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async" draggable="false">'
                     : '<div class="ph">' + ico("image") + "<span>화면 미등록</span></div>") +
     '<div class="thumb-acts edit-only">' +
       '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양 바꾸기" tabindex="-1"><span>' +

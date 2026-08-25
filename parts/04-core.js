@@ -213,15 +213,6 @@ async function idbGet(k) {
     q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error);
   });
 }
-async function idbDel(k) {
-  const db = await idb();
-  return new Promise((res, rej) => {
-    const t = db.transaction("kv", "readwrite");
-    t.objectStore("kv").delete(k);
-    t.oncomplete = () => res(); t.onerror = () => rej(t.error);
-  });
-}
-
 /* ---------------- 토스트 ---------------- */
 function toast(msg, kind, action) {
   const el = document.createElement("div");
@@ -292,7 +283,6 @@ function snapshotBytes(s) {
 }
 
 async function shareSave() {
-  if (folder.dir) return folderSave();          // 폴더 연결 상태면 폴더에 저장
   const api = await claudeApi();
   if (!api) { toast("이 화면에서는 공유 저장을 쓸 수 없습니다. JSON 내보내기나 폴더 연결을 사용하세요.", "bad"); return; }
   const btn = $("#btnShare"); btn.disabled = true;

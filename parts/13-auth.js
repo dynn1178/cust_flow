@@ -246,7 +246,7 @@ async function openMembersModal() {
   const row = p => {
     const r = ROLE[p.role] || ROLE.viewer;
     return '<div class="brow" data-uid="' + p.id + '">' +
-      (p.avatar ? '<img class="avatar" src="' + esc(p.avatar) + '" alt="">' : '<span class="avatar ph">' + ico("lock", "xs") + "</span>") +
+      (p.avatar ? '<img class="avatar" src="' + esc(p.avatar) + '" alt="" draggable="false">' : '<span class="avatar ph">' + ico("lock", "xs") + "</span>") +
       '<div class="fn">' + esc(p.name || p.email) + "<em>" + esc(p.email) + "</em></div>" +
       (canGrant
         ? '<select class="field" data-role="' + p.id + '">' + Object.entries(ROLE).map(([k, v]) =>
