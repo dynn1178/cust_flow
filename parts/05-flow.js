@@ -7,6 +7,7 @@ const NSZ = {};                       // 노드 실제 크기 캐시
 const EDGE_EL = {};                   // 엣지 id -> DOM 참조
 let flowMode = "select";
 let linkFrom = null;
+let autoLayoutDir = "v";              // 마지막으로 쓴 정렬 방향(메뉴에 표시용) — v: 세로 정렬, h: 가로 정렬
 
 function onFrame(fn) {                // 다음 프레임에 한 번만 실행
   let id = 0, last = null;
@@ -220,8 +221,15 @@ function campRowsBig(n) {
       '<span class="fdot" style="background:' + CSTATUS_C[c.status] + '"></span></div>';
   }).join("") + (n.camps.length > 6 ? '<div class="fitem more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
 }
+function incompleteRowsBig(n) {
+  const miss = completeness(n);
+  if (!miss.length) return '<div class="fnone">모두 등록됨</div>';
+  return '<div class="node-focus"><div class="fitem" style="--c:var(--warn)">' + ico("alert", "xs") +
+    '<span class="ftext"><span class="fev">' + miss.map(esc).join(" · ") + "</span></span></div></div>";
+}
 function focusCount(n, f) {
   if (f === "camp") return n.camps.length;
+  if (f === "incomplete") return completeness(n).length;
   if (PLAT[f]) return n.tags.filter(t => t.platform === f).length;
   return 0;
 }
@@ -255,9 +263,12 @@ function nodeHtml(n) {
     body = n.camps.length ? '<div class="node-camps">' + n.camps.slice(0, 4).map(campRow).join("") +
       (n.camps.length > 4 ? '<div class="ncamp more">+' + (n.camps.length - 4) + " 개 더</div>" : "") + "</div>" : "";
   } else if (f === "camp") body = campRowsBig(n);
+  else if (f === "incomplete") body = incompleteRowsBig(n);
   else if (PLAT[f]) body = tagRowsBig(n, f);
 
-  return '<div class="node-thumb">' + thumb + '<span class="node-kind">' + esc(KIND[n.kind] || "페이지") + "</span></div>" +
+  const miss = completeness(n);
+  const warn = miss.length ? '<span class="node-warn" title="' + esc(miss.join(" · ")) + '">' + ico("alert", "xs") + "</span>" : "";
+  return '<div class="node-thumb">' + thumb + warn + '<span class="node-kind">' + esc(KIND[n.kind] || "페이지") + "</span></div>" +
     '<div class="node-main"><div class="node-name">' + esc(n.name) + "</div>" +
     (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
     (bd ? '<div class="node-badges">' + bd + "</div>" : "") + body + "</div>";
@@ -271,7 +282,7 @@ function renderNodes() {
     if (!el) { el = document.createElement("div"); el.dataset.node = n.id; layer.appendChild(el); }
     else delete have[n.id];
     const f = state.ui.focus || "all";
-    const dim = (f === "camp" || PLAT[f]) && focusCount(n, f) === 0;
+    const dim = (f === "camp" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
     el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
@@ -306,7 +317,7 @@ function updateFlowSelTools() {
   else if (sel.node) { bar.style.display = ""; $("#flowSelToolsLabel").textContent = "페이지 설정"; }
   else bar.style.display = "none";
 }
-function renderFlow() { renderNodes(); drawEdges(); }
+function renderFlow() { renderLanes(); renderNodes(); drawEdges(); renderMinimap(); }
 
 /* 움직이는 동안에는 GPU 레이어로 부드럽게, 멈추면 레이어를 풀어
    브라우저가 현재 배율로 글자를 다시 그리게 한다(확대 시 흐려짐 방지). */
@@ -326,6 +337,7 @@ function applyTransform(live) {
     settleTimer = setTimeout(settleTransform, 160);
   } else settleTransform();
   $("#zVal").textContent = Math.round(v.zoom * 100) + "%";
+  renderMinimap();
 }
 const applyTransformSoon = onFrame(function () { applyTransform(true); });
 function zoomTo(z, cx, cy) {
@@ -511,7 +523,14 @@ function initFlow() {
     paintSelection();
   });
   $("#btnAddNode").addEventListener("click", () => addNode());
-  $("#btnAutoLayout").addEventListener("click", autoLayout);
+  $("#btnLanes").addEventListener("click", openLaneModal);
+  $("#btnAutoLayout").addEventListener("click", () => {
+    openMenu(
+      '<button class="mi' + (autoLayoutDir === "v" ? " on" : "") + '" data-act="v">' + ico("grid", "xs") + '세로 정렬<span class="cnt">기본</span></button>' +
+      '<button class="mi' + (autoLayoutDir === "h" ? " on" : "") + '" data-act="h">' + ico("grid", "xs") + "가로 정렬</button>",
+      $("#btnAutoLayout"), it => autoLayout(it.dataset.act)
+    );
+  });
   $("#btnFocus").addEventListener("click", () => {
     const cur = state.ui.focus || "all";
     openMenu(Object.entries(FOCUS).map(([k, v]) =>
@@ -644,19 +663,18 @@ function editNode(id) {
       markDirty(); renderFlow(); renderPanels();
     },
     onAction: k => { if (k === "shot") { closeModal(); openShotModal(n); } },
-    onDelete: () => confirmDel('"' + n.name + '" 페이지를 삭제할까요?', () => {
-      B().nodes = B().nodes.filter(x => x.id !== id);
-      B().edges = B().edges.filter(e => e.from !== id && e.to !== id);
-      if (sel.node === id) sel.node = B().nodes.length ? B().nodes[0].id : null;
-      markDirty(); renderFlow(); selectNode(sel.node);
-    })
+    onDelete: () => confirmDel('"' + n.name + '" 페이지를 삭제할까요?', () => deleteNode(id))
   });
 }
 
 /* ---------------- 자동 정렬 ----------------
    지금 자리를 기준점으로 삼아 흐름 순서대로 다시 세운다.
+   dir "v"(기본) — 흐름의 깊이(depth)를 가로축으로, 같은 깊이의 형제 노드는 세로로 쌓는다.
+   dir "h"       — 깊이를 세로축으로, 같은 깊이의 형제 노드는 가로로 늘어놓는다(위 축을 그대로 뒤집은 것).
    화면(zoom·pan)은 건드리지 않으므로 시야가 튀지 않고, 되돌리기를 제공한다. */
-function autoLayout() {
+function autoLayout(dir) {
+  dir = dir === "h" ? "h" : "v";
+  autoLayoutDir = dir;
   const nodes = B().nodes, edges = B().edges;
   if (!nodes.length) return;
   const prev = nodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
@@ -669,7 +687,7 @@ function autoLayout() {
   const groups = {};
   nodes.forEach(n => (groups[find(n.id)] = groups[find(n.id)] || []).push(n));
 
-  let cursorY = oy;
+  let cursor = oy;   // 다음 그룹은 항상 아래쪽으로 이어 쌓는다
   Object.keys(groups).forEach(key => {
     const g = groups[key], ids = g.map(n => n.id);
     const inner = edges.filter(e => ids.indexOf(e.from) >= 0 && ids.indexOf(e.to) >= 0 && e.from !== e.to);
@@ -692,27 +710,39 @@ function autoLayout() {
       cols[c].sort((a, b) => order[a.id] - order[b.id]);
       cols[c].forEach((n, i) => order[n.id] = i);
     });
-    const rowH = [];
-    const maxRows = Math.max.apply(null, colKeys.map(c => cols[c].length));
-    for (let i = 0; i < maxRows; i++) {
-      rowH[i] = Math.max.apply(null, colKeys.map(c => cols[c][i] ? (NSZ[cols[c][i].id] ? NSZ[cols[c][i].id].h : 150) : 0).concat([110]));
+
+    /* 같은 순번(i)에 있는 형제 노드들의 교차축 크기 — 세로 정렬은 높이, 가로 정렬은 너비 */
+    const crossSize = [];
+    const maxItems = Math.max.apply(null, colKeys.map(c => cols[c].length));
+    for (let i = 0; i < maxItems; i++) {
+      crossSize[i] = Math.max.apply(null, colKeys.map(c => {
+        const n = cols[c][i]; if (!n) return 0;
+        const z = NSZ[n.id];
+        return dir === "h" ? (z ? z.w : nodeW(n)) : (z ? z.h : 150);
+      }).concat([dir === "h" ? 160 : 110]));
     }
-    let x = ox;
+
+    /* 세로 정렬: main(깊이)=x는 항상 ox에서 시작, cross(형제)=y는 그룹마다 cursor에서 시작.
+       가로 정렬: main(깊이)=y는 그룹마다 cursor에서 시작, cross(형제)=x는 항상 ox에서 시작. */
+    const crossStart = dir === "h" ? ox : cursor;
+    let main = dir === "h" ? cursor : ox;
     colKeys.forEach(c => {
-      let y = cursorY;
-      const colW = Math.max.apply(null, cols[c].map(n => NSZ[n.id] ? NSZ[n.id].w : nodeW(n)));
+      let cross = crossStart;
+      const mainSize = Math.max.apply(null, cols[c].map(n => {
+        const z = NSZ[n.id];
+        return dir === "h" ? (z ? z.h : 150) : (z ? z.w : nodeW(n));
+      }));
       cols[c].forEach((n, i) => {
-        n.x = Math.round(x / GRID) * GRID;
-        n.y = Math.round(y / GRID) * GRID;
-        y += rowH[i] + 56;
+        if (dir === "h") { n.x = Math.round(cross / GRID) * GRID; n.y = Math.round(main / GRID) * GRID; cross += crossSize[i] + 78; }
+        else { n.x = Math.round(main / GRID) * GRID; n.y = Math.round(cross / GRID) * GRID; cross += crossSize[i] + 56; }
       });
-      x += colW + 78;
+      main += mainSize + (dir === "h" ? 56 : 78);
     });
-    cursorY += rowH.reduce((a, b) => a + b + 56, 0) + 30;
+    cursor = dir === "h" ? (main + 30) : (cursor + crossSize.reduce((a, b) => a + b + 56, 0) + 30);
   });
 
   markDirty(); renderFlow();
-  toast("흐름 순서대로 정렬했습니다", "ok", {
+  toast("흐름 순서대로 정렬했습니다" + (dir === "h" ? " (가로)" : ""), "ok", {
     label: "되돌리기",
     fn: () => { prev.forEach(p => { const n = nodeById(p.id); if (n) { n.x = p.x; n.y = p.y; } }); markDirty(); renderFlow(); }
   });

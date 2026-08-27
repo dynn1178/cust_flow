@@ -45,6 +45,10 @@
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
   <symbol id="i-density" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></symbol>
   <symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 4v7a6 6 0 0 0 12 0V4h-4v7a2 2 0 0 1-4 0V4z"/><path d="M6 8h4M14 8h4"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M7 8H4V5"/><path d="M4 8c2-3 5-4.5 8.5-4.5A8 8 0 1 1 5 16"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M17 8h3V5"/><path d="M20 8c-2-3-5-4.5-8.5-4.5A8 8 0 1 0 19 16"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5 21 19.5H3z"/><path d="M12 10v4.2"/><circle cx="12" cy="17" r="0.9" style="fill:currentColor;stroke:none"/></symbol>
+  <symbol id="i-lanes" viewBox="0 0 24 24"><rect x="3.5" y="4" width="5" height="16" rx="1.3"/><rect x="9.5" y="4" width="5" height="16" rx="1.3"/><rect x="15.5" y="4" width="5" height="16" rx="1.3"/></symbol>
 </svg>
 
 <div class="app">
@@ -63,6 +67,7 @@
       <button class="btn" data-view="album"><svg class="ico xs"><use href="#i-image"/></svg>앨범</button>
     </div>
     <div class="spacer"></div>
+    <button class="btn icon" id="btnQuickSearch" title="빠른 검색 (Ctrl+F)"><svg class="ico"><use href="#i-search"/></svg></button>
     <div class="savechip" id="saveChip" data-state="ok"><span class="dot"></span><span id="saveText">불러오는 중</span></div>
     <button class="btn" id="btnAuth" style="display:none" title="구글 계정"><svg class="ico"><use href="#i-lock"/></svg><span id="authName">구글로 로그인</span></button>
     <button class="btn" id="btnLock" title="관리자 모드"><svg class="ico"><use href="#i-lock"/></svg><span id="lockText">보기 전용</span></button>
@@ -79,6 +84,7 @@
       <div class="flow-grid"></div>
       <div id="flowSurface">
         <div id="flowWorld">
+          <div id="laneLayer"></div>
           <svg id="edgeLayer">
             <g id="edgeG"></g>
             <g id="guideG"></g>
@@ -96,10 +102,16 @@
         </div>
         <button class="btn sm edit-only" id="btnBulk" title="스크린샷 여러 장을 한 번에 등록"><svg class="ico xs"><use href="#i-stack"/></svg>화면 일괄 등록</button>
         <div class="tool-sep edit-only"></div>
-        <button class="btn sm edit-only" id="btnAutoLayout" title="흐름 순서대로 정렬"><svg class="ico xs"><use href="#i-grid"/></svg>정렬</button>
+        <button class="btn icon sm edit-only" id="btnUndo" title="되돌리기 (Ctrl+Z)" disabled><svg class="ico xs"><use href="#i-undo"/></svg></button>
+        <button class="btn icon sm edit-only" id="btnRedo" title="다시 실행 (Ctrl+Shift+Z)" disabled><svg class="ico xs"><use href="#i-redo"/></svg></button>
+        <div class="tool-sep edit-only"></div>
+        <button class="btn sm edit-only" id="btnAutoLayout" title="흐름 순서대로 정렬"><svg class="ico xs"><use href="#i-grid"/></svg>정렬<svg class="ico xs"><use href="#i-chev"/></svg></button>
         <button class="btn sm edit-only on" id="btnSnap" title="자석 정렬 — 다른 페이지에 맞춰 달라붙기"><svg class="ico xs"><use href="#i-magnet"/></svg></button>
+        <button class="btn sm edit-only" id="btnLanes" title="구간(스윔레인) 배경 설정"><svg class="ico xs"><use href="#i-lanes"/></svg>구간</button>
+        <button class="btn icon sm" id="btnMinimap" title="미니맵 표시/숨김"><svg class="ico xs"><use href="#i-map"/></svg></button>
         <button class="btn sm" id="btnFocus" title="카드에서 무엇을 크게 볼지"><svg class="ico xs" id="focusIco"><use href="#i-density"/></svg><span id="focusName">전체</span><svg class="ico xs"><use href="#i-chev"/></svg></button>
       </div>
+      <div class="minimap glass" id="minimap"><svg id="minimapSvg" viewBox="0 0 168 112"></svg></div>
       <div class="flow-zoom glass">
         <button class="btn icon sm" id="zOut"><svg class="ico xs"><use href="#i-zout"/></svg></button>
         <span class="zoomval" id="zVal">100%</span>
@@ -148,7 +160,7 @@
             <button class="btn icon sm" id="sOut"><svg class="ico xs"><use href="#i-zout"/></svg></button>
             <span class="zoomval" id="sVal">맞춤</span>
             <button class="btn icon sm" id="sIn"><svg class="ico xs"><use href="#i-zin"/></svg></button>
-            <button class="btn icon sm on" id="sFit" title="영역에 맞춤"><svg class="ico xs"><use href="#i-fit"/></svg></button>
+            <button class="btn sm on" id="sFit" title="화면 맞춤 방식 선택"><svg class="ico xs"><use href="#i-fit"/></svg><span id="sFitName">가로 맞춤</span><svg class="ico xs"><use href="#i-chev"/></svg></button>
           </div>
         </div>
         <div class="stage-wrap" id="stageWrap">

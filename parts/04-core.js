@@ -51,8 +51,16 @@ const FOCUS = {
   camp:      { name: "캠페인 위주", ico: "mega", c: "var(--camp)" },
   amplitude: { name: "Amplitude 위주", ico: "amp", c: "var(--amp)" },
   braze:     { name: "Braze 위주", ico: "braze", c: "var(--braze)" },
-  ga4:       { name: "GA4 위주", ico: "ga4", c: "var(--ga4)" }
+  ga4:       { name: "GA4 위주", ico: "ga4", c: "var(--ga4)" },
+  incomplete:{ name: "미완성만", ico: "alert", c: "var(--warn)" }
 };
+/* 데이터 완성도 — 화면 이미지·태그가 없는 페이지를 놓치지 않도록 */
+function completeness(n) {
+  const missing = [];
+  if (!thumbSrc(n)) missing.push("화면 이미지 없음");
+  if (!n.tags.length) missing.push("태그 없음");
+  return missing;
+}
 const ANCHOR = { auto: "자동", n: "위", e: "오른쪽", s: "아래", w: "왼쪽" };
 const DOC_W = 390, DOC_H = 844;
 const GRID = 22;
@@ -142,7 +150,7 @@ function seed() {
   ];
   return {
     v: 2, title: "고객 여정 태그 맵", updatedAt: 0, bi: 0,
-    boards: [{ id: "b1", name: "커머스 앱 · 구매 여정", nodes, edges, sel: "n2", view: { zoom: 0.72, panX: 24, panY: 12, fitted: false } }],
+    boards: [{ id: "b1", name: "커머스 앱 · 구매 여정", nodes, edges, lanes: [], sel: "n2", view: { zoom: 0.72, panX: 24, panY: 12, fitted: false } }],
     ui: { flowH: 372, leftW: 274, rightW: 300, focus: "all", snap: true }
   };
 }
@@ -150,7 +158,13 @@ function seed() {
 /* ---------------- 상태 ---------------- */
 let state = seed();
 let sel = { node: "n2", edge: null, layer: null };
-let stageZoom = null;            // null = 영역 맞춤
+let stageZoom = null;            // null = 맞춤 모드 (stageFitMode 방식대로 자동 계산)
+let stageFitMode = "width";      // 맞춤 모드일 때 계산 방식: width(가로 맞춤, 기본) · height(세로 맞춤) · contain(전체 화면 맞춤)
+const STAGE_FIT = {
+  width: { name: "가로 맞춤" },
+  height: { name: "세로 맞춤" },
+  contain: { name: "전체 화면 맞춤" }
+};
 let layerTool = "select";
 let drawColor = SWATCH[0];
 let drawStroke = 3;
@@ -234,6 +248,7 @@ let draftTimer = null;
 function markDirty() {
   if (!dirty) { dirty = true; setSaveChip("dirty", "저장 안 됨"); }
   invalidateViews();
+  scheduleHistory();
   clearTimeout(draftTimer);
   draftTimer = setTimeout(saveDraft, 900);
 }

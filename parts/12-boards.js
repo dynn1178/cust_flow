@@ -4,7 +4,7 @@
    태그 목록과 캠페인 목록은 모든 보드를 한 번에 보여준다.
    ======================================================================== */
 function newBoard(name) {
-  return { id: uid("b"), name: name || "새 여정", nodes: [], edges: [], sel: null, view: { zoom: 1, panX: 40, panY: 30, fitted: true } };
+  return { id: uid("b"), name: name || "새 여정", nodes: [], edges: [], lanes: [], sel: null, view: { zoom: 1, panX: 40, panY: 30, fitted: true } };
 }
 function syncBoardName() {
   $("#boardName").textContent = B().name;
@@ -20,6 +20,7 @@ function switchBoard(i) {
   Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
   Object.keys(NSZ).forEach(k => delete NSZ[k]);
   $("#nodeLayer").innerHTML = "";
+  historyOf(b); updateHistoryUI();
   syncBoardName(); applyTransform(); renderFlow(); renderStage(); renderPanels();
   markDirty();
 }
@@ -63,6 +64,7 @@ function openBoardMenu() {
           mounted = { id: null, src: null, w: 0, h: 0 };
           $("#nodeLayer").innerHTML = "";
           Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
+          historyOf(B()); updateHistoryUI();
           syncBoardName(); applyTransform(); renderFlow(); renderStage(); renderPanels();
           markDirty(); toast("보드를 만들었습니다. 페이지를 추가하거나 스크린샷을 끌어다 놓으세요.", "ok");
         }
@@ -85,12 +87,15 @@ function openBoardMenu() {
     }
     if (a === "del") {
       confirmDel('"' + B().name + '" 보드를 삭제할까요? 이 보드의 페이지·태그·캠페인이 모두 사라집니다.', () => {
+        const goneId = B().id;
         state.boards.splice(state.bi, 1);
         state.bi = Math.max(0, state.bi - 1);
+        delete history[goneId];
         sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null };
         mounted = { id: null, src: null, w: 0, h: 0 };
         $("#nodeLayer").innerHTML = "";
         Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
+        historyOf(B()); updateHistoryUI();
         syncBoardName(); applyTransform(); renderFlow(); renderStage(); renderPanels();
         markDirty();
       });

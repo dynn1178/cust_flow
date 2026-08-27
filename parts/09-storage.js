@@ -184,6 +184,10 @@ function openStorageModal() {
       '<button class="btn sm" data-act="export">' + ico("down", "xs") + 'JSON 내보내기</button>' +
       '<button class="btn sm" data-act="import">' + ico("up", "xs") + 'JSON 불러오기</button></div>' +
       '<p class="hint">이미지는 JSON 안에 함께 담깁니다. 파일 하나로 백업하거나 다른 사람에게 넘길 때 쓰세요.</p></div>' +
+    '<div class="frow"><span class="lbl">보드 내보내기</span><div style="display:flex; gap:6px">' +
+      '<button class="btn sm" data-act="exportpng">' + ico("down", "xs") + 'PNG 이미지</button>' +
+      '<button class="btn sm" data-act="exportpdf">' + ico("down", "xs") + 'PDF 문서</button></div>' +
+      '<p class="hint">지금 보고 있는 보드의 여정 지도를 정리된 개요도로 그려서 이미지·PDF로 저장합니다. 발표·보고 자료에 붙여 넣기 좋습니다.</p></div>' +
     (myRole() === "server_admin"
       ? '<div class="frow"><span class="lbl">서버 (Supabase)</span>' +
         '<button class="btn sm" data-act="server">' + ico("share", "xs") + (supa ? "연결됨 — " + esc(supaCfg().url.replace("https://", "")) : "구글 로그인·회원 권한 켜기") + "</button>" +
@@ -209,6 +213,8 @@ function openStorageModal() {
     closeModal();
     if (act === "export") exportJson();
     if (act === "import") importJson();
+    if (act === "exportpng") exportBoardPng();
+    if (act === "exportpdf") exportBoardPdf();
     if (act === "host") openCloudModal();
     if (act === "urlize") convertAllImagesToUrl();
     if (act === "server") openServerModal();

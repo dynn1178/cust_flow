@@ -8,7 +8,7 @@ cd "$(dirname "$0")"
 HEAD="parts/01-head.html parts/02-css.html"
 BODY="parts/03-markup.html parts/04-core.js parts/05-flow.js parts/06-stage.js \
 parts/07-panels.js parts/09-storage.js parts/10-import.js parts/11-lock.js \
-parts/12-boards.js parts/13-auth.js parts/08-shell.js"
+parts/12-boards.js parts/14-extras.js parts/13-auth.js parts/08-shell.js"
 
 cat $HEAD $BODY > journey-atlas.html
 

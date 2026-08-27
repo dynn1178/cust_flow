@@ -10,7 +10,11 @@ function stageScale(n) {
   const d = docSize(n);
   if (stageZoom) return stageZoom;
   const box = $("#stageScroll").getBoundingClientRect();
-  return clamp(Math.min((box.width - 36) / d.w, (box.height - 36) / d.h), 0.05, 4);
+  const availW = box.width - 36, availH = box.height - 36;
+  const s = stageFitMode === "height" ? availH / d.h
+    : stageFitMode === "contain" ? Math.min(availW / d.w, availH / d.h)
+    : availW / d.w;                  // "width" — 기본값
+  return clamp(s, 0.05, 4);
 }
 function bbox(l) {
   if (l.kind === "pen") {
@@ -104,6 +108,7 @@ function renderStage() {
   doc.style.height = Math.round(d.h * s) + "px";
   $("#sVal").textContent = stageZoom ? Math.round(s * 100) + "%" : "맞춤";
   $("#sFit").classList.toggle("on", !stageZoom);
+  $("#sFitName").textContent = STAGE_FIT[stageFitMode].name;
 
   if (mounted.id !== n.id || mounted.src !== src || mounted.w !== d.w || mounted.h !== d.h) {
     const shot = src
@@ -363,7 +368,22 @@ function initStage() {
   $("#btnLayerImg").addEventListener("click", () => pickFile(addImageLayer));
   $("#sIn").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) * 1.2, .1, 4); renderStage(); });
   $("#sOut").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) / 1.2, .1, 4); renderStage(); });
-  $("#sFit").addEventListener("click", () => { stageZoom = null; renderStage(); });
+  $("#sFit").addEventListener("click", () => {
+    openMenu(Object.entries(STAGE_FIT).map(([k, v]) =>
+      '<button class="mi' + (k === stageFitMode && !stageZoom ? " on" : "") + '" data-act="' + k + '">' + ico("fit", "xs") + v.name +
+      (k === "width" ? '<span class="cnt">기본</span>' : "") + "</button>").join(""), $("#sFit"), it => {
+        stageFitMode = it.dataset.act; stageZoom = null; renderStage();
+      });
+  });
+
+  /* Alt + 휠 = 화면 확대/축소, Alt를 누르지 않으면 평소대로 세로 스크롤 */
+  $("#stageScroll").addEventListener("wheel", e => {
+    if (!e.altKey) return;
+    e.preventDefault();
+    const n = curNode(); if (!n) return;
+    stageZoom = clamp(stageScale(n) * (e.deltaY < 0 ? 1.08 : 1 / 1.08), .05, 4);
+    renderStage();
+  }, { passive: false });
 
   /* 실제 OS 파일 드래그일 때만 반응한다 — 레이어를 옮기다가(포인터 드래그) 우연히
      브라우저 기본 이미지 드래그가 겹쳐도 드롭존이 잘못 뜨지 않도록 방어한다. */

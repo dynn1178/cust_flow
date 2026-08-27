@@ -65,20 +65,38 @@ function initShell() {
   $("#btnStorage").addEventListener("click", openStorageModal);
   $("#btnExport").addEventListener("click", exportJson);
   $("#btnImport").addEventListener("click", importJson);
+  $("#btnQuickSearch").addEventListener("click", openQuickSearch);
 
   document.addEventListener("keydown", e => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (canEdit()) (supaOn() ? serverSave() : shareSave()); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); openQuickSearch(); return; }
     if (typing) return;
     if (e.key === "Escape") {
       closeModal(); $("#popRoot").innerHTML = ""; closeMenu();
       sel.layer = null; sel.edge = null; setTool("select");
       renderStage(); renderPanels(); drawEdges();
     }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && canEdit()) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y" && canEdit()) { e.preventDefault(); redo(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && canEdit() && sel.node && !sel.layer) { e.preventDefault(); duplicateNode(sel.node); return; }
     if ((e.key === "Delete" || e.key === "Backspace") && canEdit()) {
       const n = curNode();
       if (sel.layer && n) { n.layers = n.layers.filter(l => l.id !== sel.layer); sel.layer = null; markDirty(); renderFlow(); renderStage(); renderPanels(); e.preventDefault(); }
       else if (sel.edge) { B().edges = B().edges.filter(x => x.id !== sel.edge); sel.edge = null; markDirty(); renderFlow(); e.preventDefault(); }
+      else if (sel.node && n) { e.preventDefault(); confirmDel('"' + n.name + '" 페이지를 삭제할까요?', () => deleteNode(n.id)); }
+    }
+    if (/^Arrow(Up|Down|Left|Right)$/.test(e.key) && canEdit() && sel.node && !sel.layer && !sel.edge) {
+      const n = curNode(); if (!n) return;
+      e.preventDefault();
+      const step = e.shiftKey ? GRID : 1;
+      if (e.key === "ArrowUp") n.y -= step;
+      else if (e.key === "ArrowDown") n.y += step;
+      else if (e.key === "ArrowLeft") n.x -= step;
+      else n.x += step;
+      const el = $('[data-node="' + n.id + '"]');
+      if (el) { el.style.left = n.x + "px"; el.style.top = n.y + "px"; moveEdgesOf(n.id); }
+      markDirty();
     }
   });
   addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
@@ -132,6 +150,7 @@ function normalizeBoard(b) {
   b = b || {};
   b.id = b.id || uid("b");
   b.name = b.name || "여정";
+  b.lanes = b.lanes || [];
   b.nodes = (b.nodes || []).map(n => Object.assign({
     kind: "page", path: "", note: "", shot: null, shotData: null, thumb: null,
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
@@ -171,10 +190,12 @@ function renderAll() {
   applySizes(); applyTransform(); renderFlow();
   if (!B().nodes.some(n => n.id === sel.node)) sel.node = (B().nodes[0] || {}).id || null;
   renderStage(); renderPanels(); invalidateViews();
+  seedHistoryForAllBoards();
 }
 
 async function boot() {
   initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initAlbumView(); initShell(); initSplitters(); initImport(); initBoards(); initAuth();
+  initMinimap(); wireUndoRedoButtons();
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */
   if (supaOn()) {

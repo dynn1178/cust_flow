@@ -133,6 +133,14 @@ tr:hover .rowacts{opacity:1}
 .popover{position:fixed; z-index:120; border-radius:var(--r-md); padding:10px; display:flex; flex-direction:column; gap:9px;
   width:250px; box-shadow:var(--shadow); max-height:88vh; overflow:auto}
 .popover.wide{width:302px}
+.qsearch{width:min(480px,100%)}
+.qs-results{max-height:52vh; overflow:auto; display:flex; flex-direction:column; gap:2px}
+.qs-group{font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); padding:8px 2px 3px}
+.qs-row{display:flex; align-items:center; gap:8px; padding:8px 9px; border-radius:var(--r-xs); cursor:pointer;
+  font-size:12.5px; border:0; background:transparent; color:var(--ink-2); text-align:left; width:100%}
+.qs-row:hover{background:var(--glass-2); color:var(--ink)}
+.qs-t{font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:44%}
+.qs-s{color:var(--ink-3); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1}
 .toast .btn{margin-left:6px; height:22px}
 .lockrow{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-2)}
 .lockrow .ico{color:var(--ink-3)}

@@ -192,10 +192,14 @@ select.field{cursor:pointer}
   font-weight:600; display:flex; align-items:center; background:var(--glass-3); border:1px solid var(--stroke);
   color:var(--ink-2)}
 .node.hued .node-kind{color:color-mix(in srgb,var(--nc) 70%,var(--ink)); border-color:color-mix(in srgb,var(--nc) 40%,transparent)}
+.node-warn{position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:99px; display:flex; align-items:center; justify-content:center;
+  background:color-mix(in srgb,var(--warn) 20%,var(--glass-3)); border:1px solid color-mix(in srgb,var(--warn) 45%,transparent); color:var(--warn)}
+.node-warn .ico{width:12px; height:12px; stroke-width:2.2}
 .node-main{padding:9px 10px 10px; display:flex; flex-direction:column; gap:6px}
-.node-name{font-size:max(14.5px,calc(14.5px / var(--zoom,1))); font-weight:700; letter-spacing:-.022em; line-height:1.24; word-break:keep-all; color:var(--ink)}
-.node.size-s .node-name{font-size:max(13px,calc(13px / var(--zoom,1)))}
-.node.size-l .node-name{font-size:max(16.5px,calc(16.5px / var(--zoom,1)))}
+.node-name{font-size:max(14.5px,calc(14.5px / max(var(--zoom,1),.5))); font-weight:600; letter-spacing:-.018em; line-height:1.24; word-break:keep-all; color:var(--ink);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis}
+.node.size-s .node-name{font-size:max(13px,calc(13px / max(var(--zoom,1),.5)))}
+.node.size-l .node-name{font-size:max(16.5px,calc(16.5px / max(var(--zoom,1),.5)))}
 .node-path{font-family:var(--f-mono); font-size:10px; color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:-4px}
 .node-badges{display:flex; flex-wrap:wrap; gap:4px}
 .bdg{display:inline-flex; align-items:center; gap:4px; height:23px; padding:0 7px; border-radius:7px;
@@ -254,6 +258,13 @@ select.field{cursor:pointer}
   border-radius:var(--r-md); flex-wrap:wrap; max-width:calc(100% - 20px); align-items:center}
 .flow-zoom{position:absolute; bottom:10px; right:10px; display:flex; gap:4px; z-index:30; padding:5px;
   border-radius:var(--r-md); align-items:center}
+.minimap{position:absolute; top:10px; right:10px; z-index:29; width:168px; height:112px; border-radius:var(--r-md); overflow:hidden; cursor:crosshair}
+.minimap svg{width:100%; height:100%; display:block; touch-action:none}
+.minimap .mm-view{fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; vector-effect:non-scaling-stroke; pointer-events:none}
+#laneLayer{position:absolute; left:0; top:0; pointer-events:none; z-index:0}
+.lane{position:absolute; background:color-mix(in srgb,var(--lc) 7%,transparent); border-right:1.5px dashed color-mix(in srgb,var(--lc) 45%,transparent)}
+.lane-label{margin:10px 0 0 10px; display:inline-flex; padding:4px 10px; border-radius:99px; font-size:11px; font-weight:700;
+  background:color-mix(in srgb,var(--lc) 22%,var(--bg-3)); color:color-mix(in srgb,var(--lc) 85%,var(--ink)); white-space:nowrap}
 .zoomval{font-family:var(--f-mono); font-size:11px; color:var(--ink-2); min-width:38px; text-align:center}
 .flow-seltools{position:absolute; bottom:54px; right:10px; z-index:30; padding:5px; border-radius:var(--r-md)}
 .splitter-h{height:9px; flex:none; cursor:row-resize; display:grid; place-items:center; border-radius:99px; touch-action:none}
