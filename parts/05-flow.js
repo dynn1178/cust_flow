@@ -272,7 +272,7 @@ function nodeHtml(n) {
   return '<div class="node-head"><span class="node-hue-dot"></span>' +
       '<div class="node-headtxt"><div class="node-name">' + esc(n.name) + "</div>" +
       (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") + "</div>" +
-      '<span class="node-kind">' + esc(KIND[n.kind] || "페이지") + "</span>" +
+      '<span class="node-kind" title="' + esc(KIND[n.kind] || "페이지") + '"><span>' + esc(KIND[n.kind] || "페이지") + "</span></span>" +
     "</div>" +
     '<div class="node-thumb">' + thumb + warn + "</div>" +
     '<div class="node-main">' +

@@ -169,11 +169,17 @@ select.field{cursor:pointer}
 .flow.busy .node{box-shadow:none}
 
 .node{
-  position:absolute; width:190px; border-radius:var(--r-md); overflow:hidden; cursor:grab;
+  position:absolute; width:max(190px,min(240px,calc(190px / max(var(--zoom,1),.79)))); border-radius:var(--r-md); overflow:hidden; cursor:grab;
   background:var(--glass-3); border:1px solid var(--stroke); box-shadow:var(--shadow-sm);
   contain:layout style; transition:box-shadow .15s,border-color .15s; user-select:none;
 }
-.node.size-s{width:150px} .node.size-m{width:190px} .node.size-l{width:240px}
+/* 축소할 때 카드가 세로보다 가로로 더 급하게 좁아져 내용이 잘리지 않도록,
+   폭은 일정 배율(최대 +50px)까지만 완만하게 보정한다 — 전부 보정하면(=화면상
+   폭이 아예 고정되면) 옆 카드와 겹칠 수 있어 상한을 둔다. 바깥쪽 max()는
+   확대(zoom>1)했을 때 오히려 기본폭보다 좁아지는 일이 없도록 막는다. */
+.node.size-s{width:max(150px,min(200px,calc(150px / max(var(--zoom,1),.75))))}
+.node.size-m{width:max(190px,min(240px,calc(190px / max(var(--zoom,1),.79))))}
+.node.size-l{width:max(240px,min(290px,calc(240px / max(var(--zoom,1),.83))))}
 .node.sharp{border-radius:5px}
 .node.hued{border-color:color-mix(in srgb,var(--nc) 42%,var(--stroke))}
 .node.hued::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--nc); z-index:3}
@@ -181,12 +187,15 @@ select.field{cursor:pointer}
 .node.sel{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
 .node.dragging{cursor:grabbing; z-index:20}
 .node.link-src{border-color:var(--camp); box-shadow:0 0 0 2px color-mix(in srgb,var(--camp) 30%,transparent)}
-/* 헤더 — 이름·경로·유형을 이미지 위쪽 별도 줄로 분리해 썸네일을 가리지 않는다 */
-.node-head{display:flex; align-items:flex-start; gap:8px; padding:9px 10px 8px; border-bottom:1px solid var(--stroke-2)}
+/* 헤더 — 이름·경로·유형을 이미지 위쪽 별도 줄로 분리해 썸네일을 가리지 않는다.
+   유형 배지는 헤더 안에서 같은 줄을 나눠 쓰지 않도록 완전히 빼서 오른쪽 위에
+   따로 얹는다 — 제목과 폭을 다투다 겹치는 일이 없도록. */
+.node-head{position:relative; display:flex; align-items:flex-start; gap:8px; padding:9px 10px 8px; border-bottom:1px solid var(--stroke-2)}
 .node-hue-dot{width:8px; height:8px; border-radius:99px; background:var(--nc); margin-top:5px; flex:none}
-.node-headtxt{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
-.node-kind{flex:none; min-height:18px; padding:2px 8px; border-radius:99px; font-size:max(10px,calc(10px / var(--zoom,1)));
-  font-weight:600; display:flex; align-items:center; background:var(--glass-3); border:1px solid var(--stroke); color:var(--ink-2)}
+.node-headtxt{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; padding-right:80px}
+.node-kind{position:absolute; top:7px; right:8px; z-index:2; max-width:74px; min-height:18px; padding:2px 8px; border-radius:99px; overflow:hidden;
+  font-size:max(10px,calc(10px / max(var(--zoom,1),.6))); font-weight:600; display:flex; align-items:center; background:var(--glass-3); border:1px solid var(--stroke); color:var(--ink-2)}
+.node-kind span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .node.hued .node-kind{color:color-mix(in srgb,var(--nc) 70%,var(--ink)); border-color:color-mix(in srgb,var(--nc) 40%,transparent)}
 
 .node-thumb{height:129px; background:var(--glass-2); position:relative; display:grid; place-items:center; overflow:hidden}
@@ -199,44 +208,48 @@ select.field{cursor:pointer}
   background:color-mix(in srgb,var(--warn) 20%,var(--glass-3)); border:1px solid color-mix(in srgb,var(--warn) 45%,transparent); color:var(--warn)}
 .node-warn .ico{width:12px; height:12px; stroke-width:2.2}
 .node-main{padding:9px 10px 10px; display:flex; flex-direction:column; gap:6px}
-.node-name{font-size:max(14.5px,calc(14.5px / var(--zoom,1))); font-weight:600; letter-spacing:-.018em; line-height:1.24; word-break:keep-all; color:var(--ink);
+/* 세로로 쌓인 카드끼리 축소 시 겹치지 않도록, 카드 높이를 키우는 본문 글자들은
+   (제목·배지·태그·캠페인) 폭과 같은 방식으로 상한을 둔 채로만 커진다 — 헤더의
+   유형 배지처럼 다른 요소와 안 겹치는 게 목적이 아니라 카드 자체가 너무
+   높아지는 걸 막는 목적이라 배율은 조금 더 촘촘하게 잡는다. */
+.node-name{font-size:max(14.5px,min(21px,calc(14.5px / var(--zoom,1)))); font-weight:600; letter-spacing:-.018em; line-height:1.24; word-break:keep-all; color:var(--ink);
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis}
-.node.size-s .node-name{font-size:max(13px,calc(13px / var(--zoom,1)))}
-.node.size-l .node-name{font-size:max(16.5px,calc(16.5px / var(--zoom,1)))}
-.node-path{font-family:var(--f-mono); font-size:max(10px,calc(10px / var(--zoom,1))); color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.node.size-s .node-name{font-size:max(13px,min(19px,calc(13px / var(--zoom,1))))}
+.node.size-l .node-name{font-size:max(16.5px,min(24px,calc(16.5px / var(--zoom,1))))}
+.node-path{font-family:var(--f-mono); font-size:max(10px,min(14px,calc(10px / var(--zoom,1)))); color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .node-badges{display:flex; flex-wrap:wrap; gap:4px}
 .bdg{display:inline-flex; align-items:center; gap:4px; min-height:23px; padding:3px 7px; border-radius:7px;
   font-size:11px; font-weight:600; font-family:var(--f-mono);
   background:color-mix(in srgb,var(--c) 15%,transparent); color:color-mix(in srgb,var(--c) 78%,var(--ink));
   border:1px solid color-mix(in srgb,var(--c) 28%,transparent)}
-.bdg b{font-size:max(14px,calc(14px / var(--zoom,1))); font-weight:700; line-height:1.15; font-variant-numeric:tabular-nums}
+.bdg b{font-size:max(14px,min(19px,calc(14px / var(--zoom,1)))); font-weight:700; line-height:1.15; font-variant-numeric:tabular-nums}
 .bdg .ico{width:12px;height:12px;stroke-width:2.1; flex:none}
 .bdg.big{min-height:27px; padding:4px 10px; border-radius:8px}
-.bdg.big b{font-size:max(17px,calc(17px / var(--zoom,1)))}
+.bdg.big b{font-size:max(17px,min(23px,calc(17px / var(--zoom,1))))}
 .bdg.big .ico{width:14px;height:14px}
-.node.size-s .bdg{min-height:21px} .node.size-s .bdg b{font-size:max(12.5px,calc(12.5px / var(--zoom,1)))}
-.node.size-l .bdg b{font-size:max(15.5px,calc(15.5px / var(--zoom,1)))}
+.node.size-s .bdg{min-height:21px} .node.size-s .bdg b{font-size:max(12.5px,min(17px,calc(12.5px / var(--zoom,1))))}
+.node.size-l .bdg b{font-size:max(15.5px,min(21px,calc(15.5px / var(--zoom,1))))}
 
 /* 보기 모드 — 페이지 이름 아래에 해당 항목만 크게 */
 .node-focus{display:flex; flex-direction:column; gap:4px; padding-top:7px; border-top:1px dashed var(--stroke-2)}
 .fitem{display:flex; align-items:flex-start; gap:6px; line-height:1.35; color:var(--ink)}
 .fitem .ico{color:var(--c); width:13px; height:13px; stroke-width:2.1; flex:none; margin-top:2px}
 .ftext{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px}
-.fev{font-size:max(12.5px,calc(12.5px / var(--zoom,1))); font-weight:600; letter-spacing:-.012em; word-break:keep-all; overflow-wrap:anywhere;
+.fev{font-size:max(12.5px,min(17px,calc(12.5px / var(--zoom,1)))); font-weight:600; letter-spacing:-.012em; word-break:keep-all; overflow-wrap:anywhere;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
-.fmeta{font-size:max(10px,calc(10px / var(--zoom,1))); color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.node-focus.tags .fev{font-family:var(--f-mono); font-size:max(11.5px,calc(11.5px / var(--zoom,1))); word-break:break-all}
-.node.size-l .fev{font-size:max(13.5px,calc(13.5px / var(--zoom,1)))}
-.node.size-l .node-focus.tags .fev{font-size:max(12.5px,calc(12.5px / var(--zoom,1)))}
-.node.size-s .fev{font-size:max(11.5px,calc(11.5px / var(--zoom,1)))}
+.fmeta{font-size:max(10px,min(14px,calc(10px / var(--zoom,1)))); color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.node-focus.tags .fev{font-family:var(--f-mono); font-size:max(11.5px,min(15px,calc(11.5px / var(--zoom,1)))); word-break:break-all}
+.node.size-l .fev{font-size:max(13.5px,min(18px,calc(13.5px / var(--zoom,1))))}
+.node.size-l .node-focus.tags .fev{font-size:max(12.5px,min(16px,calc(12.5px / var(--zoom,1))))}
+.node.size-s .fev{font-size:max(11.5px,min(15px,calc(11.5px / var(--zoom,1))))}
 .node.size-s .fmeta{display:none}
 .fdot{width:7px; height:7px; border-radius:99px; flex:none; margin-top:4px}
-.fitem.more{font-size:max(10.5px,calc(10.5px / var(--zoom,1))); color:var(--ink-3); padding-left:19px}
-.fnone{font-size:max(11px,calc(11px / var(--zoom,1))); color:var(--ink-3); padding-top:7px; border-top:1px dashed var(--stroke-2)}
+.fitem.more{font-size:max(10.5px,min(14px,calc(10.5px / var(--zoom,1)))); color:var(--ink-3); padding-left:19px}
+.fnone{font-size:max(11px,min(15px,calc(11px / var(--zoom,1)))); color:var(--ink-3); padding-top:7px; border-top:1px dashed var(--stroke-2)}
 .node.dim{opacity:.38}
 .node.dim:hover,.node.dim.sel{opacity:.95}
 .node-camps{display:flex; flex-direction:column; gap:3px; padding-top:6px; border-top:1px dashed var(--stroke-2)}
-.ncamp{display:flex; align-items:center; gap:5px; font-size:max(10.5px,calc(10.5px / var(--zoom,1))); color:var(--ink-2); line-height:1.35}
+.ncamp{display:flex; align-items:center; gap:5px; font-size:max(10.5px,min(13px,calc(10.5px / var(--zoom,1)))); color:var(--ink-2); line-height:1.35}
 .ncamp .ico{color:var(--c); width:11px; height:11px; stroke-width:2}
 .nc-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .nc-dot{width:6px; height:6px; border-radius:99px; flex:none}
