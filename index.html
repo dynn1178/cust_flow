@@ -195,22 +195,29 @@ select.field{cursor:pointer}
 .node.dim{opacity:.38}
 .node.dim:hover,.node.dim.sel{opacity:.95}
 
-.node-title{padding:7px 4px 8px; display:flex; flex-direction:column; align-items:center; gap:1px; text-align:center}
+/* 프레임 — 이름·이미지·배지를 하나의 테두리로 묶는다. 확대·축소해도 이
+   덩어리가 통째로 같이 움직이므로 안쪽 글자가 넘칠 걱정이 없다. 태그·캠페인
+   목록(.node-main)은 이 프레임 바깥 아래에 그대로 노출된다. 투박한 진한
+   테두리 대신, 앱 전체에 쓰는 글라스 톤(반투명 배경 + 옅은 테두리 + 은은한
+   그림자)으로 통일해 더 정돈돼 보이게 한다. */
+.node-frame{position:relative; border-radius:var(--r-md); background:var(--glass-3); border:1px solid var(--stroke);
+  box-shadow:var(--shadow-sm); overflow:hidden; transition:border-color .15s,box-shadow .15s}
+.node.sharp .node-frame{border-radius:5px}
+.node.hued .node-frame{border-color:color-mix(in srgb,var(--nc) 55%,var(--stroke))}
+.node.sel .node-frame{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
+.node.link-src .node-frame{border-color:var(--camp); box-shadow:0 0 0 2px color-mix(in srgb,var(--camp) 30%,transparent)}
+
+.node-title{padding:8px 8px 7px; display:flex; flex-direction:column; align-items:center; gap:1px; text-align:center}
 .node-name{font-size:max(14.5px,min(24px,calc(14.5px / max(var(--zoom,1),.6)))); font-weight:700; letter-spacing:-.02em; line-height:1.24; word-break:keep-all; color:var(--ink);
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis}
 .node.size-s .node-name{font-size:max(13px,min(21px,calc(13px / max(var(--zoom,1),.6))))}
 .node.size-l .node-name{font-size:max(16.5px,min(27px,calc(16.5px / max(var(--zoom,1),.6))))}
 .node-path{font-family:var(--f-mono); font-size:max(10px,min(15px,calc(10px / max(var(--zoom,1),.6)))); color:var(--ink-3); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 
-/* 이미지 프레임 — 실제 "액자" 느낌을 주는 유일한 테두리·그림자 요소 */
-.node-pic{position:relative; height:129px; background:var(--glass-2); border-radius:var(--r-md); overflow:hidden;
-  border:2px solid var(--ink-3); box-shadow:var(--shadow-sm); display:grid; place-items:center; transition:border-color .15s,box-shadow .15s}
+/* 이미지 — 프레임에 이미 테두리·그림자가 있으니 여기서는 모서리만 잡는다 */
+.node-pic{position:relative; height:129px; background:var(--glass-2); overflow:hidden; display:grid; place-items:center}
 .node.size-s .node-pic{height:99px}
 .node.size-l .node-pic{height:165px}
-.node.sharp .node-pic{border-radius:5px}
-.node.hued .node-pic{border-color:var(--nc)}
-.node.sel .node-pic{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
-.node.link-src .node-pic{border-color:var(--camp); box-shadow:0 0 0 2px color-mix(in srgb,var(--camp) 30%,transparent)}
 .node-pic img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block}
 .node-pic .ph{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--ink-3); font-size:10.5px}
 .node-pic .ph .ico{width:18px;height:18px;opacity:.5}
@@ -229,7 +236,7 @@ select.field{cursor:pointer}
 .node.size-s .node-pic .pick span{font-size:11.5px; padding:5px 10px}
 
 .node-main{padding:8px 4px 2px; display:flex; flex-direction:column; gap:7px}
-.node-badges{display:flex; flex-wrap:wrap; gap:4px; justify-content:center}
+.node-badges{display:flex; flex-wrap:wrap; gap:4px; justify-content:center; padding:0 8px 9px}
 .bdg{display:inline-flex; align-items:center; gap:4px; min-height:23px; padding:3px 7px; border-radius:7px;
   font-size:11px; font-weight:600; font-family:var(--f-mono);
   background:color-mix(in srgb,var(--c) 15%,transparent); color:color-mix(in srgb,var(--c) 78%,var(--ink));
@@ -244,7 +251,7 @@ select.field{cursor:pointer}
 
 /* 목록 — 태그·캠페인이 여러 개면 그냥 아래로 계속 쌓인다(잘리지 않음) */
 .node-list{display:flex; flex-direction:column; gap:6px; padding-top:6px; border-top:1px dashed var(--stroke-2)}
-.g-row{display:flex; align-items:flex-start; gap:6px; font-size:max(11px,min(15px,calc(11px / max(var(--zoom,1),.65))))}
+.g-row{display:flex; align-items:flex-start; gap:6px; font-size:max(12.5px,min(17px,calc(12.5px / max(var(--zoom,1),.65))))}
 .g-dot{width:6px; height:6px; border-radius:99px; flex:none; margin-top:.5em}
 .g-body{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px}
 .g-name{color:var(--ink); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -270,13 +277,27 @@ select.field{cursor:pointer}
 .minimap .mm-view{fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; vector-effect:non-scaling-stroke; pointer-events:none}
 #laneLayer{position:absolute; left:0; top:0; pointer-events:none; z-index:0}
 #flowSurface.lane-drawing{cursor:crosshair}
-.lane{position:absolute; background:color-mix(in srgb,var(--lc) 7%,transparent); border-right:1.5px dashed color-mix(in srgb,var(--lc) 45%,transparent)}
-.lane-preview{opacity:.85; border-right:none; box-shadow:inset 0 0 0 2px var(--lc)}
-.lane-label{position:absolute; top:10px; left:10px; pointer-events:auto; cursor:move; display:inline-flex; padding:4px 10px; border-radius:99px; font-size:11px; font-weight:700;
-  background:color-mix(in srgb,var(--lc) 22%,var(--bg-3)); color:color-mix(in srgb,var(--lc) 85%,var(--ink)); white-space:nowrap; box-shadow:var(--shadow-sm)}
-.lane-edge{position:absolute; top:0; bottom:0; width:12px; pointer-events:auto; cursor:col-resize; z-index:1}
-.lane-edge.l{left:-6px} .lane-edge.r{right:-6px}
-.lane-edge:hover{background:color-mix(in srgb,var(--lc) 20%,transparent)}
+.lane{position:absolute; border-radius:10px; background:color-mix(in srgb,var(--lc) 7%,transparent);
+  border:1.5px dashed color-mix(in srgb,var(--lc) 45%,transparent)}
+.lane-preview{opacity:.85; box-shadow:inset 0 0 0 2px var(--lc)}
+/* 라벨은 "누르면 뭔가 된다"는 느낌이 들도록 호버 시 살짝 떠오르고 진해진다 —
+   드래그하면 이동, 그냥 클릭하면 이름·색 편집이 열린다는 두 가지 동작을 다
+   암시해야 해서 move 커서 + 수정 아이콘을 같이 둔다. */
+.lane-label{position:absolute; top:10px; left:10px; pointer-events:auto; cursor:move; display:inline-flex; align-items:center; gap:7px;
+  padding:7px 15px; border-radius:99px; font-size:14px; font-weight:700; letter-spacing:-.01em;
+  background:color-mix(in srgb,var(--lc) 26%,var(--bg-3)); color:color-mix(in srgb,var(--lc) 88%,var(--ink)); white-space:nowrap; box-shadow:var(--shadow-sm);
+  transition:box-shadow .15s,transform .15s,background .15s}
+.lane-label:hover{background:color-mix(in srgb,var(--lc) 42%,var(--bg-3)); box-shadow:var(--shadow); transform:translateY(-1px)}
+.lane-label:active{transform:translateY(0)}
+.lane-editcue{display:flex; flex:none; opacity:0; transition:opacity .15s}
+.lane-label:hover .lane-editcue{opacity:.8}
+.lane-editcue .ico{width:12px; height:12px; stroke-width:2.2}
+.lane-edge{position:absolute; pointer-events:auto; z-index:1}
+.lane-edge.l{left:-6px; top:0; bottom:0; width:12px; cursor:ew-resize}
+.lane-edge.r{right:-6px; top:0; bottom:0; width:12px; cursor:ew-resize}
+.lane-edge.t{top:-6px; left:0; right:0; height:12px; cursor:ns-resize}
+.lane-edge.b{bottom:-6px; left:0; right:0; height:12px; cursor:ns-resize}
+.lane-edge:hover{background:color-mix(in srgb,var(--lc) 22%,transparent)}
 .zoomval{font-family:var(--f-mono); font-size:11px; color:var(--ink-2); min-width:38px; text-align:center}
 .flow-seltools{position:absolute; bottom:54px; right:10px; z-index:30; padding:5px; border-radius:var(--r-md)}
 .splitter-h{height:9px; flex:none; cursor:row-resize; display:grid; place-items:center; border-radius:99px; touch-action:none}
@@ -324,7 +345,8 @@ select.field{cursor:pointer}
   justify-content:safe center; align-content:safe center; padding:18px}
 #stageDoc{position:relative; transform-origin:center center; box-shadow:var(--shadow); border-radius:6px;
   background:var(--bg-3); flex:none}
-#stageDoc img.shot{display:block; width:100%; height:100%; object-fit:contain; border-radius:6px; pointer-events:none; user-select:none}
+#stageDoc img.shot{position:absolute; display:block; object-fit:contain; border-radius:6px; pointer-events:none; user-select:none}
+#stageDoc .noshot{position:absolute; display:flex; align-items:center; justify-content:center; border-radius:6px; pointer-events:none; user-select:none}
 #layerSvg{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
 #layerSvg .lyr{cursor:pointer}
 #layerSvg .lyr.sel .shape{stroke-dasharray:none; filter:drop-shadow(0 0 0 transparent)}
@@ -1216,19 +1238,26 @@ function onFrame(fn) {                // 다음 프레임에 한 번만 실행
 function nodeW(n) { return (NSIZE[n.size] || NSIZE.m).w; }
 function nodeRect(n) {
   const s = NSZ[n.id];
-  return { x: n.x, y: n.y, w: s ? s.w : nodeW(n), h: s ? s.h : 150 };
+  /* midY = 포트·연결선이 좌우로 붙는 세로 기준점. 태그·캠페인 목록은 카드
+     아래 바깥에 노출될 뿐 길이가 들쭉날쭉해서, 전체 높이의 절반을 쓰면 목록이
+     길어질 때마다 연결선 시작점이 이미지에서 멀어진다 — 그래서 이름·이미지·
+     배지를 담은 테두리(frameH)만의 세로 중앙을 쓴다. */
+  const h = s ? s.h : 150;
+  const midY = n.y + (s && s.frameH ? s.frameH : h) / 2;
+  return { x: n.x, y: n.y, w: s ? s.w : nodeW(n), h, midY };
 }
 
 /* ---------------- 연결선 기하 ---------------- */
 const SIDE_N = { n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, e: { x: 1, y: 0 }, w: { x: -1, y: 0 } };
 function sidePoint(r, side) {
+  const midY = r.midY != null ? r.midY : r.y + r.h / 2;
   if (side === "n") return { x: r.x + r.w / 2, y: r.y };
   if (side === "s") return { x: r.x + r.w / 2, y: r.y + r.h };
-  if (side === "w") return { x: r.x, y: r.y + r.h / 2 };
-  return { x: r.x + r.w, y: r.y + r.h / 2 };
+  if (side === "w") return { x: r.x, y: midY };
+  return { x: r.x + r.w, y: midY };
 }
 function autoSide(r, target) {
-  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const cx = r.x + r.w / 2, cy = r.midY != null ? r.midY : r.y + r.h / 2;
   const dx = target.x - cx, dy = target.y - cy;
   if (Math.abs(dx) * r.h >= Math.abs(dy) * r.w) return dx >= 0 ? "e" : "w";
   return dy >= 0 ? "s" : "n";
@@ -1461,12 +1490,21 @@ function nodeHtml(n) {
 
   const miss = completeness(n);
   const warn = miss.length ? '<span class="node-warn" title="' + esc(miss.join(" · ")) + '">' + ico("alert", "xs") + "</span>" : "";
-  return '<div class="node-title"><div class="node-name">' + esc(n.name) + "</div>" +
+  /* 제목·이미지·배지를 하나의 테두리(.node-frame)로 묶는다 — 확대·축소해도
+     이 틀 전체가 한 덩어리로 같이 움직이니 안에서 글자가 넘칠 걱정이 없다.
+     태그·캠페인 목록(body)은 지금처럼 그 바깥 아래에 그대로 노출한다.
+     연결선 포트도 프레임 안에 둬서, 목록 길이와 상관없이 항상 프레임(이미지)
+     세로 중앙에서 선이 시작하도록 한다. */
+  return '<div class="node-frame">' +
+      '<div class="node-title"><div class="node-name">' + esc(n.name) + "</div>" +
       (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
+      "</div>" +
+      '<div class="node-pic">' + thumb + warn + "</div>" +
+      (bd ? '<div class="node-badges">' + bd + "</div>" : "") +
+      '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
+      '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
     "</div>" +
-    '<div class="node-pic">' + thumb + warn + "</div>" +
-    '<div class="node-main">' +
-    (bd ? '<div class="node-badges">' + bd + "</div>" : "") + body + "</div>";
+    (body ? '<div class="node-main">' + body + "</div>" : "");
 }
 function renderNodes() {
   const layer = $("#nodeLayer");
@@ -1484,13 +1522,12 @@ function renderNodes() {
       state.ui.focus, n.tags.map(t => t.platform + t.status + t.event).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
-      el.innerHTML = nodeHtml(n) +
-        '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
-        '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>';
+      el.innerHTML = nodeHtml(n);
       el.dataset.sig = sig;
     }
     el.style.left = n.x + "px"; el.style.top = n.y + "px";
-    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150 };
+    const frameEl = el.querySelector(".node-frame");
+    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150, frameH: frameEl ? frameEl.offsetHeight : 0 };
   });
   Object.keys(have).forEach(id => { have[id].remove(); delete NSZ[id]; });
   paintSelection();
@@ -1956,15 +1993,20 @@ function autoLayout(dir) {
 let mounted = { id: null, src: null, w: 0, h: 0 };
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
-/* 화면 이미지 크기만이 아니라, 이미지 밖으로 삐져나온 도형·텍스트 레이어까지
-   포함한 실제 콘텐츠 범위 — 맞춤(가로/세로/전체 화면) 계산과 캔버스 크기는
-   항상 이 범위를 기준으로 한다. */
+/* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)
+   삐져나온 도형·텍스트 레이어까지 포함한 실제 콘텐츠 범위 — 맞춤(가로/세로/
+   전체 화면) 계산과 캔버스 크기는 항상 이 범위를 기준으로 한다. x1/y1은
+   이미지 왼쪽 위(0,0) 기준으로 왼쪽·위로 얼마나 더 넓어졌는지(음수)를 담는다. */
 function docExtent(n) {
   const base = docSize(n);
-  if (!n || !n.layers || !n.layers.length) return base;
-  let w = base.w, h = base.h;
-  n.layers.forEach(l => { const b = bbox(l); w = Math.max(w, b.x + b.w); h = Math.max(h, b.y + b.h); });
-  return { w, h };
+  if (!n || !n.layers || !n.layers.length) return { x1: 0, y1: 0, w: base.w, h: base.h };
+  let x1 = 0, y1 = 0, x2 = base.w, y2 = base.h;
+  n.layers.forEach(l => {
+    const b = bbox(l);
+    x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y);
+    x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h);
+  });
+  return { x1, y1, w: x2 - x1, h: y2 - y1 };
 }
 function stageScale(n) {
   const d = docExtent(n);
@@ -1976,16 +2018,27 @@ function stageScale(n) {
     : availW / d.w;                  // "width" — 기본값
   return clamp(s, 0.05, 4);
 }
+/* 이미지 자체는 항상 레이어 좌표계의 (0,0)~(base.w,base.h)에 있으므로, 범위가
+   왼쪽·위로 넓어졌으면(x1/y1이 음수) 그만큼 이미지를 오른쪽·아래로 밀어서
+   그려야 캔버스 왼쪽 위 모서리와 좌표계가 맞는다. */
+function positionShotEl(el, base, ext, s) {
+  el.style.left = Math.round(-ext.x1 * s) + "px";
+  el.style.top = Math.round(-ext.y1 * s) + "px";
+  el.style.width = Math.round(base.w * s) + "px";
+  el.style.height = Math.round(base.h * s) + "px";
+}
 /* 드래그 중에는 화면 이미지·캔버스 크기를 건드리지 않다가(스크롤이 튀지
    않도록), 그리기·이동·크기 조절이 끝나는 시점에만 맞춤 범위를 다시 맞춘다. */
 function resyncStageExtent() {
   const n = curNode(); if (!n) return;
-  const ext = docExtent(n), s = stageScale(n);
+  const base = docSize(n), ext = docExtent(n), s = stageScale(n);
   const doc = $("#stageDoc");
   doc.style.width = Math.round(ext.w * s) + "px";
   doc.style.height = Math.round(ext.h * s) + "px";
+  const img = doc.querySelector(".shot, .noshot");
+  if (img) positionShotEl(img, base, ext, s);
   const svg = $("#layerSvg");
-  if (svg) svg.setAttribute("viewBox", "0 0 " + ext.w + " " + ext.h);
+  if (svg) svg.setAttribute("viewBox", ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h);
 }
 function bbox(l) {
   if (l.kind === "pen") {
@@ -2081,18 +2134,18 @@ function renderStage() {
   $("#sFit").classList.toggle("on", !stageZoom);
   $("#sFitName").textContent = STAGE_FIT[stageFitMode].name;
 
-  const shotStyle = "width:" + Math.round(base.w * s) + "px; height:" + Math.round(base.h * s) + "px;";
+  const shotStyle = "left:" + Math.round(-ext.x1 * s) + "px; top:" + Math.round(-ext.y1 * s) + "px; width:" + Math.round(base.w * s) + "px; height:" + Math.round(base.h * s) + "px;";
   if (mounted.id !== n.id || mounted.src !== src || mounted.w !== base.w || mounted.h !== base.h) {
     const shot = src
       ? '<img class="shot" src="' + src + '" alt="' + esc(n.name) + ' 화면" draggable="false" style="' + shotStyle + '">'
       : '<div class="noshot" style="' + shotStyle + '"><div class="empty">' + ico("image") + "<div>화면 이미지를 올리거나 붙여넣기(Ctrl+V)<br>없이도 레이어를 그릴 수 있습니다</div></div></div>";
-    doc.innerHTML = shot + '<svg id="layerSvg" viewBox="0 0 ' + ext.w + " " + ext.h + '"></svg>';
+    doc.innerHTML = shot + '<svg id="layerSvg" viewBox="' + ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h + '"></svg>';
     mounted = { id: n.id, src: src, w: base.w, h: base.h };
   } else {
     const img = doc.querySelector(".shot, .noshot");
-    if (img) { img.style.width = Math.round(base.w * s) + "px"; img.style.height = Math.round(base.h * s) + "px"; }
+    if (img) positionShotEl(img, base, ext, s);
     const svg = $("#layerSvg");
-    if (svg) svg.setAttribute("viewBox", "0 0 " + ext.w + " " + ext.h);
+    if (svg) svg.setAttribute("viewBox", ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h);
   }
   renderLayers();
   renderStageFoot(n, (n.layers || []).find(x => x.id === sel.layer));
@@ -2216,7 +2269,7 @@ function initStage() {
   const doc = $("#stageDoc"), wrap = $("#stageWrap");
   const toDoc = ev => {
     const n = curNode(), d = docExtent(n), r = doc.getBoundingClientRect();
-    return { x: (ev.clientX - r.left) / (r.width / d.w), y: (ev.clientY - r.top) / (r.height / d.h) };
+    return { x: d.x1 + (ev.clientX - r.left) / (r.width / d.w), y: d.y1 + (ev.clientY - r.top) / (r.height / d.h) };
   };
 
   doc.addEventListener("pointerdown", e => {
@@ -3852,9 +3905,10 @@ function initMinimap() {
 }
 
 /* ---------------- 구간(스윔레인) 배경 ----------------
-   캔버스에 이름이 붙은 세로 구간을 배경으로 그린다("유입 → 탐색 → 구매" 같은
-   퍼널 단계). 좌표를 입력하는 대신 캔버스에서 직접 그려서 만들고, 라벨을
-   끌면 이동, 가장자리를 끌면 크기를 조절한다. */
+   캔버스에 이름이 붙은 구간을 배경으로 그린다("유입 → 탐색 → 구매" 같은 퍼널
+   단계, 또는 가로·세로를 섞은 임의 영역). 좌표를 입력하는 대신 캔버스에서
+   직접 사각형으로 그려서 만들고, 라벨을 끌면 이동, 네 변을 끌면 그 방향으로만
+   크기를 조절한다. */
 const LANE_PALETTE = ["#4a63e7", "#7c4ddb", "#12a97a", "#e08a1e", "#e0483f", "#0f9a70", "#64748b"];
 function nextLaneColor() { return LANE_PALETTE[(B().lanes || []).length % LANE_PALETTE.length]; }
 function laneById(id) { return (B().lanes || []).find(l => l.id === id); }
@@ -3865,46 +3919,56 @@ function laneExtentY() {
   nodes.forEach(n => { const q = nodeRect(n); y1 = Math.min(y1, q.y); y2 = Math.max(y2, q.y + q.h); });
   return { y1: y1 - 160, y2: y2 + 160 };
 }
+/* 예전에는 구간이 세로 전체를 덮는 띠(x·w만 저장)였다 — y·h가 없는 예전
+   데이터는 그때 모습 그대로 보이도록 세로 범위를 자동 계산해서 채운다. */
+function laneRect(l) {
+  if (l.y != null && l.h != null) return { x: l.x, y: l.y, w: l.w || 300, h: l.h };
+  const { y1, y2 } = laneExtentY();
+  return { x: l.x, y: y1, w: l.w || 900, h: Math.max(40, y2 - y1) };
+}
 function renderLanes() {
   const layer = $("#laneLayer"); if (!layer) return;
   const lanes = B().lanes || [];
   if (!lanes.length) { layer.innerHTML = ""; return; }
-  const { y1, y2 } = laneExtentY(), h = Math.max(40, y2 - y1), editable = canEdit();
+  const editable = canEdit();
   layer.innerHTML = lanes.map(l => {
-    const w = l.w || 900;
-    return '<div class="lane" data-lane="' + l.id + '" style="left:' + l.x + "px; top:" + y1 + "px; width:" + w + "px; height:" + h + "px; --lc:" + (l.color || "#4a63e7") + '">' +
-      (editable ? '<div class="lane-edge l" data-edge="l"></div><div class="lane-edge r" data-edge="r"></div>' : "") +
-      '<div class="lane-label"' + (editable ? "" : ' style="pointer-events:none"') + '>' + esc(l.name || "구간") + "</div></div>";
+    const r = laneRect(l);
+    return '<div class="lane" data-lane="' + l.id + '" style="left:' + r.x + "px; top:" + r.y + "px; width:" + r.w + "px; height:" + r.h + "px; --lc:" + (l.color || "#4a63e7") + '">' +
+      (editable ? '<div class="lane-edge l" data-edge="l"></div><div class="lane-edge r" data-edge="r"></div>' +
+        '<div class="lane-edge t" data-edge="t"></div><div class="lane-edge b" data-edge="b"></div>' : "") +
+      '<div class="lane-label"' + (editable ? "" : ' style="pointer-events:none"') + '><span class="lane-name">' + esc(l.name || "구간") + "</span>" +
+      (editable ? '<span class="lane-editcue">' + ico("edit", "xs") + "</span>" : "") + "</div></div>";
   }).join("");
 }
-/* 캔버스 배경을 드래그해서 새 구간을 그린다 — initFlow()의 pointerdown
-   핸들러에서 laneMode일 때 이 함수로 넘어온다(노드 드래그·패닝과 겹치지
-   않도록 가장 먼저 분기). */
+/* 캔버스 배경을 대각선으로 드래그해서 새 구간을 사각형으로 그린다 —
+   initFlow()의 pointerdown 핸들러에서 laneMode일 때 이 함수로 넘어온다
+   (노드 드래그·패닝과 겹치지 않도록 가장 먼저 분기). */
 function startLaneDraw(e, surf, r) {
   e.preventDefault();
   const v = B().view;
-  const toWorldX = cx => (cx - r.left - v.panX) / v.zoom;
-  const startX = toWorldX(e.clientX);
-  let curX = startX;
+  const toWorld = (cx, cy) => ({ x: (cx - r.left - v.panX) / v.zoom, y: (cy - r.top - v.panY) / v.zoom });
+  const start = toWorld(e.clientX, e.clientY);
+  let cur = start;
   const color = nextLaneColor();
   const preview = document.createElement("div");
   preview.className = "lane lane-preview";
   preview.style.setProperty("--lc", color);
   $("#laneLayer").appendChild(preview);
   const paint = () => {
-    const { y1, y2 } = laneExtentY();
-    const x1 = Math.min(startX, curX), w = Math.max(4, Math.abs(curX - startX));
-    preview.style.left = x1 + "px"; preview.style.top = y1 + "px"; preview.style.width = w + "px"; preview.style.height = Math.max(40, y2 - y1) + "px";
+    const x1 = Math.min(start.x, cur.x), y1 = Math.min(start.y, cur.y);
+    const w = Math.max(4, Math.abs(cur.x - start.x)), h = Math.max(4, Math.abs(cur.y - start.y));
+    preview.style.left = x1 + "px"; preview.style.top = y1 + "px"; preview.style.width = w + "px"; preview.style.height = h + "px";
   };
   paint();
-  const mv = ev => { curX = toWorldX(ev.clientX); paint(); };
+  const mv = ev => { cur = toWorld(ev.clientX, ev.clientY); paint(); };
   const up = ev => {
     surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
     preview.remove();
     laneMode = false; $("#btnLanes").classList.remove("on"); surf.classList.remove("lane-drawing");
-    const x1 = Math.round(Math.min(startX, curX)), w = Math.round(Math.abs(curX - startX));
-    if (w < 20) return;
-    const lane = { id: uid("lane"), name: "구간 " + ((B().lanes || []).length + 1), x: x1, w, color };
+    const x1 = Math.round(Math.min(start.x, cur.x)), y1 = Math.round(Math.min(start.y, cur.y));
+    const w = Math.round(Math.abs(cur.x - start.x)), h = Math.round(Math.abs(cur.y - start.y));
+    if (w < 20 || h < 20) return;
+    const lane = { id: uid("lane"), name: "구간 " + ((B().lanes || []).length + 1), x: x1, y: y1, w, h, color };
     B().lanes = (B().lanes || []).concat(lane);
     markDirty(); renderFlow();
     if (ev.type === "pointerup") openLaneRenamePopover(lane.id, ev.clientX, ev.clientY);
@@ -3912,8 +3976,8 @@ function startLaneDraw(e, surf, r) {
   surf.setPointerCapture(e.pointerId);
   surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
 }
-/* 라벨(이동)·가장자리(크기 조절) 드래그, 라벨을 드래그 없이 누르면 이름·색
-   편집 팝오버를 연다. */
+/* 라벨(이동)·네 변(그 방향으로 크기 조절) 드래그, 라벨을 드래그 없이 누르면
+   이름·색 편집 팝오버를 연다. */
 function initLaneInteractions() {
   const laneLayer = $("#laneLayer");
   laneLayer.addEventListener("pointerdown", e => {
@@ -3924,15 +3988,19 @@ function initLaneInteractions() {
     e.preventDefault(); e.stopPropagation();
     const laneEl = e.target.closest(".lane"), lane = laneById(laneEl.dataset.lane);
     if (!lane) return;
-    const v = B().view, sx = e.clientX, sy = e.clientY, ox = lane.x, ow = lane.w || 900;
+    const r0 = laneRect(lane);
+    if (lane.y == null || lane.h == null) { lane.x = r0.x; lane.y = r0.y; lane.w = r0.w; lane.h = r0.h; }
+    const v = B().view, sx = e.clientX, sy = e.clientY, ox = lane.x, oy = lane.y, ow = lane.w, oh = lane.h;
     const side = edge ? edge.dataset.edge : null;
     let moved = false;
     const mv = ev => {
-      const dx = (ev.clientX - sx) / v.zoom;
-      if (Math.abs(ev.clientX - sx) > 3) moved = true;
-      if (label) lane.x = Math.round(ox + dx);
+      const dx = (ev.clientX - sx) / v.zoom, dy = (ev.clientY - sy) / v.zoom;
+      if (Math.abs(ev.clientX - sx) > 3 || Math.abs(ev.clientY - sy) > 3) moved = true;
+      if (label) { lane.x = Math.round(ox + dx); lane.y = Math.round(oy + dy); }
       else if (side === "r") lane.w = Math.max(20, Math.round(ow + dx));
-      else { const nx = Math.round(ox + dx), nw = Math.round(ow - dx); if (nw >= 20) { lane.x = nx; lane.w = nw; } }
+      else if (side === "l") { const nx = Math.round(ox + dx), nw = Math.round(ow - dx); if (nw >= 20) { lane.x = nx; lane.w = nw; } }
+      else if (side === "b") lane.h = Math.max(20, Math.round(oh + dy));
+      else if (side === "t") { const ny = Math.round(oy + dy), nh = Math.round(oh - dy); if (nh >= 20) { lane.y = ny; lane.h = nh; } }
       renderFlow();
     };
     const up = () => {
@@ -4071,12 +4139,17 @@ async function exportBoardCanvas() {
 
   const ox = pad - x1, oy = pad + titleH - y1;
   (b.lanes || []).forEach(l => {
-    const lx = l.x + ox, lw = l.w || 900;
+    const lr = laneRect(l);
+    const lx = lr.x + ox, ly = lr.y + oy;
     ctx.fillStyle = hexToRgba(l.color || "#4a63e7", 0.08);
-    ctx.fillRect(lx, oy + y1 - 20, lw, (y2 - y1) + 40);
+    ctx.fillRect(lx, ly, lr.w, lr.h);
+    ctx.strokeStyle = hexToRgba(l.color || "#4a63e7", 0.4);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeRect(lx, ly, lr.w, lr.h);
+    ctx.setLineDash([]);
     ctx.fillStyle = l.color || "#4a63e7";
     ctx.font = "700 11px 'IBM Plex Sans KR', sans-serif";
-    ctx.fillText(l.name || "", lx + 8, oy + y1 - 6);
+    ctx.fillText(l.name || "", lx + 8, ly + 16);
   });
   edges.forEach(e => {
     const d = pathFor(e); if (!d) return;

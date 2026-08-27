@@ -6,15 +6,20 @@
 let mounted = { id: null, src: null, w: 0, h: 0 };
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
-/* 화면 이미지 크기만이 아니라, 이미지 밖으로 삐져나온 도형·텍스트 레이어까지
-   포함한 실제 콘텐츠 범위 — 맞춤(가로/세로/전체 화면) 계산과 캔버스 크기는
-   항상 이 범위를 기준으로 한다. */
+/* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)
+   삐져나온 도형·텍스트 레이어까지 포함한 실제 콘텐츠 범위 — 맞춤(가로/세로/
+   전체 화면) 계산과 캔버스 크기는 항상 이 범위를 기준으로 한다. x1/y1은
+   이미지 왼쪽 위(0,0) 기준으로 왼쪽·위로 얼마나 더 넓어졌는지(음수)를 담는다. */
 function docExtent(n) {
   const base = docSize(n);
-  if (!n || !n.layers || !n.layers.length) return base;
-  let w = base.w, h = base.h;
-  n.layers.forEach(l => { const b = bbox(l); w = Math.max(w, b.x + b.w); h = Math.max(h, b.y + b.h); });
-  return { w, h };
+  if (!n || !n.layers || !n.layers.length) return { x1: 0, y1: 0, w: base.w, h: base.h };
+  let x1 = 0, y1 = 0, x2 = base.w, y2 = base.h;
+  n.layers.forEach(l => {
+    const b = bbox(l);
+    x1 = Math.min(x1, b.x); y1 = Math.min(y1, b.y);
+    x2 = Math.max(x2, b.x + b.w); y2 = Math.max(y2, b.y + b.h);
+  });
+  return { x1, y1, w: x2 - x1, h: y2 - y1 };
 }
 function stageScale(n) {
   const d = docExtent(n);
@@ -26,16 +31,27 @@ function stageScale(n) {
     : availW / d.w;                  // "width" — 기본값
   return clamp(s, 0.05, 4);
 }
+/* 이미지 자체는 항상 레이어 좌표계의 (0,0)~(base.w,base.h)에 있으므로, 범위가
+   왼쪽·위로 넓어졌으면(x1/y1이 음수) 그만큼 이미지를 오른쪽·아래로 밀어서
+   그려야 캔버스 왼쪽 위 모서리와 좌표계가 맞는다. */
+function positionShotEl(el, base, ext, s) {
+  el.style.left = Math.round(-ext.x1 * s) + "px";
+  el.style.top = Math.round(-ext.y1 * s) + "px";
+  el.style.width = Math.round(base.w * s) + "px";
+  el.style.height = Math.round(base.h * s) + "px";
+}
 /* 드래그 중에는 화면 이미지·캔버스 크기를 건드리지 않다가(스크롤이 튀지
    않도록), 그리기·이동·크기 조절이 끝나는 시점에만 맞춤 범위를 다시 맞춘다. */
 function resyncStageExtent() {
   const n = curNode(); if (!n) return;
-  const ext = docExtent(n), s = stageScale(n);
+  const base = docSize(n), ext = docExtent(n), s = stageScale(n);
   const doc = $("#stageDoc");
   doc.style.width = Math.round(ext.w * s) + "px";
   doc.style.height = Math.round(ext.h * s) + "px";
+  const img = doc.querySelector(".shot, .noshot");
+  if (img) positionShotEl(img, base, ext, s);
   const svg = $("#layerSvg");
-  if (svg) svg.setAttribute("viewBox", "0 0 " + ext.w + " " + ext.h);
+  if (svg) svg.setAttribute("viewBox", ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h);
 }
 function bbox(l) {
   if (l.kind === "pen") {
@@ -131,18 +147,18 @@ function renderStage() {
   $("#sFit").classList.toggle("on", !stageZoom);
   $("#sFitName").textContent = STAGE_FIT[stageFitMode].name;
 
-  const shotStyle = "width:" + Math.round(base.w * s) + "px; height:" + Math.round(base.h * s) + "px;";
+  const shotStyle = "left:" + Math.round(-ext.x1 * s) + "px; top:" + Math.round(-ext.y1 * s) + "px; width:" + Math.round(base.w * s) + "px; height:" + Math.round(base.h * s) + "px;";
   if (mounted.id !== n.id || mounted.src !== src || mounted.w !== base.w || mounted.h !== base.h) {
     const shot = src
       ? '<img class="shot" src="' + src + '" alt="' + esc(n.name) + ' 화면" draggable="false" style="' + shotStyle + '">'
       : '<div class="noshot" style="' + shotStyle + '"><div class="empty">' + ico("image") + "<div>화면 이미지를 올리거나 붙여넣기(Ctrl+V)<br>없이도 레이어를 그릴 수 있습니다</div></div></div>";
-    doc.innerHTML = shot + '<svg id="layerSvg" viewBox="0 0 ' + ext.w + " " + ext.h + '"></svg>';
+    doc.innerHTML = shot + '<svg id="layerSvg" viewBox="' + ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h + '"></svg>';
     mounted = { id: n.id, src: src, w: base.w, h: base.h };
   } else {
     const img = doc.querySelector(".shot, .noshot");
-    if (img) { img.style.width = Math.round(base.w * s) + "px"; img.style.height = Math.round(base.h * s) + "px"; }
+    if (img) positionShotEl(img, base, ext, s);
     const svg = $("#layerSvg");
-    if (svg) svg.setAttribute("viewBox", "0 0 " + ext.w + " " + ext.h);
+    if (svg) svg.setAttribute("viewBox", ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h);
   }
   renderLayers();
   renderStageFoot(n, (n.layers || []).find(x => x.id === sel.layer));
@@ -266,7 +282,7 @@ function initStage() {
   const doc = $("#stageDoc"), wrap = $("#stageWrap");
   const toDoc = ev => {
     const n = curNode(), d = docExtent(n), r = doc.getBoundingClientRect();
-    return { x: (ev.clientX - r.left) / (r.width / d.w), y: (ev.clientY - r.top) / (r.height / d.h) };
+    return { x: d.x1 + (ev.clientX - r.left) / (r.width / d.w), y: d.y1 + (ev.clientY - r.top) / (r.height / d.h) };
   };
 
   doc.addEventListener("pointerdown", e => {

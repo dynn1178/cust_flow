@@ -37,7 +37,8 @@
   justify-content:safe center; align-content:safe center; padding:18px}
 #stageDoc{position:relative; transform-origin:center center; box-shadow:var(--shadow); border-radius:6px;
   background:var(--bg-3); flex:none}
-#stageDoc img.shot{display:block; width:100%; height:100%; object-fit:contain; border-radius:6px; pointer-events:none; user-select:none}
+#stageDoc img.shot{position:absolute; display:block; object-fit:contain; border-radius:6px; pointer-events:none; user-select:none}
+#stageDoc .noshot{position:absolute; display:flex; align-items:center; justify-content:center; border-radius:6px; pointer-events:none; user-select:none}
 #layerSvg{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
 #layerSvg .lyr{cursor:pointer}
 #layerSvg .lyr.sel .shape{stroke-dasharray:none; filter:drop-shadow(0 0 0 transparent)}

@@ -21,19 +21,26 @@ function onFrame(fn) {                // 다음 프레임에 한 번만 실행
 function nodeW(n) { return (NSIZE[n.size] || NSIZE.m).w; }
 function nodeRect(n) {
   const s = NSZ[n.id];
-  return { x: n.x, y: n.y, w: s ? s.w : nodeW(n), h: s ? s.h : 150 };
+  /* midY = 포트·연결선이 좌우로 붙는 세로 기준점. 태그·캠페인 목록은 카드
+     아래 바깥에 노출될 뿐 길이가 들쭉날쭉해서, 전체 높이의 절반을 쓰면 목록이
+     길어질 때마다 연결선 시작점이 이미지에서 멀어진다 — 그래서 이름·이미지·
+     배지를 담은 테두리(frameH)만의 세로 중앙을 쓴다. */
+  const h = s ? s.h : 150;
+  const midY = n.y + (s && s.frameH ? s.frameH : h) / 2;
+  return { x: n.x, y: n.y, w: s ? s.w : nodeW(n), h, midY };
 }
 
 /* ---------------- 연결선 기하 ---------------- */
 const SIDE_N = { n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, e: { x: 1, y: 0 }, w: { x: -1, y: 0 } };
 function sidePoint(r, side) {
+  const midY = r.midY != null ? r.midY : r.y + r.h / 2;
   if (side === "n") return { x: r.x + r.w / 2, y: r.y };
   if (side === "s") return { x: r.x + r.w / 2, y: r.y + r.h };
-  if (side === "w") return { x: r.x, y: r.y + r.h / 2 };
-  return { x: r.x + r.w, y: r.y + r.h / 2 };
+  if (side === "w") return { x: r.x, y: midY };
+  return { x: r.x + r.w, y: midY };
 }
 function autoSide(r, target) {
-  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const cx = r.x + r.w / 2, cy = r.midY != null ? r.midY : r.y + r.h / 2;
   const dx = target.x - cx, dy = target.y - cy;
   if (Math.abs(dx) * r.h >= Math.abs(dy) * r.w) return dx >= 0 ? "e" : "w";
   return dy >= 0 ? "s" : "n";
@@ -266,12 +273,21 @@ function nodeHtml(n) {
 
   const miss = completeness(n);
   const warn = miss.length ? '<span class="node-warn" title="' + esc(miss.join(" · ")) + '">' + ico("alert", "xs") + "</span>" : "";
-  return '<div class="node-title"><div class="node-name">' + esc(n.name) + "</div>" +
+  /* 제목·이미지·배지를 하나의 테두리(.node-frame)로 묶는다 — 확대·축소해도
+     이 틀 전체가 한 덩어리로 같이 움직이니 안에서 글자가 넘칠 걱정이 없다.
+     태그·캠페인 목록(body)은 지금처럼 그 바깥 아래에 그대로 노출한다.
+     연결선 포트도 프레임 안에 둬서, 목록 길이와 상관없이 항상 프레임(이미지)
+     세로 중앙에서 선이 시작하도록 한다. */
+  return '<div class="node-frame">' +
+      '<div class="node-title"><div class="node-name">' + esc(n.name) + "</div>" +
       (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
+      "</div>" +
+      '<div class="node-pic">' + thumb + warn + "</div>" +
+      (bd ? '<div class="node-badges">' + bd + "</div>" : "") +
+      '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
+      '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
     "</div>" +
-    '<div class="node-pic">' + thumb + warn + "</div>" +
-    '<div class="node-main">' +
-    (bd ? '<div class="node-badges">' + bd + "</div>" : "") + body + "</div>";
+    (body ? '<div class="node-main">' + body + "</div>" : "");
 }
 function renderNodes() {
   const layer = $("#nodeLayer");
@@ -289,13 +305,12 @@ function renderNodes() {
       state.ui.focus, n.tags.map(t => t.platform + t.status + t.event).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
-      el.innerHTML = nodeHtml(n) +
-        '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
-        '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>';
+      el.innerHTML = nodeHtml(n);
       el.dataset.sig = sig;
     }
     el.style.left = n.x + "px"; el.style.top = n.y + "px";
-    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150 };
+    const frameEl = el.querySelector(".node-frame");
+    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150, frameH: frameEl ? frameEl.offsetHeight : 0 };
   });
   Object.keys(have).forEach(id => { have[id].remove(); delete NSZ[id]; });
   paintSelection();

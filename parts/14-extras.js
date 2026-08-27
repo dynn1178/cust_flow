@@ -240,9 +240,10 @@ function initMinimap() {
 }
 
 /* ---------------- 구간(스윔레인) 배경 ----------------
-   캔버스에 이름이 붙은 세로 구간을 배경으로 그린다("유입 → 탐색 → 구매" 같은
-   퍼널 단계). 좌표를 입력하는 대신 캔버스에서 직접 그려서 만들고, 라벨을
-   끌면 이동, 가장자리를 끌면 크기를 조절한다. */
+   캔버스에 이름이 붙은 구간을 배경으로 그린다("유입 → 탐색 → 구매" 같은 퍼널
+   단계, 또는 가로·세로를 섞은 임의 영역). 좌표를 입력하는 대신 캔버스에서
+   직접 사각형으로 그려서 만들고, 라벨을 끌면 이동, 네 변을 끌면 그 방향으로만
+   크기를 조절한다. */
 const LANE_PALETTE = ["#4a63e7", "#7c4ddb", "#12a97a", "#e08a1e", "#e0483f", "#0f9a70", "#64748b"];
 function nextLaneColor() { return LANE_PALETTE[(B().lanes || []).length % LANE_PALETTE.length]; }
 function laneById(id) { return (B().lanes || []).find(l => l.id === id); }
@@ -253,46 +254,56 @@ function laneExtentY() {
   nodes.forEach(n => { const q = nodeRect(n); y1 = Math.min(y1, q.y); y2 = Math.max(y2, q.y + q.h); });
   return { y1: y1 - 160, y2: y2 + 160 };
 }
+/* 예전에는 구간이 세로 전체를 덮는 띠(x·w만 저장)였다 — y·h가 없는 예전
+   데이터는 그때 모습 그대로 보이도록 세로 범위를 자동 계산해서 채운다. */
+function laneRect(l) {
+  if (l.y != null && l.h != null) return { x: l.x, y: l.y, w: l.w || 300, h: l.h };
+  const { y1, y2 } = laneExtentY();
+  return { x: l.x, y: y1, w: l.w || 900, h: Math.max(40, y2 - y1) };
+}
 function renderLanes() {
   const layer = $("#laneLayer"); if (!layer) return;
   const lanes = B().lanes || [];
   if (!lanes.length) { layer.innerHTML = ""; return; }
-  const { y1, y2 } = laneExtentY(), h = Math.max(40, y2 - y1), editable = canEdit();
+  const editable = canEdit();
   layer.innerHTML = lanes.map(l => {
-    const w = l.w || 900;
-    return '<div class="lane" data-lane="' + l.id + '" style="left:' + l.x + "px; top:" + y1 + "px; width:" + w + "px; height:" + h + "px; --lc:" + (l.color || "#4a63e7") + '">' +
-      (editable ? '<div class="lane-edge l" data-edge="l"></div><div class="lane-edge r" data-edge="r"></div>' : "") +
-      '<div class="lane-label"' + (editable ? "" : ' style="pointer-events:none"') + '>' + esc(l.name || "구간") + "</div></div>";
+    const r = laneRect(l);
+    return '<div class="lane" data-lane="' + l.id + '" style="left:' + r.x + "px; top:" + r.y + "px; width:" + r.w + "px; height:" + r.h + "px; --lc:" + (l.color || "#4a63e7") + '">' +
+      (editable ? '<div class="lane-edge l" data-edge="l"></div><div class="lane-edge r" data-edge="r"></div>' +
+        '<div class="lane-edge t" data-edge="t"></div><div class="lane-edge b" data-edge="b"></div>' : "") +
+      '<div class="lane-label"' + (editable ? "" : ' style="pointer-events:none"') + '><span class="lane-name">' + esc(l.name || "구간") + "</span>" +
+      (editable ? '<span class="lane-editcue">' + ico("edit", "xs") + "</span>" : "") + "</div></div>";
   }).join("");
 }
-/* 캔버스 배경을 드래그해서 새 구간을 그린다 — initFlow()의 pointerdown
-   핸들러에서 laneMode일 때 이 함수로 넘어온다(노드 드래그·패닝과 겹치지
-   않도록 가장 먼저 분기). */
+/* 캔버스 배경을 대각선으로 드래그해서 새 구간을 사각형으로 그린다 —
+   initFlow()의 pointerdown 핸들러에서 laneMode일 때 이 함수로 넘어온다
+   (노드 드래그·패닝과 겹치지 않도록 가장 먼저 분기). */
 function startLaneDraw(e, surf, r) {
   e.preventDefault();
   const v = B().view;
-  const toWorldX = cx => (cx - r.left - v.panX) / v.zoom;
-  const startX = toWorldX(e.clientX);
-  let curX = startX;
+  const toWorld = (cx, cy) => ({ x: (cx - r.left - v.panX) / v.zoom, y: (cy - r.top - v.panY) / v.zoom });
+  const start = toWorld(e.clientX, e.clientY);
+  let cur = start;
   const color = nextLaneColor();
   const preview = document.createElement("div");
   preview.className = "lane lane-preview";
   preview.style.setProperty("--lc", color);
   $("#laneLayer").appendChild(preview);
   const paint = () => {
-    const { y1, y2 } = laneExtentY();
-    const x1 = Math.min(startX, curX), w = Math.max(4, Math.abs(curX - startX));
-    preview.style.left = x1 + "px"; preview.style.top = y1 + "px"; preview.style.width = w + "px"; preview.style.height = Math.max(40, y2 - y1) + "px";
+    const x1 = Math.min(start.x, cur.x), y1 = Math.min(start.y, cur.y);
+    const w = Math.max(4, Math.abs(cur.x - start.x)), h = Math.max(4, Math.abs(cur.y - start.y));
+    preview.style.left = x1 + "px"; preview.style.top = y1 + "px"; preview.style.width = w + "px"; preview.style.height = h + "px";
   };
   paint();
-  const mv = ev => { curX = toWorldX(ev.clientX); paint(); };
+  const mv = ev => { cur = toWorld(ev.clientX, ev.clientY); paint(); };
   const up = ev => {
     surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
     preview.remove();
     laneMode = false; $("#btnLanes").classList.remove("on"); surf.classList.remove("lane-drawing");
-    const x1 = Math.round(Math.min(startX, curX)), w = Math.round(Math.abs(curX - startX));
-    if (w < 20) return;
-    const lane = { id: uid("lane"), name: "구간 " + ((B().lanes || []).length + 1), x: x1, w, color };
+    const x1 = Math.round(Math.min(start.x, cur.x)), y1 = Math.round(Math.min(start.y, cur.y));
+    const w = Math.round(Math.abs(cur.x - start.x)), h = Math.round(Math.abs(cur.y - start.y));
+    if (w < 20 || h < 20) return;
+    const lane = { id: uid("lane"), name: "구간 " + ((B().lanes || []).length + 1), x: x1, y: y1, w, h, color };
     B().lanes = (B().lanes || []).concat(lane);
     markDirty(); renderFlow();
     if (ev.type === "pointerup") openLaneRenamePopover(lane.id, ev.clientX, ev.clientY);
@@ -300,8 +311,8 @@ function startLaneDraw(e, surf, r) {
   surf.setPointerCapture(e.pointerId);
   surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
 }
-/* 라벨(이동)·가장자리(크기 조절) 드래그, 라벨을 드래그 없이 누르면 이름·색
-   편집 팝오버를 연다. */
+/* 라벨(이동)·네 변(그 방향으로 크기 조절) 드래그, 라벨을 드래그 없이 누르면
+   이름·색 편집 팝오버를 연다. */
 function initLaneInteractions() {
   const laneLayer = $("#laneLayer");
   laneLayer.addEventListener("pointerdown", e => {
@@ -312,15 +323,19 @@ function initLaneInteractions() {
     e.preventDefault(); e.stopPropagation();
     const laneEl = e.target.closest(".lane"), lane = laneById(laneEl.dataset.lane);
     if (!lane) return;
-    const v = B().view, sx = e.clientX, sy = e.clientY, ox = lane.x, ow = lane.w || 900;
+    const r0 = laneRect(lane);
+    if (lane.y == null || lane.h == null) { lane.x = r0.x; lane.y = r0.y; lane.w = r0.w; lane.h = r0.h; }
+    const v = B().view, sx = e.clientX, sy = e.clientY, ox = lane.x, oy = lane.y, ow = lane.w, oh = lane.h;
     const side = edge ? edge.dataset.edge : null;
     let moved = false;
     const mv = ev => {
-      const dx = (ev.clientX - sx) / v.zoom;
-      if (Math.abs(ev.clientX - sx) > 3) moved = true;
-      if (label) lane.x = Math.round(ox + dx);
+      const dx = (ev.clientX - sx) / v.zoom, dy = (ev.clientY - sy) / v.zoom;
+      if (Math.abs(ev.clientX - sx) > 3 || Math.abs(ev.clientY - sy) > 3) moved = true;
+      if (label) { lane.x = Math.round(ox + dx); lane.y = Math.round(oy + dy); }
       else if (side === "r") lane.w = Math.max(20, Math.round(ow + dx));
-      else { const nx = Math.round(ox + dx), nw = Math.round(ow - dx); if (nw >= 20) { lane.x = nx; lane.w = nw; } }
+      else if (side === "l") { const nx = Math.round(ox + dx), nw = Math.round(ow - dx); if (nw >= 20) { lane.x = nx; lane.w = nw; } }
+      else if (side === "b") lane.h = Math.max(20, Math.round(oh + dy));
+      else if (side === "t") { const ny = Math.round(oy + dy), nh = Math.round(oh - dy); if (nh >= 20) { lane.y = ny; lane.h = nh; } }
       renderFlow();
     };
     const up = () => {
@@ -459,12 +474,17 @@ async function exportBoardCanvas() {
 
   const ox = pad - x1, oy = pad + titleH - y1;
   (b.lanes || []).forEach(l => {
-    const lx = l.x + ox, lw = l.w || 900;
+    const lr = laneRect(l);
+    const lx = lr.x + ox, ly = lr.y + oy;
     ctx.fillStyle = hexToRgba(l.color || "#4a63e7", 0.08);
-    ctx.fillRect(lx, oy + y1 - 20, lw, (y2 - y1) + 40);
+    ctx.fillRect(lx, ly, lr.w, lr.h);
+    ctx.strokeStyle = hexToRgba(l.color || "#4a63e7", 0.4);
+    ctx.setLineDash([5, 4]);
+    ctx.strokeRect(lx, ly, lr.w, lr.h);
+    ctx.setLineDash([]);
     ctx.fillStyle = l.color || "#4a63e7";
     ctx.font = "700 11px 'IBM Plex Sans KR', sans-serif";
-    ctx.fillText(l.name || "", lx + 8, oy + y1 - 6);
+    ctx.fillText(l.name || "", lx + 8, ly + 16);
   });
   edges.forEach(e => {
     const d = pathFor(e); if (!d) return;
