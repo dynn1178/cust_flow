@@ -240,9 +240,12 @@ function initMinimap() {
 }
 
 /* ---------------- 구간(스윔레인) 배경 ----------------
-   캔버스에 이름이 붙은 세로 구간을 배경으로 표시한다("유입 → 탐색 → 구매"
-   같은 퍼널 단계). 시작 X 좌표가 작은 순서로 왼쪽부터 이어 붙이고,
-   마지막 구간은 오른쪽으로 넉넉히 열어 둔다. */
+   캔버스에 이름이 붙은 세로 구간을 배경으로 그린다("유입 → 탐색 → 구매" 같은
+   퍼널 단계). 좌표를 입력하는 대신 캔버스에서 직접 그려서 만들고, 라벨을
+   끌면 이동, 가장자리를 끌면 크기를 조절한다. */
+const LANE_PALETTE = ["#4a63e7", "#7c4ddb", "#12a97a", "#e08a1e", "#e0483f", "#0f9a70", "#64748b"];
+function nextLaneColor() { return LANE_PALETTE[(B().lanes || []).length % LANE_PALETTE.length]; }
+function laneById(id) { return (B().lanes || []).find(l => l.id === id); }
 function laneExtentY() {
   const nodes = B().nodes;
   if (!nodes.length) return { y1: -200, y2: 800 };
@@ -252,59 +255,113 @@ function laneExtentY() {
 }
 function renderLanes() {
   const layer = $("#laneLayer"); if (!layer) return;
-  const b = B(), lanes = (b.lanes || []).slice().sort((a, z) => a.x - z.x);
+  const lanes = B().lanes || [];
   if (!lanes.length) { layer.innerHTML = ""; return; }
-  const { y1, y2 } = laneExtentY(), h = Math.max(40, y2 - y1);
-  layer.innerHTML = lanes.map((l, i) => {
-    const nextX = i < lanes.length - 1 ? lanes[i + 1].x : l.x + 900;
-    const w = Math.max(40, nextX - l.x);
-    return '<div class="lane" style="left:' + l.x + "px; top:" + y1 + "px; width:" + w + "px; height:" + h + "px; --lc:" + (l.color || "#4a63e7") + '">' +
-      '<div class="lane-label">' + esc(l.name || "구간") + "</div></div>";
+  const { y1, y2 } = laneExtentY(), h = Math.max(40, y2 - y1), editable = canEdit();
+  layer.innerHTML = lanes.map(l => {
+    const w = l.w || 900;
+    return '<div class="lane" data-lane="' + l.id + '" style="left:' + l.x + "px; top:" + y1 + "px; width:" + w + "px; height:" + h + "px; --lc:" + (l.color || "#4a63e7") + '">' +
+      (editable ? '<div class="lane-edge l" data-edge="l"></div><div class="lane-edge r" data-edge="r"></div>' : "") +
+      '<div class="lane-label"' + (editable ? "" : ' style="pointer-events:none"') + '>' + esc(l.name || "구간") + "</div></div>";
   }).join("");
 }
-function laneRowHtml(l) {
-  return '<div data-lane style="display:flex;gap:6px;align-items:center">' +
-    '<input type="color" value="' + esc(l.color || "#4a63e7") + '" data-lc style="width:32px;height:32px;padding:2px;border-radius:8px;border:1px solid var(--stroke);background:var(--glass-2);flex:none">' +
-    '<input class="field" placeholder="구간 이름 (예: 유입)" value="' + esc(l.name || "") + '" data-ln>' +
-    '<input class="field mono" style="max-width:96px;flex:none" placeholder="시작 X" value="' + (l.x != null ? l.x : "") + '" data-lx>' +
-    '<button class="btn icon sm" data-rmlane type="button">' + ico("close", "xs") + "</button></div>";
+/* 캔버스 배경을 드래그해서 새 구간을 그린다 — initFlow()의 pointerdown
+   핸들러에서 laneMode일 때 이 함수로 넘어온다(노드 드래그·패닝과 겹치지
+   않도록 가장 먼저 분기). */
+function startLaneDraw(e, surf, r) {
+  e.preventDefault();
+  const v = B().view;
+  const toWorldX = cx => (cx - r.left - v.panX) / v.zoom;
+  const startX = toWorldX(e.clientX);
+  let curX = startX;
+  const color = nextLaneColor();
+  const preview = document.createElement("div");
+  preview.className = "lane lane-preview";
+  preview.style.setProperty("--lc", color);
+  $("#laneLayer").appendChild(preview);
+  const paint = () => {
+    const { y1, y2 } = laneExtentY();
+    const x1 = Math.min(startX, curX), w = Math.max(4, Math.abs(curX - startX));
+    preview.style.left = x1 + "px"; preview.style.top = y1 + "px"; preview.style.width = w + "px"; preview.style.height = Math.max(40, y2 - y1) + "px";
+  };
+  paint();
+  const mv = ev => { curX = toWorldX(ev.clientX); paint(); };
+  const up = ev => {
+    surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
+    preview.remove();
+    laneMode = false; $("#btnLanes").classList.remove("on"); surf.classList.remove("lane-drawing");
+    const x1 = Math.round(Math.min(startX, curX)), w = Math.round(Math.abs(curX - startX));
+    if (w < 20) return;
+    const lane = { id: uid("lane"), name: "구간 " + ((B().lanes || []).length + 1), x: x1, w, color };
+    B().lanes = (B().lanes || []).concat(lane);
+    markDirty(); renderFlow();
+    if (ev.type === "pointerup") openLaneRenamePopover(lane.id, ev.clientX, ev.clientY);
+  };
+  surf.setPointerCapture(e.pointerId);
+  surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
 }
-function openLaneModal() {
-  if (!canEdit()) return;
-  const b = B();
-  const lanes = (b.lanes || []).slice().sort((a, z) => a.x - z.x);
-  const root = modalHost();
-  root.innerHTML =
-    '<div class="scrim"><div class="modal glass" role="dialog" aria-modal="true">' +
-      '<div class="modal-head">' + ico("lanes") + "<h3>구간(스윔레인)</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
-      '<div class="modal-body">' +
-        '<p class="hint">캔버스에 세로 구간 배경을 표시합니다. 시작 X 좌표가 작은 순서대로 왼쪽부터 이어 붙습니다(비워두면 삭제).</p>' +
-        '<div id="laneRows" style="display:flex;flex-direction:column;gap:6px">' + lanes.map(laneRowHtml).join("") + "</div>" +
-        '<button class="btn sm" data-addlane type="button">' + ico("plus", "xs") + "구간 추가</button>" +
-      "</div>" +
-      '<div class="modal-foot"><div class="spacer"></div><button class="btn" data-x>취소</button><button class="btn primary" data-ok>저장</button></div>' +
-    "</div></div>";
-  root.addEventListener("click", e => {
-    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
-    if (e.target.closest("[data-addlane]")) { $("#laneRows").insertAdjacentHTML("beforeend", laneRowHtml({})); return; }
-    if (e.target.closest("[data-rmlane]")) { e.target.closest("[data-lane]").remove(); return; }
-    if (e.target.closest("[data-ok]")) {
-      const existing = (b.lanes || []).slice();
-      const rows = $$("[data-lane]", root);
-      const next = [];
-      rows.forEach((row, i) => {
-        const name = $("[data-ln]", row).value.trim();
-        const xRaw = $("[data-lx]", row).value.trim();
-        if (!name && !xRaw) return;                    // 이름도 X도 비어 있으면 건너뛴다(=삭제)
-        const x = xRaw === "" ? 0 : Number(xRaw);
-        if (Number.isNaN(x)) return;
-        next.push({ id: (existing[i] && existing[i].id) || uid("lane"), name: name || "구간", x, color: $("[data-lc]", row).value || "#4a63e7" });
-      });
-      b.lanes = next;
-      closeModal(); markDirty(); renderFlow();
-      toast("구간을 저장했습니다", "ok");
-    }
+/* 라벨(이동)·가장자리(크기 조절) 드래그, 라벨을 드래그 없이 누르면 이름·색
+   편집 팝오버를 연다. */
+function initLaneInteractions() {
+  const laneLayer = $("#laneLayer");
+  laneLayer.addEventListener("pointerdown", e => {
+    if (!canEdit()) return;
+    const label = e.target.closest(".lane-label");
+    const edge = e.target.closest(".lane-edge");
+    if (!label && !edge) return;
+    e.preventDefault(); e.stopPropagation();
+    const laneEl = e.target.closest(".lane"), lane = laneById(laneEl.dataset.lane);
+    if (!lane) return;
+    const v = B().view, sx = e.clientX, sy = e.clientY, ox = lane.x, ow = lane.w || 900;
+    const side = edge ? edge.dataset.edge : null;
+    let moved = false;
+    const mv = ev => {
+      const dx = (ev.clientX - sx) / v.zoom;
+      if (Math.abs(ev.clientX - sx) > 3) moved = true;
+      if (label) lane.x = Math.round(ox + dx);
+      else if (side === "r") lane.w = Math.max(20, Math.round(ow + dx));
+      else { const nx = Math.round(ox + dx), nw = Math.round(ow - dx); if (nw >= 20) { lane.x = nx; lane.w = nw; } }
+      renderFlow();
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", mv); document.removeEventListener("pointerup", up);
+      if (moved) markDirty();
+      else if (label) openLaneRenamePopover(lane.id, sx, sy);
+    };
+    document.addEventListener("pointermove", mv); document.addEventListener("pointerup", up);
   });
+}
+function openLaneRenamePopover(laneId, cx, cy) {
+  const lane = laneById(laneId); if (!lane) return;
+  const root = $("#popRoot");
+  root.innerHTML =
+    '<div class="popover glass">' +
+      '<div class="frow"><span class="lbl">구간 이름</span><input class="field" id="lnName" value="' + esc(lane.name || "") + '" placeholder="예: 유입"></div>' +
+      '<div class="frow"><span class="lbl">색</span><div class="hues" id="lnHues">' +
+        LANE_PALETTE.map(c => '<button type="button" class="hue' + (lane.color === c ? " on" : "") + '" data-c="' + c + '" style="--h:' + c + '"></button>').join("") +
+      "</div></div>" +
+      '<div class="rowseg">' +
+        '<button class="btn sm danger" data-dellane style="flex:1">' + ico("trash", "xs") + "삭제</button>" +
+        '<button class="btn sm primary" data-closelane style="flex:1">완료</button></div>' +
+    "</div>";
+  const pop = $(".popover", root);
+  pop.style.left = clamp(cx - 130, 8, Math.max(8, innerWidth - 300)) + "px";
+  pop.style.top = clamp(cy + 12, 8, Math.max(8, innerHeight - pop.offsetHeight - 12)) + "px";
+  $("#lnName", pop).addEventListener("input", ev => { lane.name = ev.target.value; markDirty(); renderFlow(); });
+  pop.addEventListener("click", ev => {
+    const c = ev.target.closest("[data-c]");
+    if (c) { lane.color = c.dataset.c; $$("[data-c]", pop).forEach(x => x.classList.toggle("on", x === c)); markDirty(); renderFlow(); return; }
+    if (ev.target.closest("[data-dellane]")) { B().lanes = (B().lanes || []).filter(x => x.id !== laneId); root.innerHTML = ""; markDirty(); renderFlow(); return; }
+    if (ev.target.closest("[data-closelane]")) { root.innerHTML = ""; }
+  });
+  const away = ev => {
+    if (!ev.target.closest(".popover") && !ev.target.closest(".lane-label")) {
+      root.innerHTML = "";
+      document.removeEventListener("pointerdown", away);
+    }
+  };
+  setTimeout(() => document.addEventListener("pointerdown", away), 0);
+  setTimeout(() => { const f = $("#lnName", pop); if (f) f.focus(); }, 0);
 }
 
 /* ---------------- 보드 이미지 / PDF 내보내기 ----------------
@@ -345,12 +402,42 @@ function hueOfHex(k) {
   }
   return h.c;
 }
+/* 썸네일을 CORS 허용 모드로 미리 불러온다 — crossOrigin을 지정하면 서버가
+   CORS를 허용하지 않을 때 "오염된 채로 로드"되는 대신 아예 로드가 실패하므로
+   (onerror), 캔버스를 더럽혀 내보내기 전체가 막히는 일 없이 그 카드만
+   썸네일 없이 그려진다. */
+function loadImageSafe(src, timeoutMs) {
+  return new Promise(resolve => {
+    if (!src) { resolve(null); return; }
+    const img = new Image();
+    let done = false;
+    const finish = ok => { if (done) return; done = true; resolve(ok ? img : null); };
+    img.crossOrigin = "anonymous";
+    img.onload = () => finish(true);
+    img.onerror = () => finish(false);
+    img.src = src;
+    setTimeout(() => finish(false), timeoutMs || 6000);
+  });
+}
+function drawCover(ctx, img, dx, dy, dw, dh) {
+  const ir = img.width / img.height, dr = dw / dh;
+  let sx, sy, sw, sh;
+  if (ir > dr) { sh = img.height; sw = sh * dr; sx = (img.width - sw) / 2; sy = 0; }
+  else { sw = img.width; sh = sw / dr; sx = 0; sy = (img.height - sh) / 2; }
+  ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+}
 /* 반환값의 canvas.width/height는 선명도를 위해 dpr배 확대된 실제 픽셀 크기이고,
    w/h는 CSS 논리 크기다 — PDF에 넣을 때 페이지 크기(w/h)와 이미지 해상도
    (canvas.width/height)를 다르게 써야 하므로 둘 다 갖고 있어야 한다. */
-function exportBoardCanvas() {
+async function exportBoardCanvas() {
   const b = B(), nodes = b.nodes, edges = b.edges;
   if (!nodes.length) { toast("내보낼 페이지가 없습니다", "bad"); return null; }
+  const thumbImgs = {};
+  await Promise.all(nodes.map(async n => {
+    const src = thumbSrc(n); if (!src) return;
+    const img = await loadImageSafe(src);
+    if (img) thumbImgs[n.id] = img;
+  }));
   let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
   nodes.forEach(n => { const q = nodeRect(n); x1 = Math.min(x1, q.x); y1 = Math.min(y1, q.y); x2 = Math.max(x2, q.x + q.w); y2 = Math.max(y2, q.y + q.h); });
   const pad = 60, titleH = 56;
@@ -371,9 +458,8 @@ function exportBoardCanvas() {
   ctx.fillText("Customer Journey Atlas · " + new Date().toLocaleDateString("ko-KR"), pad, 52);
 
   const ox = pad - x1, oy = pad + titleH - y1;
-  (b.lanes || []).slice().sort((p, q) => p.x - q.x).forEach((l, i, arr) => {
-    const nextX = i < arr.length - 1 ? arr[i + 1].x : x2;
-    const lx = l.x + ox, lw = Math.max(10, nextX - l.x);
+  (b.lanes || []).forEach(l => {
+    const lx = l.x + ox, lw = l.w || 900;
     ctx.fillStyle = hexToRgba(l.color || "#4a63e7", 0.08);
     ctx.fillRect(lx, oy + y1 - 20, lw, (y2 - y1) + 40);
     ctx.fillStyle = l.color || "#4a63e7";
@@ -394,6 +480,8 @@ function exportBoardCanvas() {
   });
   nodes.forEach(n => {
     const q = nodeRect(n), x = q.x + ox, y = q.y + oy;
+    const img = thumbImgs[n.id];
+    const thumbH = img ? Math.round(Math.min(q.h * 0.52, 128)) : 0;
     ctx.save();
     roundRectPath(ctx, x, y, q.w, q.h, 12);
     ctx.fillStyle = dark ? "#202023" : "#ffffff";
@@ -402,14 +490,20 @@ function exportBoardCanvas() {
     ctx.strokeStyle = n.hue && n.hue !== "none" ? hueOfHex(n.hue) : (dark ? "#3a3a40" : "#d7dcec");
     ctx.stroke();
     ctx.clip();
+    if (img) {
+      drawCover(ctx, img, x, y, q.w, thumbH);
+      ctx.fillStyle = hexToRgba(dark ? "#000000" : "#ffffff", 0.02);
+      ctx.fillRect(x, y + thumbH - 1, q.w, 1);
+    }
     if (n.hue && n.hue !== "none") { ctx.fillStyle = hueOfHex(n.hue); ctx.fillRect(x, y, 4, q.h); }
     ctx.restore();
+    const textTop = y + thumbH;
     ctx.fillStyle = dark ? "#ededf0" : "#131a2c";
     ctx.font = "600 13px 'IBM Plex Sans KR', sans-serif";
-    wrapText(ctx, n.name, x + 14, y + 24, q.w - 24, 16);
+    wrapText(ctx, n.name, x + 14, textTop + 20, q.w - 24, 16);
     ctx.font = "10px 'IBM Plex Sans KR', sans-serif";
     ctx.fillStyle = dark ? "#a6a6ad" : "#495372";
-    ctx.fillText((KIND[n.kind] || "페이지") + " · 태그 " + n.tags.length + " · 캠페인 " + n.camps.length, x + 14, y + 44);
+    ctx.fillText((KIND[n.kind] || "페이지") + " · 태그 " + n.tags.length + " · 캠페인 " + n.camps.length, x + 14, textTop + 40);
     if (n.path) { ctx.font = "10px monospace"; ctx.fillStyle = dark ? "#74747c" : "#7b849f"; ctx.fillText(n.path, x + 14, y + q.h - 12); }
   });
   return { canvas: cv, w, h };
@@ -435,12 +529,15 @@ async function downloadBinary(filename, blob) {
     toast(filename + " 저장 완료", "ok");
   } catch (e) { toast("파일을 내보낼 수 없습니다.", "bad"); }
 }
-function exportBoardPng() {
-  const r = exportBoardCanvas(); if (!r) return;
-  r.canvas.toBlob(blob => {
-    if (!blob) { toast("이미지를 만들지 못했습니다", "bad"); return; }
-    downloadBinary(safeBoardFilename() + ".png", blob);
-  }, "image/png");
+async function exportBoardPng() {
+  toast("이미지를 만드는 중…");
+  const r = await exportBoardCanvas(); if (!r) return;
+  try {
+    r.canvas.toBlob(blob => {
+      if (!blob) { toast("이미지를 만들지 못했습니다", "bad"); return; }
+      downloadBinary(safeBoardFilename() + ".png", blob);
+    }, "image/png");
+  } catch (e) { toast("이미지를 만들지 못했습니다", "bad"); }
 }
 /* ---------------- 최소 PDF 생성기 ----------------
    외부 라이브러리 없이, JPEG 이미지를 그대로 한 페이지에 담는 PDF를 손으로
@@ -478,10 +575,13 @@ function buildPdfFromJpeg(jpegBytes, pxW, pxH, ptW, ptH) {
   for (let i = 0; i < out.length; i++) bytes[i] = out.charCodeAt(i) & 0xff;
   return bytes;
 }
-function exportBoardPdf() {
-  const r = exportBoardCanvas(); if (!r) return;
-  const jpegUrl = r.canvas.toDataURL("image/jpeg", 0.92);
-  const jpegBytes = dataUrlToBytes(jpegUrl);
-  const pdfBytes = buildPdfFromJpeg(jpegBytes, r.canvas.width, r.canvas.height, r.w, r.h);
-  downloadBinary(safeBoardFilename() + ".pdf", new Blob([pdfBytes], { type: "application/pdf" }));
+async function exportBoardPdf() {
+  toast("PDF를 만드는 중…");
+  const r = await exportBoardCanvas(); if (!r) return;
+  try {
+    const jpegUrl = r.canvas.toDataURL("image/jpeg", 0.92);
+    const jpegBytes = dataUrlToBytes(jpegUrl);
+    const pdfBytes = buildPdfFromJpeg(jpegBytes, r.canvas.width, r.canvas.height, r.w, r.h);
+    downloadBinary(safeBoardFilename() + ".pdf", new Blob([pdfBytes], { type: "application/pdf" }));
+  } catch (e) { toast("PDF를 만들지 못했습니다", "bad"); }
 }

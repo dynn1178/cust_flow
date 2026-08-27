@@ -6,8 +6,18 @@
 let mounted = { id: null, src: null, w: 0, h: 0 };
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
+/* 화면 이미지 크기만이 아니라, 이미지 밖으로 삐져나온 도형·텍스트 레이어까지
+   포함한 실제 콘텐츠 범위 — 맞춤(가로/세로/전체 화면) 계산과 캔버스 크기는
+   항상 이 범위를 기준으로 한다. */
+function docExtent(n) {
+  const base = docSize(n);
+  if (!n || !n.layers || !n.layers.length) return base;
+  let w = base.w, h = base.h;
+  n.layers.forEach(l => { const b = bbox(l); w = Math.max(w, b.x + b.w); h = Math.max(h, b.y + b.h); });
+  return { w, h };
+}
 function stageScale(n) {
-  const d = docSize(n);
+  const d = docExtent(n);
   if (stageZoom) return stageZoom;
   const box = $("#stageScroll").getBoundingClientRect();
   const availW = box.width - 36, availH = box.height - 36;
@@ -15,6 +25,17 @@ function stageScale(n) {
     : stageFitMode === "contain" ? Math.min(availW / d.w, availH / d.h)
     : availW / d.w;                  // "width" — 기본값
   return clamp(s, 0.05, 4);
+}
+/* 드래그 중에는 화면 이미지·캔버스 크기를 건드리지 않다가(스크롤이 튀지
+   않도록), 그리기·이동·크기 조절이 끝나는 시점에만 맞춤 범위를 다시 맞춘다. */
+function resyncStageExtent() {
+  const n = curNode(); if (!n) return;
+  const ext = docExtent(n), s = stageScale(n);
+  const doc = $("#stageDoc");
+  doc.style.width = Math.round(ext.w * s) + "px";
+  doc.style.height = Math.round(ext.h * s) + "px";
+  const svg = $("#layerSvg");
+  if (svg) svg.setAttribute("viewBox", "0 0 " + ext.w + " " + ext.h);
 }
 function bbox(l) {
   if (l.kind === "pen") {
@@ -103,19 +124,25 @@ function renderStage() {
   }
   empty.style.display = "none";
   $("#stageTitle").textContent = n.name;
-  const d = docSize(n), s = stageScale(n), src = shotSrc(n);
-  doc.style.width = Math.round(d.w * s) + "px";
-  doc.style.height = Math.round(d.h * s) + "px";
+  const base = docSize(n), ext = docExtent(n), s = stageScale(n), src = shotSrc(n);
+  doc.style.width = Math.round(ext.w * s) + "px";
+  doc.style.height = Math.round(ext.h * s) + "px";
   $("#sVal").textContent = stageZoom ? Math.round(s * 100) + "%" : "맞춤";
   $("#sFit").classList.toggle("on", !stageZoom);
   $("#sFitName").textContent = STAGE_FIT[stageFitMode].name;
 
-  if (mounted.id !== n.id || mounted.src !== src || mounted.w !== d.w || mounted.h !== d.h) {
+  const shotStyle = "width:" + Math.round(base.w * s) + "px; height:" + Math.round(base.h * s) + "px;";
+  if (mounted.id !== n.id || mounted.src !== src || mounted.w !== base.w || mounted.h !== base.h) {
     const shot = src
-      ? '<img class="shot" src="' + src + '" alt="' + esc(n.name) + ' 화면" draggable="false">'
-      : '<div class="noshot"><div class="empty">' + ico("image") + "<div>화면 이미지를 올리거나 붙여넣기(Ctrl+V)<br>없이도 레이어를 그릴 수 있습니다</div></div></div>";
-    doc.innerHTML = shot + '<svg id="layerSvg" viewBox="0 0 ' + d.w + " " + d.h + '"></svg>';
-    mounted = { id: n.id, src: src, w: d.w, h: d.h };
+      ? '<img class="shot" src="' + src + '" alt="' + esc(n.name) + ' 화면" draggable="false" style="' + shotStyle + '">'
+      : '<div class="noshot" style="' + shotStyle + '"><div class="empty">' + ico("image") + "<div>화면 이미지를 올리거나 붙여넣기(Ctrl+V)<br>없이도 레이어를 그릴 수 있습니다</div></div></div>";
+    doc.innerHTML = shot + '<svg id="layerSvg" viewBox="0 0 ' + ext.w + " " + ext.h + '"></svg>';
+    mounted = { id: n.id, src: src, w: base.w, h: base.h };
+  } else {
+    const img = doc.querySelector(".shot, .noshot");
+    if (img) { img.style.width = Math.round(base.w * s) + "px"; img.style.height = Math.round(base.h * s) + "px"; }
+    const svg = $("#layerSvg");
+    if (svg) svg.setAttribute("viewBox", "0 0 " + ext.w + " " + ext.h);
   }
   renderLayers();
   renderStageFoot(n, (n.layers || []).find(x => x.id === sel.layer));
@@ -238,7 +265,7 @@ function pickFile(cb) {
 function initStage() {
   const doc = $("#stageDoc"), wrap = $("#stageWrap");
   const toDoc = ev => {
-    const n = curNode(), d = docSize(n), r = doc.getBoundingClientRect();
+    const n = curNode(), d = docExtent(n), r = doc.getBoundingClientRect();
     return { x: (ev.clientX - r.left) / (r.width / d.w), y: (ev.clientY - r.top) / (r.height / d.h) };
   };
 
@@ -295,7 +322,7 @@ function initStage() {
       e.preventDefault();
       const l = n.layers.find(x => x.id === sel.layer);
       const mv = ev => { const q = toDoc(ev); l.w = q.x - l.x; l.h = q.y - l.y; paintLayers(); };
-      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up); markDirty(); renderLayers(); };
+      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up); markDirty(); renderLayers(); resyncStageExtent(); };
       doc.setPointerCapture(e.pointerId);
       doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up); doc.addEventListener("pointercancel", up);
       return;
@@ -315,7 +342,7 @@ function initStage() {
         else { l.x = orig.x + dx; l.y = orig.y + dy; }
         paintLayers();
       };
-      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up); if (moved) { markDirty(); renderLayers(); } };
+      const up = () => { doc.removeEventListener("pointermove", mv); doc.removeEventListener("pointerup", up); doc.removeEventListener("pointercancel", up); if (moved) { markDirty(); renderLayers(); resyncStageExtent(); } };
       doc.setPointerCapture(e.pointerId);
       doc.addEventListener("pointermove", mv); doc.addEventListener("pointerup", up); doc.addEventListener("pointercancel", up);
       return;

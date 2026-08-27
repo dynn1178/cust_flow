@@ -195,7 +195,7 @@ function renderAll() {
 
 async function boot() {
   initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initAlbumView(); initShell(); initSplitters(); initImport(); initBoards(); initAuth();
-  initMinimap(); wireUndoRedoButtons();
+  initMinimap(); wireUndoRedoButtons(); initLaneInteractions();
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */
   if (supaOn()) {

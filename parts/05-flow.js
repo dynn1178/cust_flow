@@ -7,6 +7,7 @@ const NSZ = {};                       // 노드 실제 크기 캐시
 const EDGE_EL = {};                   // 엣지 id -> DOM 참조
 let flowMode = "select";
 let linkFrom = null;
+let laneMode = false;                 // 구간 그리기 모드 — 캔버스 배경을 드래그해 구간을 만든다
 let autoLayoutDir = "v";              // 마지막으로 쓴 정렬 방향(메뉴에 표시용) — v: 세로 정렬, h: 가로 정렬
 
 function onFrame(fn) {                // 다음 프레임에 한 번만 실행
@@ -268,9 +269,13 @@ function nodeHtml(n) {
 
   const miss = completeness(n);
   const warn = miss.length ? '<span class="node-warn" title="' + esc(miss.join(" · ")) + '">' + ico("alert", "xs") + "</span>" : "";
-  return '<div class="node-thumb">' + thumb + warn + '<span class="node-kind">' + esc(KIND[n.kind] || "페이지") + "</span></div>" +
-    '<div class="node-main"><div class="node-name">' + esc(n.name) + "</div>" +
-    (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
+  return '<div class="node-head"><span class="node-hue-dot"></span>' +
+      '<div class="node-headtxt"><div class="node-name">' + esc(n.name) + "</div>" +
+      (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") + "</div>" +
+      '<span class="node-kind">' + esc(KIND[n.kind] || "페이지") + "</span>" +
+    "</div>" +
+    '<div class="node-thumb">' + thumb + warn + "</div>" +
+    '<div class="node-main">' +
     (bd ? '<div class="node-badges">' + bd + "</div>" : "") + body + "</div>";
 }
 function renderNodes() {
@@ -411,6 +416,7 @@ function initFlow() {
 
   surf.addEventListener("pointerdown", e => {
     if (e.target.closest("[data-nedit]")) return;   /* 카드 안 버튼 위에서는 드래그를 준비하지 않는다 */
+    if (laneMode && canEdit() && !e.target.closest(".lane-label") && !e.target.closest(".lane-edge")) { startLaneDraw(e, surf, surf.getBoundingClientRect()); return; }
     const r = surf.getBoundingClientRect();
     const wp = e.target.closest("[data-wp]"), add = e.target.closest("[data-add]");
     const port = e.target.closest("[data-port]");
@@ -523,7 +529,12 @@ function initFlow() {
     paintSelection();
   });
   $("#btnAddNode").addEventListener("click", () => addNode());
-  $("#btnLanes").addEventListener("click", openLaneModal);
+  $("#btnLanes").addEventListener("click", () => {
+    laneMode = !laneMode;
+    $("#btnLanes").classList.toggle("on", laneMode);
+    surf.classList.toggle("lane-drawing", laneMode);
+    if (laneMode) toast("캔버스를 가로로 드래그해서 구간을 그리세요", "ok");
+  });
   $("#btnAutoLayout").addEventListener("click", () => {
     openMenu(
       '<button class="mi' + (autoLayoutDir === "v" ? " on" : "") + '" data-act="v">' + ico("grid", "xs") + '세로 정렬<span class="cnt">기본</span></button>' +
