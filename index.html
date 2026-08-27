@@ -176,56 +176,60 @@ select.field{cursor:pointer}
 #guideG .guide{stroke:var(--accent); stroke-width:1; stroke-dasharray:4 4; opacity:.85}
 .flow.busy .node{box-shadow:none}
 
+/* ============ 노드 카드 — "액자형" ============
+   카드 자체는 배경·테두리 없는 투명한 그릇이고, 이름은 이미지 프레임 위,
+   배지·목록은 그 아래에 온다. 이미지 프레임만 실제로 테두리·그림자를 가진
+   "액자"처럼 보인다. 제목·목록 글자는 프레임 안에 갇혀 있지 않으므로 축소해도
+   (약 60% 축소까지는 거의 그대로) 잘 읽히도록 여유 있게 보정한다 — 다만 카드가
+   무한정 커지면 옆 카드와 겹치니 상한(min())은 계속 둔다. */
 .node{
-  position:absolute; width:max(190px,min(240px,calc(190px / max(var(--zoom,1),.79)))); border-radius:var(--r-md); overflow:hidden; cursor:grab;
-  background:var(--glass-3); border:1px solid var(--stroke); box-shadow:var(--shadow-sm);
-  contain:layout style; transition:box-shadow .15s,border-color .15s; user-select:none;
+  position:absolute; width:max(190px,min(240px,calc(190px / max(var(--zoom,1),.79)))); cursor:grab;
+  contain:layout style; user-select:none; border-radius:var(--r-md); padding:4px; transition:background .15s;
 }
-/* 축소할 때 카드가 세로보다 가로로 더 급하게 좁아져 내용이 잘리지 않도록,
-   폭은 일정 배율(최대 +50px)까지만 완만하게 보정한다 — 전부 보정하면(=화면상
-   폭이 아예 고정되면) 옆 카드와 겹칠 수 있어 상한을 둔다. 바깥쪽 max()는
-   확대(zoom>1)했을 때 오히려 기본폭보다 좁아지는 일이 없도록 막는다. */
 .node.size-s{width:max(150px,min(200px,calc(150px / max(var(--zoom,1),.75))))}
 .node.size-m{width:max(190px,min(240px,calc(190px / max(var(--zoom,1),.79))))}
 .node.size-l{width:max(240px,min(290px,calc(240px / max(var(--zoom,1),.83))))}
-.node.sharp{border-radius:5px}
-.node.hued{border-color:color-mix(in srgb,var(--nc) 42%,var(--stroke))}
-.node.hued::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--nc); z-index:3}
-.node:hover{box-shadow:var(--shadow)}
-.node.sel{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
+.node:hover,.node.dragging{background:var(--glass-2)}
+.node.sel{background:var(--accent-soft)}
 .node.dragging{cursor:grabbing; z-index:20}
-.node.link-src{border-color:var(--camp); box-shadow:0 0 0 2px color-mix(in srgb,var(--camp) 30%,transparent)}
-/* 헤더 — 이름·경로·유형을 이미지 위쪽 별도 줄로 분리해 썸네일을 가리지 않는다.
-   유형 배지는 헤더 안에서 같은 줄을 나눠 쓰지 않도록 완전히 빼서 오른쪽 위에
-   따로 얹는다 — 제목과 폭을 다투다 겹치는 일이 없도록. */
-.node-head{position:relative; display:flex; align-items:flex-start; gap:8px; padding:9px 10px 8px; border-bottom:1px solid var(--stroke-2)}
-.node-hue-dot{width:8px; height:8px; border-radius:99px; background:var(--nc); margin-top:5px; flex:none}
-.node-headtxt{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; padding-right:80px}
-.node-kind{position:absolute; top:7px; right:8px; z-index:2; max-width:74px; min-height:18px; padding:2px 8px; border-radius:99px; overflow:hidden;
-  font-size:max(10px,calc(10px / max(var(--zoom,1),.6))); font-weight:600; display:flex; align-items:center; background:var(--glass-3); border:1px solid var(--stroke); color:var(--ink-2)}
-.node-kind span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.node.hued .node-kind{color:color-mix(in srgb,var(--nc) 70%,var(--ink)); border-color:color-mix(in srgb,var(--nc) 40%,transparent)}
+.node.dim{opacity:.38}
+.node.dim:hover,.node.dim.sel{opacity:.95}
 
-.node-thumb{height:129px; background:var(--glass-2); position:relative; display:grid; place-items:center; overflow:hidden}
-.node.size-s .node-thumb{height:99px}
-.node.size-l .node-thumb{height:165px}
-.node-thumb img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block}
-.node-thumb .ph{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--ink-3); font-size:10.5px}
-.node-thumb .ph .ico{width:18px;height:18px;opacity:.5}
+.node-title{padding:7px 4px 8px; display:flex; flex-direction:column; align-items:center; gap:1px; text-align:center}
+.node-name{font-size:max(14.5px,min(24px,calc(14.5px / max(var(--zoom,1),.6)))); font-weight:700; letter-spacing:-.02em; line-height:1.24; word-break:keep-all; color:var(--ink);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis}
+.node.size-s .node-name{font-size:max(13px,min(21px,calc(13px / max(var(--zoom,1),.6))))}
+.node.size-l .node-name{font-size:max(16.5px,min(27px,calc(16.5px / max(var(--zoom,1),.6))))}
+.node-path{font-family:var(--f-mono); font-size:max(10px,min(15px,calc(10px / max(var(--zoom,1),.6)))); color:var(--ink-3); max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+/* 이미지 프레임 — 실제 "액자" 느낌을 주는 유일한 테두리·그림자 요소 */
+.node-pic{position:relative; height:129px; background:var(--glass-2); border-radius:var(--r-md); overflow:hidden;
+  border:2px solid var(--ink-3); box-shadow:var(--shadow-sm); display:grid; place-items:center; transition:border-color .15s,box-shadow .15s}
+.node.size-s .node-pic{height:99px}
+.node.size-l .node-pic{height:165px}
+.node.sharp .node-pic{border-radius:5px}
+.node.hued .node-pic{border-color:var(--nc)}
+.node.sel .node-pic{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
+.node.link-src .node-pic{border-color:var(--camp); box-shadow:0 0 0 2px color-mix(in srgb,var(--camp) 30%,transparent)}
+.node-pic img{width:100%; height:100%; object-fit:cover; object-position:top center; display:block}
+.node-pic .ph{display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--ink-3); font-size:10.5px}
+.node-pic .ph .ico{width:18px;height:18px;opacity:.5}
 .node-warn{position:absolute; top:6px; right:6px; width:20px; height:20px; border-radius:99px; display:flex; align-items:center; justify-content:center;
   background:color-mix(in srgb,var(--warn) 20%,var(--glass-3)); border:1px solid color-mix(in srgb,var(--warn) 45%,transparent); color:var(--warn)}
 .node-warn .ico{width:12px; height:12px; stroke-width:2.2}
-.node-main{padding:9px 10px 10px; display:flex; flex-direction:column; gap:6px}
-/* 세로로 쌓인 카드끼리 축소 시 겹치지 않도록, 카드 높이를 키우는 본문 글자들은
-   (제목·배지·태그·캠페인) 폭과 같은 방식으로 상한을 둔 채로만 커진다 — 헤더의
-   유형 배지처럼 다른 요소와 안 겹치는 게 목적이 아니라 카드 자체가 너무
-   높아지는 걸 막는 목적이라 배율은 조금 더 촘촘하게 잡는다. */
-.node-name{font-size:max(14.5px,min(21px,calc(14.5px / var(--zoom,1)))); font-weight:600; letter-spacing:-.018em; line-height:1.24; word-break:keep-all; color:var(--ink);
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; text-overflow:ellipsis}
-.node.size-s .node-name{font-size:max(13px,min(19px,calc(13px / var(--zoom,1))))}
-.node.size-l .node-name{font-size:max(16.5px,min(24px,calc(16.5px / var(--zoom,1))))}
-.node-path{font-family:var(--f-mono); font-size:max(10px,min(14px,calc(10px / var(--zoom,1)))); color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.node-badges{display:flex; flex-wrap:wrap; gap:4px}
+.thumb-acts{position:absolute; left:6px; right:6px; bottom:6px; display:flex; gap:5px; justify-content:space-between;
+  align-items:flex-end; pointer-events:none; opacity:0; transition:opacity .15s}
+.node:hover .thumb-acts,.thumb-acts:focus-within{opacity:1}
+.node-pic .pick{padding:0; border:0; background:transparent; cursor:pointer; pointer-events:auto; min-width:0}
+.node-pic .pick span{display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink);
+  background:var(--glass-3); border:1px solid var(--stroke); border-radius:99px; padding:6px 12px; box-shadow:var(--shadow-sm);
+  white-space:nowrap; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px)}
+.node-pic .pick span .ico{width:15px; height:15px}
+.node-pic .pick:hover span{border-color:var(--accent); color:var(--accent)}
+.node.size-s .node-pic .pick span{font-size:11.5px; padding:5px 10px}
+
+.node-main{padding:8px 4px 2px; display:flex; flex-direction:column; gap:7px}
+.node-badges{display:flex; flex-wrap:wrap; gap:4px; justify-content:center}
 .bdg{display:inline-flex; align-items:center; gap:4px; min-height:23px; padding:3px 7px; border-radius:7px;
   font-size:11px; font-weight:600; font-family:var(--f-mono);
   background:color-mix(in srgb,var(--c) 15%,transparent); color:color-mix(in srgb,var(--c) 78%,var(--ink));
@@ -238,40 +242,19 @@ select.field{cursor:pointer}
 .node.size-s .bdg{min-height:21px} .node.size-s .bdg b{font-size:max(12.5px,min(17px,calc(12.5px / var(--zoom,1))))}
 .node.size-l .bdg b{font-size:max(15.5px,min(21px,calc(15.5px / var(--zoom,1))))}
 
-/* 보기 모드 — 페이지 이름 아래에 해당 항목만 크게 */
-.node-focus{display:flex; flex-direction:column; gap:4px; padding-top:7px; border-top:1px dashed var(--stroke-2)}
-.fitem{display:flex; align-items:flex-start; gap:6px; line-height:1.35; color:var(--ink)}
-.fitem .ico{color:var(--c); width:13px; height:13px; stroke-width:2.1; flex:none; margin-top:2px}
-.ftext{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px}
-.fev{font-size:max(12.5px,min(17px,calc(12.5px / var(--zoom,1)))); font-weight:600; letter-spacing:-.012em; word-break:keep-all; overflow-wrap:anywhere;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
-.fmeta{font-size:max(10px,min(14px,calc(10px / var(--zoom,1)))); color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.node-focus.tags .fev{font-family:var(--f-mono); font-size:max(11.5px,min(15px,calc(11.5px / var(--zoom,1)))); word-break:break-all}
-.node.size-l .fev{font-size:max(13.5px,min(18px,calc(13.5px / var(--zoom,1))))}
-.node.size-l .node-focus.tags .fev{font-size:max(12.5px,min(16px,calc(12.5px / var(--zoom,1))))}
-.node.size-s .fev{font-size:max(11.5px,min(15px,calc(11.5px / var(--zoom,1))))}
-.node.size-s .fmeta{display:none}
-.fdot{width:7px; height:7px; border-radius:99px; flex:none; margin-top:4px}
-.fitem.more{font-size:max(10.5px,min(14px,calc(10.5px / var(--zoom,1)))); color:var(--ink-3); padding-left:19px}
-.fnone{font-size:max(11px,min(15px,calc(11px / var(--zoom,1)))); color:var(--ink-3); padding-top:7px; border-top:1px dashed var(--stroke-2)}
-.node.dim{opacity:.38}
-.node.dim:hover,.node.dim.sel{opacity:.95}
-.node-camps{display:flex; flex-direction:column; gap:3px; padding-top:6px; border-top:1px dashed var(--stroke-2)}
-.ncamp{display:flex; align-items:center; gap:5px; font-size:max(10.5px,min(13px,calc(10.5px / var(--zoom,1)))); color:var(--ink-2); line-height:1.35}
-.ncamp .ico{color:var(--c); width:11px; height:11px; stroke-width:2}
-.nc-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.nc-dot{width:6px; height:6px; border-radius:99px; flex:none}
-.ncamp.more{color:var(--ink-3); padding-left:16px}
-.thumb-acts{position:absolute; left:6px; right:6px; bottom:6px; display:flex; gap:5px; justify-content:space-between;
-  align-items:flex-end; pointer-events:none; opacity:0; transition:opacity .15s}
-.node:hover .thumb-acts,.thumb-acts:focus-within{opacity:1}
-.node-thumb .pick{padding:0; border:0; background:transparent; cursor:pointer; pointer-events:auto; min-width:0}
-.node-thumb .pick span{display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink);
-  background:var(--glass-3); border:1px solid var(--stroke); border-radius:99px; padding:6px 12px; box-shadow:var(--shadow-sm);
-  white-space:nowrap; -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px)}
-.node-thumb .pick span .ico{width:15px; height:15px}
-.node-thumb .pick:hover span{border-color:var(--accent); color:var(--accent)}
-.node.size-s .node-thumb .pick span{font-size:11.5px; padding:5px 10px}
+/* 목록 — 태그·캠페인이 여러 개면 그냥 아래로 계속 쌓인다(잘리지 않음) */
+.node-list{display:flex; flex-direction:column; gap:6px; padding-top:6px; border-top:1px dashed var(--stroke-2)}
+.g-row{display:flex; align-items:flex-start; gap:6px; font-size:max(11px,min(15px,calc(11px / max(var(--zoom,1),.65))))}
+.g-dot{width:6px; height:6px; border-radius:99px; flex:none; margin-top:.5em}
+.g-body{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px}
+.g-name{color:var(--ink); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.g-name.mono{font-family:var(--f-mono)}
+.g-row.simple .g-name{font-weight:500; color:var(--ink-2)}
+.g-meta{font-size:.84em; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.g-more{font-size:max(10.5px,min(14px,calc(10.5px / max(var(--zoom,1),.65)))); color:var(--ink-3); padding-left:12px}
+.g-empty{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--ink-3); text-align:center; padding-top:2px}
+.g-miss{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--warn); display:flex; align-items:center; gap:6px}
+.g-miss .ico{width:12px; height:12px; flex:none}
 .port{pointer-events:none; position:absolute; width:13px; height:13px; border-radius:99px; background:var(--bg-3);
   border:2px solid var(--accent); opacity:0; transition:opacity .15s,transform .15s; cursor:crosshair; z-index:5}
 .node:hover .port,.node.sel .port{opacity:1; pointer-events:auto}
@@ -1406,39 +1389,36 @@ function drawEdgeHandles() {
   box.innerHTML = h;
 }
 
-/* ---------------- 노드 ---------------- */
+/* ---------------- 노드 ----------------
+   보기 모드마다 카드 아래쪽 목록의 형태만 바뀐다 — 점 색으로 채널/상태를
+   나타내고, 이름 아래 작은 메타 줄(선택)을 붙이는 공통 패턴(g-row)을 쓴다. */
+function gRow(dotColor, name, meta, mono) {
+  return '<div class="g-row' + (meta ? "" : " simple") + '"><span class="g-dot" style="background:' + dotColor + '"></span>' +
+    '<div class="g-body"><span class="g-name' + (mono ? " mono" : "") + '">' + esc(name) + "</span>" +
+    (meta ? '<span class="g-meta">' + meta + "</span>" : "") + "</div></div>";
+}
 function campRow(c) {
   const ch = CHAN[c.chan] || CHAN.push;
-  return '<div class="ncamp" style="--c:' + ch.c + '" title="' + esc(ch.name + " · " + (c.segment || "대상 미정") + " · " + CSTATUS[c.status]) + '">' +
-    ico(ch.ico, "xs") + '<span class="nc-name">' + esc(c.name) + "</span>" +
-    '<span class="nc-dot" style="background:' + CSTATUS_C[c.status] + '"></span></div>';
+  return gRow(ch.c, c.name);
 }
 function tagRowsBig(n, plat) {
   const list = n.tags.filter(t => t.platform === plat);
-  if (!list.length) return '<div class="fnone">' + PLAT[plat].name + " 태그 없음</div>";
-  return '<div class="node-focus tags">' + list.slice(0, 6).map(t =>
-    '<div class="fitem" style="--c:' + PLAT[plat].c + '">' +
-      '<span class="fdot" style="background:' + TSTATUS_C[t.status] + '" title="' + TSTATUS[t.status] + '"></span>' +
-      '<span class="ftext"><span class="fev">' + esc(t.event) + "</span>" +
-      '<span class="fmeta">' + (TRIGGER[t.trigger] || t.trigger) + " · " + TSTATUS[t.status] +
-      (t.selector ? " · " + esc(t.selector) : "") + "</span></span></div>").join("") +
-    (list.length > 6 ? '<div class="fitem more">+' + (list.length - 6) + "개 더</div>" : "") + "</div>";
+  if (!list.length) return '<div class="g-empty">' + PLAT[plat].name + " 태그 없음</div>";
+  return '<div class="node-list">' + list.slice(0, 6).map(t =>
+    gRow(TSTATUS_C[t.status], t.event, (TRIGGER[t.trigger] || t.trigger) + " · " + TSTATUS[t.status] + (t.selector ? " · " + esc(t.selector) : ""), true)
+  ).join("") + (list.length > 6 ? '<div class="g-more">+' + (list.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function campRowsBig(n) {
-  if (!n.camps.length) return '<div class="fnone">등록된 캠페인 없음</div>';
-  return '<div class="node-focus camps">' + n.camps.slice(0, 6).map(c => {
+  if (!n.camps.length) return '<div class="g-empty">등록된 캠페인 없음</div>';
+  return '<div class="node-list">' + n.camps.slice(0, 6).map(c => {
     const ch = CHAN[c.chan] || CHAN.push;
-    return '<div class="fitem" style="--c:' + ch.c + '">' + ico(ch.ico, "xs") +
-      '<span class="ftext"><span class="fev">' + esc(c.name) + "</span>" +
-      '<span class="fmeta">' + ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : "") + "</span></span>" +
-      '<span class="fdot" style="background:' + CSTATUS_C[c.status] + '"></span></div>';
-  }).join("") + (n.camps.length > 6 ? '<div class="fitem more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
+    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : ""));
+  }).join("") + (n.camps.length > 6 ? '<div class="g-more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function incompleteRowsBig(n) {
   const miss = completeness(n);
-  if (!miss.length) return '<div class="fnone">모두 등록됨</div>';
-  return '<div class="node-focus"><div class="fitem" style="--c:var(--warn)">' + ico("alert", "xs") +
-    '<span class="ftext"><span class="fev">' + miss.map(esc).join(" · ") + "</span></span></div></div>";
+  if (!miss.length) return '<div class="g-empty">모두 등록됨</div>';
+  return '<div class="node-list">' + miss.map(m => '<div class="g-miss">' + ico("alert", "xs") + esc(m) + "</div>").join("") + "</div>";
 }
 function focusCount(n, f) {
   if (f === "camp") return n.camps.length;
@@ -1473,20 +1453,18 @@ function nodeHtml(n) {
 
   let body = "";
   if (f === "all") {
-    body = n.camps.length ? '<div class="node-camps">' + n.camps.slice(0, 4).map(campRow).join("") +
-      (n.camps.length > 4 ? '<div class="ncamp more">+' + (n.camps.length - 4) + " 개 더</div>" : "") + "</div>" : "";
+    body = n.camps.length ? '<div class="node-list">' + n.camps.slice(0, 4).map(campRow).join("") +
+      (n.camps.length > 4 ? '<div class="g-more">+' + (n.camps.length - 4) + "개 더</div>" : "") + "</div>" : "";
   } else if (f === "camp") body = campRowsBig(n);
   else if (f === "incomplete") body = incompleteRowsBig(n);
   else if (PLAT[f]) body = tagRowsBig(n, f);
 
   const miss = completeness(n);
   const warn = miss.length ? '<span class="node-warn" title="' + esc(miss.join(" · ")) + '">' + ico("alert", "xs") + "</span>" : "";
-  return '<div class="node-head"><span class="node-hue-dot"></span>' +
-      '<div class="node-headtxt"><div class="node-name">' + esc(n.name) + "</div>" +
-      (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") + "</div>" +
-      '<span class="node-kind" title="' + esc(KIND[n.kind] || "페이지") + '"><span>' + esc(KIND[n.kind] || "페이지") + "</span></span>" +
+  return '<div class="node-title"><div class="node-name">' + esc(n.name) + "</div>" +
+      (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
     "</div>" +
-    '<div class="node-thumb">' + thumb + warn + "</div>" +
+    '<div class="node-pic">' + thumb + warn + "</div>" +
     '<div class="node-main">' +
     (bd ? '<div class="node-badges">' + bd + "</div>" : "") + body + "</div>";
 }

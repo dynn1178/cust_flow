@@ -194,39 +194,36 @@ function drawEdgeHandles() {
   box.innerHTML = h;
 }
 
-/* ---------------- 노드 ---------------- */
+/* ---------------- 노드 ----------------
+   보기 모드마다 카드 아래쪽 목록의 형태만 바뀐다 — 점 색으로 채널/상태를
+   나타내고, 이름 아래 작은 메타 줄(선택)을 붙이는 공통 패턴(g-row)을 쓴다. */
+function gRow(dotColor, name, meta, mono) {
+  return '<div class="g-row' + (meta ? "" : " simple") + '"><span class="g-dot" style="background:' + dotColor + '"></span>' +
+    '<div class="g-body"><span class="g-name' + (mono ? " mono" : "") + '">' + esc(name) + "</span>" +
+    (meta ? '<span class="g-meta">' + meta + "</span>" : "") + "</div></div>";
+}
 function campRow(c) {
   const ch = CHAN[c.chan] || CHAN.push;
-  return '<div class="ncamp" style="--c:' + ch.c + '" title="' + esc(ch.name + " · " + (c.segment || "대상 미정") + " · " + CSTATUS[c.status]) + '">' +
-    ico(ch.ico, "xs") + '<span class="nc-name">' + esc(c.name) + "</span>" +
-    '<span class="nc-dot" style="background:' + CSTATUS_C[c.status] + '"></span></div>';
+  return gRow(ch.c, c.name);
 }
 function tagRowsBig(n, plat) {
   const list = n.tags.filter(t => t.platform === plat);
-  if (!list.length) return '<div class="fnone">' + PLAT[plat].name + " 태그 없음</div>";
-  return '<div class="node-focus tags">' + list.slice(0, 6).map(t =>
-    '<div class="fitem" style="--c:' + PLAT[plat].c + '">' +
-      '<span class="fdot" style="background:' + TSTATUS_C[t.status] + '" title="' + TSTATUS[t.status] + '"></span>' +
-      '<span class="ftext"><span class="fev">' + esc(t.event) + "</span>" +
-      '<span class="fmeta">' + (TRIGGER[t.trigger] || t.trigger) + " · " + TSTATUS[t.status] +
-      (t.selector ? " · " + esc(t.selector) : "") + "</span></span></div>").join("") +
-    (list.length > 6 ? '<div class="fitem more">+' + (list.length - 6) + "개 더</div>" : "") + "</div>";
+  if (!list.length) return '<div class="g-empty">' + PLAT[plat].name + " 태그 없음</div>";
+  return '<div class="node-list">' + list.slice(0, 6).map(t =>
+    gRow(TSTATUS_C[t.status], t.event, (TRIGGER[t.trigger] || t.trigger) + " · " + TSTATUS[t.status] + (t.selector ? " · " + esc(t.selector) : ""), true)
+  ).join("") + (list.length > 6 ? '<div class="g-more">+' + (list.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function campRowsBig(n) {
-  if (!n.camps.length) return '<div class="fnone">등록된 캠페인 없음</div>';
-  return '<div class="node-focus camps">' + n.camps.slice(0, 6).map(c => {
+  if (!n.camps.length) return '<div class="g-empty">등록된 캠페인 없음</div>';
+  return '<div class="node-list">' + n.camps.slice(0, 6).map(c => {
     const ch = CHAN[c.chan] || CHAN.push;
-    return '<div class="fitem" style="--c:' + ch.c + '">' + ico(ch.ico, "xs") +
-      '<span class="ftext"><span class="fev">' + esc(c.name) + "</span>" +
-      '<span class="fmeta">' + ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : "") + "</span></span>" +
-      '<span class="fdot" style="background:' + CSTATUS_C[c.status] + '"></span></div>';
-  }).join("") + (n.camps.length > 6 ? '<div class="fitem more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
+    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : ""));
+  }).join("") + (n.camps.length > 6 ? '<div class="g-more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function incompleteRowsBig(n) {
   const miss = completeness(n);
-  if (!miss.length) return '<div class="fnone">모두 등록됨</div>';
-  return '<div class="node-focus"><div class="fitem" style="--c:var(--warn)">' + ico("alert", "xs") +
-    '<span class="ftext"><span class="fev">' + miss.map(esc).join(" · ") + "</span></span></div></div>";
+  if (!miss.length) return '<div class="g-empty">모두 등록됨</div>';
+  return '<div class="node-list">' + miss.map(m => '<div class="g-miss">' + ico("alert", "xs") + esc(m) + "</div>").join("") + "</div>";
 }
 function focusCount(n, f) {
   if (f === "camp") return n.camps.length;
@@ -261,20 +258,18 @@ function nodeHtml(n) {
 
   let body = "";
   if (f === "all") {
-    body = n.camps.length ? '<div class="node-camps">' + n.camps.slice(0, 4).map(campRow).join("") +
-      (n.camps.length > 4 ? '<div class="ncamp more">+' + (n.camps.length - 4) + " 개 더</div>" : "") + "</div>" : "";
+    body = n.camps.length ? '<div class="node-list">' + n.camps.slice(0, 4).map(campRow).join("") +
+      (n.camps.length > 4 ? '<div class="g-more">+' + (n.camps.length - 4) + "개 더</div>" : "") + "</div>" : "";
   } else if (f === "camp") body = campRowsBig(n);
   else if (f === "incomplete") body = incompleteRowsBig(n);
   else if (PLAT[f]) body = tagRowsBig(n, f);
 
   const miss = completeness(n);
   const warn = miss.length ? '<span class="node-warn" title="' + esc(miss.join(" · ")) + '">' + ico("alert", "xs") + "</span>" : "";
-  return '<div class="node-head"><span class="node-hue-dot"></span>' +
-      '<div class="node-headtxt"><div class="node-name">' + esc(n.name) + "</div>" +
-      (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") + "</div>" +
-      '<span class="node-kind" title="' + esc(KIND[n.kind] || "페이지") + '"><span>' + esc(KIND[n.kind] || "페이지") + "</span></span>" +
+  return '<div class="node-title"><div class="node-name">' + esc(n.name) + "</div>" +
+      (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
     "</div>" +
-    '<div class="node-thumb">' + thumb + warn + "</div>" +
+    '<div class="node-pic">' + thumb + warn + "</div>" +
     '<div class="node-main">' +
     (bd ? '<div class="node-badges">' + bd + "</div>" : "") + body + "</div>";
 }
