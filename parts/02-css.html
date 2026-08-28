@@ -4,6 +4,16 @@
 .pane{border-radius:var(--r-lg); overflow:hidden; display:flex; flex-direction:column; min-width:0}
 .pane.side{flex:none}
 .pane.center{flex:1}
+#deck[data-expand="left"] #paneStage,
+#deck[data-expand="left"] #paneRight,
+#deck[data-expand="left"] #splitL,
+#deck[data-expand="left"] #splitR{display:none}
+#deck[data-expand="left"] #paneLeft{flex:1 1 auto !important; width:auto !important; max-width:none !important; height:auto !important}
+#deck[data-expand="right"] #paneStage,
+#deck[data-expand="right"] #paneLeft,
+#deck[data-expand="right"] #splitL,
+#deck[data-expand="right"] #splitR{display:none}
+#deck[data-expand="right"] #paneRight{flex:1 1 auto !important; width:auto !important; max-width:none !important; height:auto !important}
 .pane-head{display:flex; align-items:center; gap:8px; padding:9px 11px; flex:none;
   border-bottom:1px solid var(--stroke-2); background:var(--glass-2)}
 .pane-head h2{margin:0; font-size:12.5px; font-weight:600; letter-spacing:-.01em; display:flex; align-items:center; gap:7px}

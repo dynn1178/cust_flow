@@ -33,6 +33,30 @@ function initSplitters() {
   addEventListener("resize", () => { applySizes(); if (!stageZoom) renderStage(); });
 }
 
+/* 영역 확장/축소 — 개인 화면 설정이라 문서가 아닌 이 브라우저에만 남긴다 */
+const PANE_EXP_KEY = "jta:paneExpand";
+let paneExpand = "";
+function applyPaneExpand() {
+  if (paneExpand === "left" || paneExpand === "right") $("#deck").setAttribute("data-expand", paneExpand);
+  else $("#deck").removeAttribute("data-expand");
+  $("#expLeftLabel").textContent = paneExpand === "left" ? "축소" : "확장";
+  $("#expRightLabel").textContent = paneExpand === "right" ? "축소" : "확장";
+  $("#btnExpLeft").classList.toggle("on", paneExpand === "left");
+  $("#btnExpRight").classList.toggle("on", paneExpand === "right");
+}
+function initPaneExpand() {
+  try { paneExpand = localStorage.getItem(PANE_EXP_KEY) || ""; } catch (e) { paneExpand = ""; }
+  applyPaneExpand();
+  const toggle = side => {
+    paneExpand = paneExpand === side ? "" : side;
+    applyPaneExpand();
+    try { localStorage.setItem(PANE_EXP_KEY, paneExpand); } catch (e) {}
+    applySizes(); if (!stageZoom) renderStage();
+  };
+  $("#btnExpLeft").addEventListener("click", () => toggle("left"));
+  $("#btnExpRight").addEventListener("click", () => toggle("right"));
+}
+
 /* 테마 — 기본은 라이트. 사용자가 고르면 그 선택을 기억한다(OS 설정보다 우선) */
 const THEME_KEY = "jta:theme";
 function initTheme() {
@@ -213,7 +237,7 @@ function renderAll() {
 }
 
 async function boot() {
-  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initAlbumView(); initShell(); initSplitters(); initImport(); initBoards(); initAuth();
+  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initAlbumView(); initShell(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
   initMinimap(); wireUndoRedoButtons(); initLaneInteractions();
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */
