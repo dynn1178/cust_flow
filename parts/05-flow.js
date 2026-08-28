@@ -699,12 +699,17 @@ function editNode(id) {
 
 /* ---------------- 자동 정렬 ----------------
    지금 자리를 기준점으로 삼아 흐름 순서대로 다시 세운다.
-   dir "v"(기본) — 흐름의 깊이(depth)를 가로축으로, 같은 깊이의 형제 노드는 세로로 쌓는다.
-   dir "h"       — 깊이를 세로축으로, 같은 깊이의 형제 노드는 가로로 늘어놓는다(위 축을 그대로 뒤집은 것).
+   메뉴 라벨 "세로 정렬" — 흐름이 위→아래로 흐르도록 깊이(depth)를 세로축(y)에 놓고,
+                       같은 깊이의 형제 노드는 가로로(x) 늘어놓는다.
+   메뉴 라벨 "가로 정렬" — 흐름이 왼→오른쪽으로 흐르도록 깊이를 가로축(x)에 놓고,
+                       같은 깊이의 형제 노드는 세로로(y) 쌓는다.
    화면(zoom·pan)은 건드리지 않으므로 시야가 튀지 않고, 되돌리기를 제공한다. */
-function autoLayout(dir) {
-  dir = dir === "h" ? "h" : "v";
-  autoLayoutDir = dir;
+function autoLayout(menuDir) {
+  const dir0 = menuDir === "h" ? "h" : "v";
+  autoLayoutDir = dir0;
+  /* 아래 계산 로직은 원래 dir "h"=세로축 깊이, "v"=가로축 깊이로 짜여 있어서,
+     메뉴 라벨과 맞추기 위해 여기서 뒤집어 넘긴다. */
+  const dir = dir0 === "h" ? "v" : "h";
   const nodes = B().nodes, edges = B().edges;
   if (!nodes.length) return;
   const prev = nodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
@@ -774,7 +779,7 @@ function autoLayout(dir) {
   });
 
   markDirty(); renderFlow();
-  toast("흐름 순서대로 정렬했습니다" + (dir === "h" ? " (가로)" : ""), "ok", {
+  toast("흐름 순서대로 정렬했습니다" + (dir0 === "h" ? " (가로)" : ""), "ok", {
     label: "되돌리기",
     fn: () => { prev.forEach(p => { const n = nodeById(p.id); if (n) { n.x = p.x; n.y = p.y; } }); markDirty(); renderFlow(); }
   });

@@ -104,7 +104,7 @@ body.viewer .staff-only{display:none !important}
 .rowseg{display:flex; gap:6px; flex-wrap:wrap}
 .chip{
   display:inline-flex; align-items:center; gap:5px; height:21px; padding:0 8px; border-radius:99px;
-  font-size:11px; font-weight:600;
+  font-size:11px; font-weight:600; white-space:nowrap;
   background:color-mix(in srgb,var(--c,var(--ink-3)) 16%,transparent);
   color:color-mix(in srgb,var(--c,var(--ink-3)) 78%,var(--ink));
   border:1px solid color-mix(in srgb,var(--c,var(--ink-3)) 30%,transparent);
@@ -429,16 +429,15 @@ table.tbl td.nowrap{white-space:nowrap}
 /* 태그 목록: 필터를 바꿀 때마다 칸 너비가 들쭉날쭉 흔들리지 않도록 열 너비를 고정한다 */
 #tagTable{table-layout:fixed}
 #tagTable th{white-space:normal; line-height:1.3}
-#tagTable th:nth-child(1),#tagTable td:nth-child(1){width:7%}
-#tagTable th:nth-child(2),#tagTable td:nth-child(2){width:10%}
+#tagTable th:nth-child(1),#tagTable td:nth-child(1){width:9%}
+#tagTable th:nth-child(2),#tagTable td:nth-child(2){width:8%}
 #tagTable th:nth-child(3),#tagTable td:nth-child(3){width:7%}
-#tagTable th:nth-child(4),#tagTable td:nth-child(4){width:15%}
-#tagTable th:nth-child(5),#tagTable td:nth-child(5){width:11%}
-#tagTable th:nth-child(6),#tagTable td:nth-child(6){width:7%}
-#tagTable th:nth-child(7),#tagTable td:nth-child(7){width:20%}
-#tagTable th:nth-child(8),#tagTable td:nth-child(8){width:6%}
-#tagTable th:nth-child(9),#tagTable td:nth-child(9){width:13%}
-#tagTable th:nth-child(10),#tagTable td:nth-child(10){width:4%}
+#tagTable th:nth-child(4),#tagTable td:nth-child(4){width:9%}
+#tagTable th:nth-child(5),#tagTable td:nth-child(5){width:19%}
+#tagTable th:nth-child(6),#tagTable td:nth-child(6){width:18%}
+#tagTable th:nth-child(7),#tagTable td:nth-child(7){width:4%}
+#tagTable th:nth-child(8),#tagTable td:nth-child(8){width:22%}
+#tagTable th:nth-child(9),#tagTable td:nth-child(9){width:4%}
 .tagname-link{cursor:pointer; border-radius:6px; margin:-3px -5px; padding:3px 5px; transition:background .12s}
 .tagname-link:hover{background:var(--glass-2)}
 .tagname-link:hover .evt{text-decoration:underline}
@@ -448,8 +447,12 @@ tr:hover .rowacts{opacity:1}
 .ccard{border-radius:var(--r-md); border:1px solid var(--stroke); background:var(--glass-2); padding:12px;
   display:flex; flex-direction:column; gap:9px; position:relative; overflow:hidden}
 .ccard::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--c,var(--camp))}
-.ccard h3{margin:0; font-size:13.5px; font-weight:600; letter-spacing:-.01em; padding-left:4px}
+.ccard h3{margin:0; font-size:13.5px; font-weight:600; letter-spacing:-.01em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
 .ccard .where{display:flex; flex-wrap:wrap; gap:4px}
+/* 캠페인 카드 상단 3줄 — 왼쪽·오른쪽으로 짝을 지어 정렬한다(대·소분류|상태, 이름|채널, 위치|링크) */
+.ccard .crow{display:flex; align-items:center; gap:8px}
+.ccard .crow > :first-child{flex:1; min-width:0}
+.ccard .crow .rowseg{display:flex; gap:4px; flex-wrap:wrap}
 .pagechip{font-size:10.5px; padding:2px 7px; border-radius:99px; background:var(--glass-2);
   border:1px solid var(--stroke-2); color:var(--ink-2); cursor:pointer}
 .pagechip:hover{border-color:var(--accent); color:var(--accent)}
@@ -501,9 +504,13 @@ tr:hover .rowacts{opacity:1}
 .tsamp > summary::-webkit-details-marker{display:none}
 .tsamp > summary::before{content:"▸"; font-size:9px; transition:transform .12s}
 .tsamp[open] > summary::before{transform:rotate(90deg)}
-.tsamp-cols{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
-.tsamp-col{flex:1 1 150px; min-width:130px}
+.tsamp-row{margin-top:6px}
 .tsamp-k{font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); display:block; margin-bottom:2px}
+.tsamp-row pre{margin:0; font-size:10.5px; white-space:pre-wrap; word-break:break-all; background:var(--glass-2);
+  border:1px solid var(--stroke-2); border-radius:6px; padding:6px 8px; color:var(--ink-2)}
+/* 태그 목록 표 안에서는 접지 않고 채널별 샘플을 항상 옆으로 나란히 보여준다 */
+.tsamp-cols{display:flex; flex-wrap:wrap; gap:8px}
+.tsamp-col{flex:1 1 150px; min-width:130px}
 .tsamp-col pre{margin:0; font-size:10.5px; white-space:pre-wrap; word-break:break-all; background:var(--glass-2);
   border:1px solid var(--stroke-2); border-radius:6px; padding:6px 8px; color:var(--ink-2)}
 .popover{position:fixed; z-index:120; border-radius:var(--r-md); padding:10px; display:flex; flex-direction:column; gap:9px;
@@ -1418,11 +1425,20 @@ function linkRow(l) {
     '<button class="btn icon sm" data-rmlink type="button" title="삭제">' + ico("close", "xs") + "</button>" +
   "</div>";
 }
-/* http(s) 접두어 없이 입력해도 새 탭에서 열리게 보정한다 */
+/* http(s) 접두어 없이 입력해도 새 탭에서 열리게 보정한다.
+   window.open()은 Artifact 프리뷰처럼 샌드박스가 걸린 화면에서 조용히 막히는 경우가 있어,
+   실제 <a target="_blank"> 클릭을 흉내 내는 방식을 우선 쓰고 실패하면 window.open으로 폴백한다. */
 function openUrl(url) {
   const u = String(url || "").trim();
   if (!u) return;
-  window.open(/^[a-z][a-z0-9+.-]*:/i.test(u) ? u : "https://" + u, "_blank", "noopener");
+  const href = /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : "https://" + u;
+  try {
+    const a = document.createElement("a");
+    a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer";
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) {
+    window.open(href, "_blank", "noopener");
+  }
 }
 function confirmDel(msg, fn) {
   const root = modalHost();
@@ -2156,12 +2172,17 @@ function editNode(id) {
 
 /* ---------------- 자동 정렬 ----------------
    지금 자리를 기준점으로 삼아 흐름 순서대로 다시 세운다.
-   dir "v"(기본) — 흐름의 깊이(depth)를 가로축으로, 같은 깊이의 형제 노드는 세로로 쌓는다.
-   dir "h"       — 깊이를 세로축으로, 같은 깊이의 형제 노드는 가로로 늘어놓는다(위 축을 그대로 뒤집은 것).
+   메뉴 라벨 "세로 정렬" — 흐름이 위→아래로 흐르도록 깊이(depth)를 세로축(y)에 놓고,
+                       같은 깊이의 형제 노드는 가로로(x) 늘어놓는다.
+   메뉴 라벨 "가로 정렬" — 흐름이 왼→오른쪽으로 흐르도록 깊이를 가로축(x)에 놓고,
+                       같은 깊이의 형제 노드는 세로로(y) 쌓는다.
    화면(zoom·pan)은 건드리지 않으므로 시야가 튀지 않고, 되돌리기를 제공한다. */
-function autoLayout(dir) {
-  dir = dir === "h" ? "h" : "v";
-  autoLayoutDir = dir;
+function autoLayout(menuDir) {
+  const dir0 = menuDir === "h" ? "h" : "v";
+  autoLayoutDir = dir0;
+  /* 아래 계산 로직은 원래 dir "h"=세로축 깊이, "v"=가로축 깊이로 짜여 있어서,
+     메뉴 라벨과 맞추기 위해 여기서 뒤집어 넘긴다. */
+  const dir = dir0 === "h" ? "v" : "h";
   const nodes = B().nodes, edges = B().edges;
   if (!nodes.length) return;
   const prev = nodes.map(n => ({ id: n.id, x: n.x, y: n.y }));
@@ -2231,7 +2252,7 @@ function autoLayout(dir) {
   });
 
   markDirty(); renderFlow();
-  toast("흐름 순서대로 정렬했습니다" + (dir === "h" ? " (가로)" : ""), "ok", {
+  toast("흐름 순서대로 정렬했습니다" + (dir0 === "h" ? " (가로)" : ""), "ok", {
     label: "되돌리기",
     fn: () => { prev.forEach(p => { const n = nodeById(p.id); if (n) { n.x = p.x; n.y = p.y; } }); markDirty(); renderFlow(); }
   });
@@ -2755,14 +2776,20 @@ function propLines(props) {
       '<span class="psample mono">' + esc(p.sample || "") + "</span>" +
     "</div>").join("") + "</div>";
 }
-/* 채널별 테스트 샘플을 세로로 쌓지 않고 옆으로 나란히(칼럼) 보여준다 —
-   너비가 좁으면 flex-wrap이 알아서 다음 줄로 넘긴다 */
+function sampleRowsOf(t) { return Object.entries(TSAMPLE_KEYS).filter(([k]) => t[k]); }
+/* 태깅 설정(우측 패널) 카드 안에서는 접혔다 펼쳐지는 아코디언 + 한 줄에 하나씩 쌓아서 보여준다 */
 function sampleAccordion(t) {
-  const rows = Object.entries(TSAMPLE_KEYS).filter(([k]) => t[k]);
+  const rows = sampleRowsOf(t);
   if (!rows.length) return "";
   return '<details class="tsamp"><summary>테스트 샘플 보기 (' + rows.length + ")</summary>" +
-    '<div class="tsamp-cols">' + rows.map(([k, label]) => '<div class="tsamp-col"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") + "</div>" +
+    rows.map(([k, label]) => '<div class="tsamp-row"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") +
   "</details>";
+}
+/* 태그 목록(전체 표)에서는 접지 않고 채널별 샘플을 항상 옆으로 나란히(칼럼) 펼쳐서 보여준다 */
+function sampleColumns(t) {
+  const rows = sampleRowsOf(t);
+  if (!rows.length) return "";
+  return '<div class="tsamp-cols">' + rows.map(([k, label]) => '<div class="tsamp-col"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") + "</div>";
 }
 /* 공통 속성(문서 전체에서 공유하는 속성)은 태그마다 복사해 저장하지 않고,
    보여줄 때마다 그 태그만의 속성과 합쳐서 계산한다 — 어디서든 공통 속성을
@@ -2860,15 +2887,15 @@ function bulkPreviewModal(opt) {
     if (e.target.closest("[data-run]")) { closeModal(); opt.onRun(); }
   });
 }
-const TAG_CSV_HEAD = ["보드", "페이지", "경로", "플랫폼", "화면이름(한글)", "이벤트(한글)", "이벤트(영어)", "영역", "트리거", "채널", "동작", "속성", "개발확인", "메모",
+const TAG_CSV_HEAD = ["보드", "페이지", "경로", "플랫폼", "이벤트(한글)", "이벤트(영어)", "영역", "트리거", "채널", "동작", "속성", "개발확인", "메모",
   "테스트샘플(web_pc)", "테스트샘플(web_mo)", "테스트샘플(app_aos)", "테스트샘플(app_ios)"];
 function tagToCsvRow(t, n, b) {
-  return [b.name, n.name, n.path, platformsToStr(platformsOf(t)), t.screenKo || "", t.eventKo || "", tagEventEn(t), tagArea(t),
+  return [b.name, n.name, n.path, platformsToStr(platformsOf(t)), t.eventKo || "", tagEventEn(t), tagArea(t),
     TRIGGER[t.trigger] || t.trigger, channelsToStr(t.channels), t.action || "", serializePropsStr(effectiveProps(t)), TSTATUS[t.status], t.note,
     t.testSampleWebPc || "", t.testSampleWebMo || "", t.testSampleAppAos || "", t.testSampleAppIos || ""];
 }
 function tagCsvTemplate() {
-  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "홈", "홈 화면 노출", "home_viewed", "", "화면 노출",
+  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "홈 화면 노출", "home_viewed", "", "화면 노출",
     "웹 PC, 웹 모바일, 앱 AOS, 앱 iOS", "화면 진입",
     "사용자 유형 :: user_type :: 문자열 :: guest | 배너 ID 목록 :: banner_ids :: 배열 :: ",
     "적용됨", "세션 첫 화면 진입 시 1회",
@@ -2881,14 +2908,14 @@ function openTagBulkModal(file) {
     const data = rows.slice(1);
     if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
     const parsed = data.map(r => {
-      const [boardName, pageName, path, platLabel, screenKo, eventKo, eventEn, area, triggerLabel, channelsStr, action, propsStr, statusLabel, note,
+      const [boardName, pageName, path, platLabel, eventKo, eventEn, area, triggerLabel, channelsStr, action, propsStr, statusLabel, note,
         webPc, webMo, appAos, appIos] = r;
       const platforms = platformsFromStr(platLabel);
       return {
         boardName: boardName || "", pageName: (pageName || "새 페이지").trim(), path: path || "",
         tag: {
           platforms: platforms.length ? platforms : ["amplitude"],
-          screenKo: screenKo || "", eventKo: eventKo || "", eventEn: eventEn || "unnamed_event", area: area || "",
+          eventKo: eventKo || "", eventEn: eventEn || "unnamed_event", area: area || "",
           trigger: keyByLabel(TRIGGER, triggerLabel, "custom"), channels: channelsFromStr(channelsStr), action: action || "",
           props: parsePropsStr(propsStr), status: keyByLabel(TSTATUS, statusLabel, "todo"), note: note || "",
           testSampleWebPc: webPc || "", testSampleWebMo: webMo || "", testSampleAppAos: appAos || "", testSampleAppIos: appIos || ""
@@ -2983,9 +3010,8 @@ function renderTagPanel() {
         '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
       "</button>" +
       (expanded ?
-        '<div class="evt">' + esc(t.eventKo ? t.eventKo + " " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;opacity:.8">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
+        '<div style="font-size:12.5px">' + (t.eventKo ? "<b>" + esc(t.eventKo) + "</b> " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
         '<div class="meta stack">' +
-          (t.screenKo ? "<span>화면 <b>" + esc(t.screenKo) + "</b></span>" : "") +
           (t.path ? "<span>경로 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(t.path) + "</span></span>" : "") +
           "<span><span class=\"dot\" style=\"--c:" + TSTATUS_C[t.status] + "\"></span> " + TSTATUS[t.status] + "</span>" +
           (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
@@ -3069,7 +3095,7 @@ function renderPanels() { renderTagPanel(); renderCampPanel(); }
 function editTag(id) {
   const n = curNode(); if (!n || !canEdit()) return;
   const t = id ? n.tags.find(x => x.id === id) : {
-    platforms: ["amplitude"], screenKo: "", path: "", eventKo: "", eventEn: "",
+    platforms: ["amplitude"], path: "", eventKo: "", eventEn: "",
     area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
   };
@@ -3084,7 +3110,6 @@ function editTag(id) {
       "속성 행의 '공통' 체크는 문서 전체 태그가 함께 쓰는 속성입니다 — 값을 바꾸거나 체크를 지우면 모든 태그에 똑같이 반영됩니다.",
     fields: [
       { k: "platforms", label: "플랫폼", type: "multi", opts: PLAT },
-      { k: "screenKo", label: "화면 이름(한글)", ph: "홈" },
       { k: "area", label: "영역", mono: true, ph: "#btn-cart" },
       { k: "path", label: "경로", mono: true, ph: "/home" },
       { k: "eventKo", label: "이벤트명(한글)", ph: "장바구니 담기 클릭" },
@@ -3249,7 +3274,7 @@ function renderTagView(force) {
     (tagFilter.board === "all" || state.boards[+tagFilter.board] === b) &&
     (tagFilter.node === "all" || n.id === tagFilter.node) &&
     (tagFilter.status === "all" || t.status === tagFilter.status) &&
-    (!tagFilter.q || (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + (t.screenKo || "") + " " + (t.action || "") + " " + t.note + " " +
+    (!tagFilter.q || (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + (t.action || "") + " " + t.note + " " +
       effectiveProps(t).map(p => p.ko + p.en + p.sample).join(" ") + " " + n.name + " " + b.name).toLowerCase().includes(tagFilter.q))
   );
   const cnt = p => all.filter(x => platformsOf(x.t).indexOf(p) >= 0).length;
@@ -3261,29 +3286,30 @@ function renderTagView(force) {
      '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.t.status === "todo").length + '</span><span class="t">작업 예정</span></div>'].join("");
 
   $("#tagTable").innerHTML =
-    "<thead><tr><th>보드</th><th>페이지</th><th>플랫폼</th><th>이벤트</th><th>트리거 · 동작 · 영역</th><th>채널</th><th>속성</th><th>개발확인</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
+    "<thead><tr><th>보드</th><th>페이지</th><th>플랫폼</th><th>태그명 · 트리거</th><th>이벤트 · 영역 · 채널</th><th>속성</th><th>개발확인</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
     (rows.length ? rows.map(({ t, n, b }) =>
       '<tr data-tid="' + t.id + '">' +
         '<td class="nowrap" style="color:var(--ink-3)">' + esc(b.name) + "</td>" +
         '<td class="nowrap"><b>' + esc(n.name) + "</b>" + (n.path ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(n.path) + "</div>" : "") + "</td>" +
         "<td>" + platChips(platformsOf(t)) + "</td>" +
-        /* 여정 지도로 이동은 태그명(이 셀)을 눌렀을 때만 — 테스트 샘플 펼치기 등 다른 클릭까지 이동돼 버리는 걸 막는다 */
+        /* 동작(태그명)+트리거가 이 태그를 대표하는 제목 역할 — 여기를 눌러야만 여정 지도로 이동한다.
+           테스트 샘플 펼치기 등 다른 클릭까지 이동시키지 않기 위해 이동은 이 칸에만 건다. */
         "<td>" + '<div class="tagname-link" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" title="여정 지도에서 보기">' +
-          (t.eventKo ? '<div style="font-weight:600">' + esc(t.eventKo) + "</div>" : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span>" +
-          "</div>" +
-          (t.screenKo ? '<div class="hint">화면 · ' + esc(t.screenKo) + "</div>" : "") + (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") + "</td>" +
-        '<td><div class="meta stack">' +
-          "<span>트리거 <b>" + (TRIGGER[t.trigger] || t.trigger) + "</b></span>" +
-          (t.action ? "<span>동작 <b>" + esc(t.action) + "</b></span>" : "") +
-          (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
+          '<div style="font-weight:600">' + esc(t.action || "(태그명 없음)") + "</div>" +
+          '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
         "</div></td>" +
-        '<td><div class="rowseg">' + (tchanChips(t.channels) || "—") + "</div></td>" +
+        '<td><div class="meta stack">' +
+          "<span>" + (t.eventKo ? '<b style="color:var(--ink)">' + esc(t.eventKo) + "</b> " : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span></span>" +
+          (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
+          (t.channels && t.channels.length ? '<span class="rowseg">' + tchanChips(t.channels) + "</span>" : "") +
+          (t.note ? '<span class="hint">' + esc(t.note) + "</span>" : "") +
+        "</div></td>" +
         "<td>" + (propLines(displayProps(t)) || "—") + "</td>" +
         '<td class="nowrap"><span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span></td>" +
-        "<td>" + (sampleAccordion(t) || "—") + "</td>" +
+        "<td>" + (sampleColumns(t) || "—") + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +
       "</tr>").join("")
-      : '<tr><td colspan="10"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
+      : '<tr><td colspan="9"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
     "</tbody>";
 }
 function initTagView() {
@@ -3383,18 +3409,24 @@ function renderCampView(force) {
   $("#campGrid").innerHTML = rows.length ? rows.map(({ c, n, b }) => {
     const pins = (n.layers || []).filter(l => l.campId === c.id).length;
     const lane = laneOfNode(b, n);
+    const links = campLinkButtons(c);
     return '<div class="ccard" style="--c:' + (CHAN[c.chan] || CHAN.push).c + '">' +
-      '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div><span class="chip" style="--c:' + CSTATUS_C[c.status] + '">' + CSTATUS[c.status] + "</span></div>" +
-      "<h3>" + esc(c.name) + "</h3>" +
-      (c.cat1 || c.cat2 ? '<div class="rowseg">' + (c.cat1 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat1) + "</span>" : "") +
-        (c.cat2 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat2) + "</span>" : "") + "</div>" : "") +
-      '<div class="meta">' + (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
-        (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
+      '<div class="crow">' +
+        '<div class="rowseg">' + (c.cat1 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat1) + "</span>" : "") +
+          (c.cat2 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat2) + "</span>" : "") + "</div>" +
+        '<span class="chip" style="--c:' + CSTATUS_C[c.status] + '">' + CSTATUS[c.status] + "</span>" +
+      "</div>" +
+      '<div class="crow">' + "<h3>" + esc(c.name) + "</h3>" + chanChip(c.chan) + "</div>" +
+      '<div class="crow">' +
+        '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(b.name) + " · " + esc(n.name) + "</span>" +
+        (links || "") +
+      "</div>" +
+      (c.segment || c.timing ? '<div class="meta">' + (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
+        (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" : "") +
       (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
-      campLinkButtons(c) +
-      '<div class="where"><span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(b.name) + " · " + esc(n.name) + "</span>" +
+      (lane || pins ? '<div class="where">' +
         (lane ? '<span class="pagechip lanechip" style="--c:' + (lane.color || "var(--accent)") + '" title="여정 지도의 구간">' + ico("lanes", "xs") + " " + esc(lane.name || "구간") + "</span>" : "") +
-        (pins ? '<span class="pagechip">' + ico("pin", "xs") + " 화면 배치 " + pins + "</span>" : "") + "</div>" +
+        (pins ? '<span class="pagechip">' + ico("pin", "xs") + " 화면 배치 " + pins + "</span>" : "") + "</div>" : "") +
       (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
     "</div>";
   }).join("") : '<div class="empty" style="grid-column:1/-1">' + ico("mega") + "<div>조건에 맞는 캠페인이 없습니다</div></div>";

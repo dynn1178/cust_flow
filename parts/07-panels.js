@@ -46,14 +46,20 @@ function propLines(props) {
       '<span class="psample mono">' + esc(p.sample || "") + "</span>" +
     "</div>").join("") + "</div>";
 }
-/* 채널별 테스트 샘플을 세로로 쌓지 않고 옆으로 나란히(칼럼) 보여준다 —
-   너비가 좁으면 flex-wrap이 알아서 다음 줄로 넘긴다 */
+function sampleRowsOf(t) { return Object.entries(TSAMPLE_KEYS).filter(([k]) => t[k]); }
+/* 태깅 설정(우측 패널) 카드 안에서는 접혔다 펼쳐지는 아코디언 + 한 줄에 하나씩 쌓아서 보여준다 */
 function sampleAccordion(t) {
-  const rows = Object.entries(TSAMPLE_KEYS).filter(([k]) => t[k]);
+  const rows = sampleRowsOf(t);
   if (!rows.length) return "";
   return '<details class="tsamp"><summary>테스트 샘플 보기 (' + rows.length + ")</summary>" +
-    '<div class="tsamp-cols">' + rows.map(([k, label]) => '<div class="tsamp-col"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") + "</div>" +
+    rows.map(([k, label]) => '<div class="tsamp-row"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") +
   "</details>";
+}
+/* 태그 목록(전체 표)에서는 접지 않고 채널별 샘플을 항상 옆으로 나란히(칼럼) 펼쳐서 보여준다 */
+function sampleColumns(t) {
+  const rows = sampleRowsOf(t);
+  if (!rows.length) return "";
+  return '<div class="tsamp-cols">' + rows.map(([k, label]) => '<div class="tsamp-col"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") + "</div>";
 }
 /* 공통 속성(문서 전체에서 공유하는 속성)은 태그마다 복사해 저장하지 않고,
    보여줄 때마다 그 태그만의 속성과 합쳐서 계산한다 — 어디서든 공통 속성을
@@ -151,15 +157,15 @@ function bulkPreviewModal(opt) {
     if (e.target.closest("[data-run]")) { closeModal(); opt.onRun(); }
   });
 }
-const TAG_CSV_HEAD = ["보드", "페이지", "경로", "플랫폼", "화면이름(한글)", "이벤트(한글)", "이벤트(영어)", "영역", "트리거", "채널", "동작", "속성", "개발확인", "메모",
+const TAG_CSV_HEAD = ["보드", "페이지", "경로", "플랫폼", "이벤트(한글)", "이벤트(영어)", "영역", "트리거", "채널", "동작", "속성", "개발확인", "메모",
   "테스트샘플(web_pc)", "테스트샘플(web_mo)", "테스트샘플(app_aos)", "테스트샘플(app_ios)"];
 function tagToCsvRow(t, n, b) {
-  return [b.name, n.name, n.path, platformsToStr(platformsOf(t)), t.screenKo || "", t.eventKo || "", tagEventEn(t), tagArea(t),
+  return [b.name, n.name, n.path, platformsToStr(platformsOf(t)), t.eventKo || "", tagEventEn(t), tagArea(t),
     TRIGGER[t.trigger] || t.trigger, channelsToStr(t.channels), t.action || "", serializePropsStr(effectiveProps(t)), TSTATUS[t.status], t.note,
     t.testSampleWebPc || "", t.testSampleWebMo || "", t.testSampleAppAos || "", t.testSampleAppIos || ""];
 }
 function tagCsvTemplate() {
-  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "홈", "홈 화면 노출", "home_viewed", "", "화면 노출",
+  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "홈 화면 노출", "home_viewed", "", "화면 노출",
     "웹 PC, 웹 모바일, 앱 AOS, 앱 iOS", "화면 진입",
     "사용자 유형 :: user_type :: 문자열 :: guest | 배너 ID 목록 :: banner_ids :: 배열 :: ",
     "적용됨", "세션 첫 화면 진입 시 1회",
@@ -172,14 +178,14 @@ function openTagBulkModal(file) {
     const data = rows.slice(1);
     if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
     const parsed = data.map(r => {
-      const [boardName, pageName, path, platLabel, screenKo, eventKo, eventEn, area, triggerLabel, channelsStr, action, propsStr, statusLabel, note,
+      const [boardName, pageName, path, platLabel, eventKo, eventEn, area, triggerLabel, channelsStr, action, propsStr, statusLabel, note,
         webPc, webMo, appAos, appIos] = r;
       const platforms = platformsFromStr(platLabel);
       return {
         boardName: boardName || "", pageName: (pageName || "새 페이지").trim(), path: path || "",
         tag: {
           platforms: platforms.length ? platforms : ["amplitude"],
-          screenKo: screenKo || "", eventKo: eventKo || "", eventEn: eventEn || "unnamed_event", area: area || "",
+          eventKo: eventKo || "", eventEn: eventEn || "unnamed_event", area: area || "",
           trigger: keyByLabel(TRIGGER, triggerLabel, "custom"), channels: channelsFromStr(channelsStr), action: action || "",
           props: parsePropsStr(propsStr), status: keyByLabel(TSTATUS, statusLabel, "todo"), note: note || "",
           testSampleWebPc: webPc || "", testSampleWebMo: webMo || "", testSampleAppAos: appAos || "", testSampleAppIos: appIos || ""
@@ -274,9 +280,8 @@ function renderTagPanel() {
         '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
       "</button>" +
       (expanded ?
-        '<div class="evt">' + esc(t.eventKo ? t.eventKo + " " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;opacity:.8">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
+        '<div style="font-size:12.5px">' + (t.eventKo ? "<b>" + esc(t.eventKo) + "</b> " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
         '<div class="meta stack">' +
-          (t.screenKo ? "<span>화면 <b>" + esc(t.screenKo) + "</b></span>" : "") +
           (t.path ? "<span>경로 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(t.path) + "</span></span>" : "") +
           "<span><span class=\"dot\" style=\"--c:" + TSTATUS_C[t.status] + "\"></span> " + TSTATUS[t.status] + "</span>" +
           (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
@@ -360,7 +365,7 @@ function renderPanels() { renderTagPanel(); renderCampPanel(); }
 function editTag(id) {
   const n = curNode(); if (!n || !canEdit()) return;
   const t = id ? n.tags.find(x => x.id === id) : {
-    platforms: ["amplitude"], screenKo: "", path: "", eventKo: "", eventEn: "",
+    platforms: ["amplitude"], path: "", eventKo: "", eventEn: "",
     area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
   };
@@ -375,7 +380,6 @@ function editTag(id) {
       "속성 행의 '공통' 체크는 문서 전체 태그가 함께 쓰는 속성입니다 — 값을 바꾸거나 체크를 지우면 모든 태그에 똑같이 반영됩니다.",
     fields: [
       { k: "platforms", label: "플랫폼", type: "multi", opts: PLAT },
-      { k: "screenKo", label: "화면 이름(한글)", ph: "홈" },
       { k: "area", label: "영역", mono: true, ph: "#btn-cart" },
       { k: "path", label: "경로", mono: true, ph: "/home" },
       { k: "eventKo", label: "이벤트명(한글)", ph: "장바구니 담기 클릭" },
@@ -540,7 +544,7 @@ function renderTagView(force) {
     (tagFilter.board === "all" || state.boards[+tagFilter.board] === b) &&
     (tagFilter.node === "all" || n.id === tagFilter.node) &&
     (tagFilter.status === "all" || t.status === tagFilter.status) &&
-    (!tagFilter.q || (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + (t.screenKo || "") + " " + (t.action || "") + " " + t.note + " " +
+    (!tagFilter.q || (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + (t.action || "") + " " + t.note + " " +
       effectiveProps(t).map(p => p.ko + p.en + p.sample).join(" ") + " " + n.name + " " + b.name).toLowerCase().includes(tagFilter.q))
   );
   const cnt = p => all.filter(x => platformsOf(x.t).indexOf(p) >= 0).length;
@@ -552,29 +556,30 @@ function renderTagView(force) {
      '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.t.status === "todo").length + '</span><span class="t">작업 예정</span></div>'].join("");
 
   $("#tagTable").innerHTML =
-    "<thead><tr><th>보드</th><th>페이지</th><th>플랫폼</th><th>이벤트</th><th>트리거 · 동작 · 영역</th><th>채널</th><th>속성</th><th>개발확인</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
+    "<thead><tr><th>보드</th><th>페이지</th><th>플랫폼</th><th>태그명 · 트리거</th><th>이벤트 · 영역 · 채널</th><th>속성</th><th>개발확인</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
     (rows.length ? rows.map(({ t, n, b }) =>
       '<tr data-tid="' + t.id + '">' +
         '<td class="nowrap" style="color:var(--ink-3)">' + esc(b.name) + "</td>" +
         '<td class="nowrap"><b>' + esc(n.name) + "</b>" + (n.path ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(n.path) + "</div>" : "") + "</td>" +
         "<td>" + platChips(platformsOf(t)) + "</td>" +
-        /* 여정 지도로 이동은 태그명(이 셀)을 눌렀을 때만 — 테스트 샘플 펼치기 등 다른 클릭까지 이동돼 버리는 걸 막는다 */
+        /* 동작(태그명)+트리거가 이 태그를 대표하는 제목 역할 — 여기를 눌러야만 여정 지도로 이동한다.
+           테스트 샘플 펼치기 등 다른 클릭까지 이동시키지 않기 위해 이동은 이 칸에만 건다. */
         "<td>" + '<div class="tagname-link" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" title="여정 지도에서 보기">' +
-          (t.eventKo ? '<div style="font-weight:600">' + esc(t.eventKo) + "</div>" : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span>" +
-          "</div>" +
-          (t.screenKo ? '<div class="hint">화면 · ' + esc(t.screenKo) + "</div>" : "") + (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") + "</td>" +
-        '<td><div class="meta stack">' +
-          "<span>트리거 <b>" + (TRIGGER[t.trigger] || t.trigger) + "</b></span>" +
-          (t.action ? "<span>동작 <b>" + esc(t.action) + "</b></span>" : "") +
-          (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
+          '<div style="font-weight:600">' + esc(t.action || "(태그명 없음)") + "</div>" +
+          '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
         "</div></td>" +
-        '<td><div class="rowseg">' + (tchanChips(t.channels) || "—") + "</div></td>" +
+        '<td><div class="meta stack">' +
+          "<span>" + (t.eventKo ? '<b style="color:var(--ink)">' + esc(t.eventKo) + "</b> " : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span></span>" +
+          (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
+          (t.channels && t.channels.length ? '<span class="rowseg">' + tchanChips(t.channels) + "</span>" : "") +
+          (t.note ? '<span class="hint">' + esc(t.note) + "</span>" : "") +
+        "</div></td>" +
         "<td>" + (propLines(displayProps(t)) || "—") + "</td>" +
         '<td class="nowrap"><span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span></td>" +
-        "<td>" + (sampleAccordion(t) || "—") + "</td>" +
+        "<td>" + (sampleColumns(t) || "—") + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +
       "</tr>").join("")
-      : '<tr><td colspan="10"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
+      : '<tr><td colspan="9"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
     "</tbody>";
 }
 function initTagView() {
@@ -674,18 +679,24 @@ function renderCampView(force) {
   $("#campGrid").innerHTML = rows.length ? rows.map(({ c, n, b }) => {
     const pins = (n.layers || []).filter(l => l.campId === c.id).length;
     const lane = laneOfNode(b, n);
+    const links = campLinkButtons(c);
     return '<div class="ccard" style="--c:' + (CHAN[c.chan] || CHAN.push).c + '">' +
-      '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div><span class="chip" style="--c:' + CSTATUS_C[c.status] + '">' + CSTATUS[c.status] + "</span></div>" +
-      "<h3>" + esc(c.name) + "</h3>" +
-      (c.cat1 || c.cat2 ? '<div class="rowseg">' + (c.cat1 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat1) + "</span>" : "") +
-        (c.cat2 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat2) + "</span>" : "") + "</div>" : "") +
-      '<div class="meta">' + (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
-        (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
+      '<div class="crow">' +
+        '<div class="rowseg">' + (c.cat1 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat1) + "</span>" : "") +
+          (c.cat2 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat2) + "</span>" : "") + "</div>" +
+        '<span class="chip" style="--c:' + CSTATUS_C[c.status] + '">' + CSTATUS[c.status] + "</span>" +
+      "</div>" +
+      '<div class="crow">' + "<h3>" + esc(c.name) + "</h3>" + chanChip(c.chan) + "</div>" +
+      '<div class="crow">' +
+        '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(b.name) + " · " + esc(n.name) + "</span>" +
+        (links || "") +
+      "</div>" +
+      (c.segment || c.timing ? '<div class="meta">' + (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
+        (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" : "") +
       (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
-      campLinkButtons(c) +
-      '<div class="where"><span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(b.name) + " · " + esc(n.name) + "</span>" +
+      (lane || pins ? '<div class="where">' +
         (lane ? '<span class="pagechip lanechip" style="--c:' + (lane.color || "var(--accent)") + '" title="여정 지도의 구간">' + ico("lanes", "xs") + " " + esc(lane.name || "구간") + "</span>" : "") +
-        (pins ? '<span class="pagechip">' + ico("pin", "xs") + " 화면 배치 " + pins + "</span>" : "") + "</div>" +
+        (pins ? '<span class="pagechip">' + ico("pin", "xs") + " 화면 배치 " + pins + "</span>" : "") + "</div>" : "") +
       (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
     "</div>";
   }).join("") : '<div class="empty" style="grid-column:1/-1">' + ico("mega") + "<div>조건에 맞는 캠페인이 없습니다</div></div>";

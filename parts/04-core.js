@@ -602,11 +602,20 @@ function linkRow(l) {
     '<button class="btn icon sm" data-rmlink type="button" title="삭제">' + ico("close", "xs") + "</button>" +
   "</div>";
 }
-/* http(s) 접두어 없이 입력해도 새 탭에서 열리게 보정한다 */
+/* http(s) 접두어 없이 입력해도 새 탭에서 열리게 보정한다.
+   window.open()은 Artifact 프리뷰처럼 샌드박스가 걸린 화면에서 조용히 막히는 경우가 있어,
+   실제 <a target="_blank"> 클릭을 흉내 내는 방식을 우선 쓰고 실패하면 window.open으로 폴백한다. */
 function openUrl(url) {
   const u = String(url || "").trim();
   if (!u) return;
-  window.open(/^[a-z][a-z0-9+.-]*:/i.test(u) ? u : "https://" + u, "_blank", "noopener");
+  const href = /^[a-z][a-z0-9+.-]*:/i.test(u) ? u : "https://" + u;
+  try {
+    const a = document.createElement("a");
+    a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer";
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) {
+    window.open(href, "_blank", "noopener");
+  }
 }
 function confirmDel(msg, fn) {
   const root = modalHost();
