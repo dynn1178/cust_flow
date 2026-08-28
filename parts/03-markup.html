@@ -183,7 +183,11 @@
           <h2><svg class="ico"><use href="#i-tag"/></svg>태깅 설정</h2>
           <span class="count" id="tagCount">0</span>
           <div class="spacer"></div>
+          <button class="btn sm" id="btnToggleAllTags" title="모든 태그를 펼치거나 접습니다"><svg class="ico xs"><use href="#i-grid"/></svg>모두 펼치기</button>
           <button class="btn sm edit-only" id="btnAddTag"><svg class="ico xs"><use href="#i-plus"/></svg>추가</button>
+        </div>
+        <div class="pane-subhead">
+          <select class="field" id="tagJumpSelect"><option value="">등록된 태그로 이동…</option></select>
         </div>
         <div class="pane-body" id="tagList"></div>
       </aside>
@@ -207,6 +211,7 @@
           <option value="todo">작업 예정</option><option value="deprecated">폐기</option>
         </select>
         <input class="field" id="tagSearch" placeholder="이벤트명 · 속성 검색" style="flex:1; min-width:150px">
+        <button class="btn sm" id="btnHideCommon" title="속성 목록에서 공통 속성을 숨깁니다">공통 속성 숨기기</button>
         <button class="btn edit-only staff-only" id="btnTagBulk" title="CSV 파일로 태그 일괄 등록"><svg class="ico"><use href="#i-up"/></svg>일괄 업로드</button>
         <button class="btn staff-only" id="btnTagTemplate" title="업로드용 샘플 CSV 내려받기"><svg class="ico"><use href="#i-down"/></svg>샘플 양식</button>
         <button class="btn staff-only" id="btnTagCsv"><svg class="ico"><use href="#i-down"/></svg>CSV</button>
@@ -226,6 +231,8 @@
           <option value="all">모든 상태</option><option value="live">운영중</option>
           <option value="draft">기획중</option><option value="test">테스트</option><option value="ended">종료</option>
         </select>
+        <select class="field" id="campCat1Filter"></select>
+        <select class="field" id="campCat2Filter"></select>
         <input class="field" id="campSearch" placeholder="캠페인명 · 세그먼트 검색" style="flex:1; min-width:150px">
         <div class="spacer"></div>
         <button class="btn edit-only staff-only" id="btnCampBulk" title="CSV 파일로 캠페인 일괄 등록"><svg class="ico"><use href="#i-up"/></svg>일괄 업로드</button>

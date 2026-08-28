@@ -733,7 +733,9 @@ function autoLayout(dir) {
     const order = {};
     colKeys.forEach((c, ci) => {
       cols[c].forEach((n, i) => {
-        if (!ci) { order[n.id] = i; return; }
+        /* 화살표로 이어지지 않은(부모가 없는) 첫 열은, 생성 순서가 아니라 지금 화면에
+           놓인 위치(세로 정렬은 위→아래, 가로 정렬은 왼→오른)를 기준으로 순서를 정한다 */
+        if (!ci) { order[n.id] = dir === "h" ? n.x : n.y; return; }
         const ps = inner.filter(e => e.to === n.id).map(e => order[e.from]).filter(v => v != null);
         order[n.id] = ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : i + 0.5;
       });

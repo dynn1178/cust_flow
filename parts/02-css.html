@@ -12,6 +12,16 @@
   border:1px solid var(--stroke-2); border-radius:6px; padding:1px 5px}
 .pane-body{flex:1; min-height:0; overflow:auto; padding:10px; display:flex; flex-direction:column; gap:8px}
 .pane-foot{flex:none; padding:8px 10px; border-top:1px solid var(--stroke-2); background:var(--glass-2)}
+.pane-subhead{display:flex; gap:6px; padding:0 11px 9px; flex:none; background:var(--glass-2); border-bottom:1px solid var(--stroke-2)}
+.pane-subhead .field{flex:1; min-width:0; height:28px; font-size:12px}
+/* 태그 카드 접힘/펼침 — 요약(태그명·트리거)만 항상 보이고, 클릭하면 나머지가 펼쳐진다 */
+.tagsummary{display:flex; align-items:center; gap:7px; width:100%; padding:2px 0; border:0; background:transparent;
+  cursor:pointer; text-align:left; font:inherit; color:inherit}
+.tagcaret{font-size:9px; color:var(--ink-3); transition:transform .12s; flex:none}
+.tagcard.expanded .tagcaret{transform:rotate(90deg)}
+.tagsummary .evt{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tagcard.flash{animation:tagflash 1.4s ease}
+@keyframes tagflash{0%,100%{box-shadow:none}20%,60%{box-shadow:0 0 0 2px var(--accent)}}
 
 /* cards in side panels */
 .card{border-radius:var(--r-md); border:1px solid var(--stroke); background:var(--glass-2); padding:9px 10px;
@@ -95,16 +105,19 @@ table.tbl td.nowrap{white-space:nowrap}
 /* 태그 목록: 필터를 바꿀 때마다 칸 너비가 들쭉날쭉 흔들리지 않도록 열 너비를 고정한다 */
 #tagTable{table-layout:fixed}
 #tagTable th{white-space:normal; line-height:1.3}
-#tagTable th:nth-child(1),#tagTable td:nth-child(1){width:8%}
-#tagTable th:nth-child(2),#tagTable td:nth-child(2){width:11%}
-#tagTable th:nth-child(3),#tagTable td:nth-child(3){width:8%}
-#tagTable th:nth-child(4),#tagTable td:nth-child(4){width:14%}
-#tagTable th:nth-child(5),#tagTable td:nth-child(5){width:10%}
-#tagTable th:nth-child(6),#tagTable td:nth-child(6){width:9%}
-#tagTable th:nth-child(7),#tagTable td:nth-child(7){width:18%}
-#tagTable th:nth-child(8),#tagTable td:nth-child(8){width:8%}
-#tagTable th:nth-child(9),#tagTable td:nth-child(9){width:10%}
+#tagTable th:nth-child(1),#tagTable td:nth-child(1){width:7%}
+#tagTable th:nth-child(2),#tagTable td:nth-child(2){width:10%}
+#tagTable th:nth-child(3),#tagTable td:nth-child(3){width:7%}
+#tagTable th:nth-child(4),#tagTable td:nth-child(4){width:15%}
+#tagTable th:nth-child(5),#tagTable td:nth-child(5){width:11%}
+#tagTable th:nth-child(6),#tagTable td:nth-child(6){width:7%}
+#tagTable th:nth-child(7),#tagTable td:nth-child(7){width:20%}
+#tagTable th:nth-child(8),#tagTable td:nth-child(8){width:6%}
+#tagTable th:nth-child(9),#tagTable td:nth-child(9){width:13%}
 #tagTable th:nth-child(10),#tagTable td:nth-child(10){width:4%}
+.tagname-link{cursor:pointer; border-radius:6px; margin:-3px -5px; padding:3px 5px; transition:background .12s}
+.tagname-link:hover{background:var(--glass-2)}
+.tagname-link:hover .evt{text-decoration:underline}
 .rowacts{display:flex; gap:4px; opacity:0; transition:opacity .16s}
 tr:hover .rowacts{opacity:1}
 .grid-cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); gap:10px; padding:12px}
@@ -116,6 +129,8 @@ tr:hover .rowacts{opacity:1}
 .pagechip{font-size:10.5px; padding:2px 7px; border-radius:99px; background:var(--glass-2);
   border:1px solid var(--stroke-2); color:var(--ink-2); cursor:pointer}
 .pagechip:hover{border-color:var(--accent); color:var(--accent)}
+.pagechip.lanechip{cursor:default; border-color:color-mix(in srgb,var(--c,var(--accent)) 42%,var(--stroke-2)); color:color-mix(in srgb,var(--c,var(--accent)) 72%,var(--ink))}
+.pagechip.lanechip:hover{border-color:color-mix(in srgb,var(--c,var(--accent)) 42%,var(--stroke-2)); color:color-mix(in srgb,var(--c,var(--accent)) 72%,var(--ink))}
 .statgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; padding:12px 12px 0}
 .stat{border-radius:var(--r-md); border:1px solid var(--stroke); background:var(--glass-2); padding:10px 12px;
   display:flex; flex-direction:column; gap:2px}
@@ -147,20 +162,25 @@ tr:hover .rowacts{opacity:1}
 .proprow:has([data-pf="common"]:checked){background:color-mix(in srgb,var(--camp) 8%,transparent); border-radius:var(--r-sm)}
 .propchk{display:flex; align-items:center; justify-content:center; cursor:pointer}
 .proprow input.field.mono,.proprow select.field{font-family:var(--f-mono); font-size:12px}
-.proplines{display:flex; flex-direction:column; gap:5px}
-.propline{display:flex; flex-wrap:wrap; align-items:baseline; gap:5px; font-size:11.5px; color:var(--ink-2); line-height:1.4}
-.propline b{font-weight:600; color:var(--ink)}
-.propline .mono{font-family:var(--f-mono); font-size:10.5px}
-.propline .ptype{color:var(--ink-3)}
-.propline .psample{background:var(--glass-2); border:1px solid var(--stroke-2); border-radius:5px; padding:1px 5px}
+/* 속성 목록을 grid로 정렬한다 — .propline은 display:contents로 자기 자신은 사라지고
+   5개 span이 부모 grid의 칼럼에 바로 편입돼, 값이 없는 칸도 자리를 지켜 줄마다 칼럼이 맞는다 */
+.proplines{display:grid; grid-template-columns:max-content minmax(56px,120px) minmax(80px,160px) max-content minmax(60px,1fr);
+  column-gap:8px; row-gap:4px; font-size:11.5px; color:var(--ink-2); line-height:1.4; align-items:baseline}
+.propline{display:contents}
+.propline .pko{font-weight:600; color:var(--ink); overflow-wrap:anywhere}
+.propline .pen{font-family:var(--f-mono); font-size:10.5px; overflow-wrap:anywhere}
+.propline .ptype{color:var(--ink-3); white-space:nowrap}
+.propline .psample{font-family:var(--f-mono); font-size:10.5px; overflow-wrap:anywhere}
+.propline .psample:not(:empty){background:var(--glass-2); border:1px solid var(--stroke-2); border-radius:5px; padding:1px 5px}
 .tsamp{border-top:1px solid var(--stroke-2); margin-top:2px; padding-top:6px}
 .tsamp > summary{cursor:pointer; font-size:11px; color:var(--ink-3); list-style:none; display:flex; align-items:center; gap:5px}
 .tsamp > summary::-webkit-details-marker{display:none}
 .tsamp > summary::before{content:"▸"; font-size:9px; transition:transform .12s}
 .tsamp[open] > summary::before{transform:rotate(90deg)}
-.tsamp-row{margin-top:6px}
+.tsamp-cols{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
+.tsamp-col{flex:1 1 150px; min-width:130px}
 .tsamp-k{font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); display:block; margin-bottom:2px}
-.tsamp-row pre{margin:0; font-size:10.5px; white-space:pre-wrap; word-break:break-all; background:var(--glass-2);
+.tsamp-col pre{margin:0; font-size:10.5px; white-space:pre-wrap; word-break:break-all; background:var(--glass-2);
   border:1px solid var(--stroke-2); border-radius:6px; padding:6px 8px; color:var(--ink-2)}
 .popover{position:fixed; z-index:120; border-radius:var(--r-md); padding:10px; display:flex; flex-direction:column; gap:9px;
   width:250px; box-shadow:var(--shadow); max-height:88vh; overflow:auto}

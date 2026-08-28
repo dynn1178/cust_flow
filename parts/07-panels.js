@@ -33,21 +33,26 @@ function tagArea(t) { return t.area != null && t.area !== "" ? t.area : (t.selec
 function tchanChips(codes) {
   return (codes || []).map(c => '<span class="chip" style="--c:var(--ink-3)">' + esc(TCHAN[c] || c) + "</span>").join("");
 }
+/* 각 속성 줄을 고정된 5개 칸(공통배지·한글명·영문key·타입·샘플)으로 렌더링한다 —
+   값이 없어도 빈 칸을 그대로 두어야 grid 칼럼이 줄마다 어긋나지 않고 표처럼 정렬된다. */
 function propLines(props) {
   if (!props || !props.length) return "";
   return '<div class="proplines">' + props.map(p =>
     '<div class="propline">' +
-      (p.common ? '<span class="chip" style="--c:var(--camp)">공통</span>' : "") +
-      (p.ko ? "<b>" + esc(p.ko) + "</b>" : "") + (p.en ? '<span class="mono">' + esc(p.en) + "</span>" : "") +
+      '<span class="pcommon">' + (p.common ? '<span class="chip" style="--c:var(--camp)">공통</span>' : "") + "</span>" +
+      '<span class="pko">' + esc(p.ko || "") + "</span>" +
+      '<span class="pen mono">' + esc(p.en || "") + "</span>" +
       '<span class="ptype">' + esc(PTYPE[p.type] || p.type || "") + "</span>" +
-      (p.sample ? '<span class="psample mono">' + esc(p.sample) + "</span>" : "") +
+      '<span class="psample mono">' + esc(p.sample || "") + "</span>" +
     "</div>").join("") + "</div>";
 }
+/* 채널별 테스트 샘플을 세로로 쌓지 않고 옆으로 나란히(칼럼) 보여준다 —
+   너비가 좁으면 flex-wrap이 알아서 다음 줄로 넘긴다 */
 function sampleAccordion(t) {
   const rows = Object.entries(TSAMPLE_KEYS).filter(([k]) => t[k]);
   if (!rows.length) return "";
   return '<details class="tsamp"><summary>테스트 샘플 보기 (' + rows.length + ")</summary>" +
-    rows.map(([k, label]) => '<div class="tsamp-row"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") +
+    '<div class="tsamp-cols">' + rows.map(([k, label]) => '<div class="tsamp-col"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") + "</div>" +
   "</details>";
 }
 /* 공통 속성(문서 전체에서 공유하는 속성)은 태그마다 복사해 저장하지 않고,
@@ -202,8 +207,8 @@ function openTagBulkModal(file) {
   });
 }
 function campCsvTemplate() {
-  const head = ["보드", "페이지", "캠페인명", "채널", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
-  const example = [B().name, (B().nodes[0] || {}).name || "홈", "장바구니 이탈 리마인드", "앱 푸시",
+  const head = ["보드", "페이지", "캠페인명", "채널", "대분류", "소분류", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
+  const example = [B().name, (B().nodes[0] || {}).name || "홈", "장바구니 이탈 리마인드", "앱 푸시", "리텐션", "장바구니 이탈",
     "Cart Updated 후 4시간 미결제", "4시간 지연 발송", "운영중", "BRZ-PUSH-2871", "/cart", "1일 1회 · 야간 발송 제외"];
   saveFile("campaign-upload-template.csv", "﻿" + [csvLine(head), csvLine(example)].join("\r\n"), "text/csv");
 }
@@ -213,11 +218,11 @@ function openCampBulkModal(file) {
     const data = rows.slice(1);
     if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
     const parsed = data.map(r => {
-      const [boardName, pageName, name, chanLabel, segment, timing, statusLabel, extId, landing, note] = r;
+      const [boardName, pageName, name, chanLabel, cat1, cat2, segment, timing, statusLabel, extId, landing, note] = r;
       return {
         boardName: boardName || "", pageName: (pageName || "새 페이지").trim(),
         camp: {
-          name: name || "이름 없는 캠페인", chan: keyByLabel(CHAN, chanLabel, "push"),
+          name: name || "이름 없는 캠페인", chan: keyByLabel(CHAN, chanLabel, "push"), cat1: cat1 || "", cat2: cat2 || "",
           segment: segment || "", timing: timing || "", status: keyByLabel(CSTATUS, statusLabel, "draft"),
           extId: extId || "", landing: landing || "", note: note || ""
         }
@@ -248,32 +253,73 @@ function openCampBulkModal(file) {
 function renderTagPanel() {
   const n = curNode(), box = $("#tagList");
   $("#tagCount").textContent = n ? n.tags.length : 0;
-  if (!n) { box.innerHTML = '<div class="empty">' + ico("tag") + "<div>페이지를 선택하세요</div></div>"; return; }
+  renderTagJumpSelect();
+  if (!n) { box.innerHTML = '<div class="empty">' + ico("tag") + "<div>페이지를 선택하세요</div></div>"; updateToggleAllBtn(n); return; }
   if (!n.tags.length) {
     box.innerHTML = '<div class="empty">' + ico("tag") + "<div>등록된 태그가 없습니다" +
       (canEdit() ? "<br>이 화면에서 발생하는 이벤트를 추가하세요" : "") + "</div></div>";
+    updateToggleAllBtn(n);
     return;
   }
   const order = { amplitude: 0, braze: 1, ga4: 2 };
   const minOrder = t => platformsOf(t).reduce((m, p) => Math.min(m, order[p] != null ? order[p] : 99), 99);
-  box.innerHTML = n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t =>
-    '<div class="card" data-tag="' + t.id + '">' +
+  box.innerHTML = n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
+    const expanded = expandedTags.has(t.id);
+    return '<div class="card tagcard' + (expanded ? " expanded" : "") + '" data-tag="' + t.id + '">' +
       '<div class="card-top">' + platChips(platformsOf(t)) +
         '<div class="spacer"></div>' + acts("tag", t.id) + "</div>" +
-      '<div class="evt">' + esc(t.eventKo ? t.eventKo + " " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;opacity:.8">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
-      '<div class="meta stack">' +
-        (t.screenKo ? "<span>화면 <b>" + esc(t.screenKo) + "</b></span>" : "") +
-        (t.path ? "<span>경로 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(t.path) + "</span></span>" : "") +
-        "<span><span class=\"dot\" style=\"--c:" + TSTATUS_C[t.status] + "\"></span> " + TSTATUS[t.status] + "</span>" +
-        "<span>트리거 <b>" + (TRIGGER[t.trigger] || t.trigger) + "</b></span>" +
-        (t.action ? "<span>동작 <b>" + esc(t.action) + "</b></span>" : "") +
-        (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
-      "</div>" +
-      (t.channels && t.channels.length ? '<div class="rowseg">' + tchanChips(t.channels) + "</div>" : "") +
-      propLines(effectiveProps(t)) +
-      (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") +
-      sampleAccordion(t) +
-    "</div>").join("");
+      '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
+        '<span class="tagcaret">▸</span>' +
+        '<span class="evt">' + esc(t.action || "(태그명 없음)") + "</span>" +
+        '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
+      "</button>" +
+      (expanded ?
+        '<div class="evt">' + esc(t.eventKo ? t.eventKo + " " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;opacity:.8">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
+        '<div class="meta stack">' +
+          (t.screenKo ? "<span>화면 <b>" + esc(t.screenKo) + "</b></span>" : "") +
+          (t.path ? "<span>경로 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(t.path) + "</span></span>" : "") +
+          "<span><span class=\"dot\" style=\"--c:" + TSTATUS_C[t.status] + "\"></span> " + TSTATUS[t.status] + "</span>" +
+          (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
+        "</div>" +
+        (t.channels && t.channels.length ? '<div class="rowseg">' + tchanChips(t.channels) + "</div>" : "") +
+        propLines(effectiveProps(t)) +
+        (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") +
+        sampleAccordion(t)
+      : "") +
+    "</div>";
+  }).join("");
+  updateToggleAllBtn(n);
+}
+/* ---------------- 태그 카드 펼침/접힘 · 태그로 바로 이동 ----------------
+   펼침 상태는 저장하지 않는 화면 전용 상태라, 문서가 아니라 여기 모듈 전역에 둔다. */
+let expandedTags = new Set();
+function updateToggleAllBtn(n) {
+  const btn = $("#btnToggleAllTags"); if (!btn) return;
+  const tags = n ? n.tags : [];
+  const allExpanded = tags.length > 0 && tags.every(t => expandedTags.has(t.id));
+  btn.innerHTML = ico(allExpanded ? "density" : "grid", "xs") + (allExpanded ? "모두 접기" : "모두 펼치기");
+  btn.disabled = !tags.length;
+}
+function renderTagJumpSelect() {
+  const sel = $("#tagJumpSelect"); if (!sel) return;
+  const cur = sel.value;
+  const all = allTags();
+  sel.innerHTML = '<option value="">등록된 태그로 이동…</option>' +
+    all.map(({ t, n, b }) => '<option value="' + t.id + '">' + esc(b.name) + " · " + esc(n.name) + " · " + esc(t.action || tagEventEn(t) || "(이름 없음)") + "</option>").join("");
+  if (all.some(x => x.t.id === cur)) sel.value = cur; else sel.value = "";
+}
+function jumpToTag(tagId) {
+  const hit = allTags().find(x => x.t.id === tagId); if (!hit) return;
+  const boardIdx = state.boards.indexOf(hit.b);
+  jumpTo(boardIdx, hit.n.id);
+  expandedTags.add(tagId);
+  renderPanels();
+  requestAnimationFrame(() => {
+    const card = document.querySelector('#tagList [data-tag="' + tagId + '"]');
+    if (!card) return;
+    card.scrollIntoView({ block: "center", behavior: "smooth" });
+    card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1400);
+  });
 }
 
 /* ---------------- 좌측: 캠페인 ---------------- */
@@ -330,13 +376,13 @@ function editTag(id) {
     fields: [
       { k: "platforms", label: "플랫폼", type: "multi", opts: PLAT },
       { k: "screenKo", label: "화면 이름(한글)", ph: "홈" },
+      { k: "area", label: "영역", mono: true, ph: "#btn-cart" },
       { k: "path", label: "경로", mono: true, ph: "/home" },
       { k: "eventKo", label: "이벤트명(한글)", ph: "장바구니 담기 클릭" },
       { k: "eventEn", label: "이벤트명(영어)", mono: true, ph: "add_to_cart_clicked" },
-      { k: "area", label: "영역", mono: true, ph: "#btn-cart" },
+      { k: "action", label: "태그명", ph: "버튼 클릭" },
       { k: "trigger", label: "트리거", type: "select", opts: TRIGGER },
       { k: "channels", label: "채널", type: "multi", opts: TCHAN },
-      { k: "action", label: "동작", ph: "버튼 클릭" },
       { k: "props", label: "속성", type: "kv" },
       { k: "status", label: "개발확인", type: "select", opts: TSTATUS },
       { k: "note", label: "메모", type: "textarea" },
@@ -375,7 +421,7 @@ function editTag(id) {
 }
 function editCamp(id) {
   const n = curNode(); if (!n || !canEdit()) return;
-  const c = id ? n.camps.find(x => x.id === id) : { name: "", chan: "push", segment: "", timing: "", status: "draft", extId: "", landing: "", note: "", links: [] };
+  const c = id ? n.camps.find(x => x.id === id) : { name: "", chan: "push", cat1: "", cat2: "", segment: "", timing: "", status: "draft", extId: "", landing: "", note: "", links: [] };
   const values = Object.assign({}, c, { links: c.links && c.links.length ? c.links : [{ label: "", url: "" }, { label: "", url: "" }] });
   openForm({
     title: id ? "캠페인 수정" : "캠페인 추가", icon: "mega",
@@ -383,6 +429,8 @@ function editCamp(id) {
     fields: [
       { k: "name", label: "캠페인명", ph: "장바구니 이탈 리마인드" },
       { k: "chan", label: "채널", type: "select", opts: CHAN },
+      { k: "cat1", label: "대분류", ph: "리텐션" },
+      { k: "cat2", label: "소분류", ph: "장바구니 이탈" },
       { k: "segment", label: "대상 세그먼트", ph: "Cart Updated 후 4시간 미결제" },
       { k: "timing", label: "발송 타이밍", ph: "4시간 지연 발송" },
       { k: "status", label: "상태", type: "select", opts: CSTATUS },
@@ -407,9 +455,23 @@ function editCamp(id) {
 function initPanels() {
   $("#btnAddTag").addEventListener("click", () => editTag(null));
   $("#btnAddCamp").addEventListener("click", () => editCamp(null));
+  $("#btnToggleAllTags").addEventListener("click", () => {
+    const n = curNode(); if (!n || !n.tags.length) return;
+    const allExpanded = n.tags.every(t => expandedTags.has(t.id));
+    n.tags.forEach(t => { if (allExpanded) expandedTags.delete(t.id); else expandedTags.add(t.id); });
+    renderTagPanel();
+  });
+  $("#tagJumpSelect").addEventListener("change", e => {
+    const id = e.target.value; if (id) jumpToTag(id);
+  });
   $("#tagList").addEventListener("click", e => {
-    const ed = e.target.closest("[data-tag-edit]"), dl = e.target.closest("[data-tag-del]");
+    const ed = e.target.closest("[data-tag-edit]"), dl = e.target.closest("[data-tag-del]"), tg = e.target.closest("[data-tag-toggle]");
     if (ed) return editTag(ed.dataset.tagEdit);
+    if (tg) {
+      const id = tg.dataset.tagToggle;
+      if (expandedTags.has(id)) expandedTags.delete(id); else expandedTags.add(id);
+      return renderTagPanel();
+    }
     if (dl && canEdit()) {
       const n = curNode(), t = n.tags.find(x => x.id === dl.dataset.tagDel);
       return confirmDel("태그 " + tagEventEn(t) + " 를 삭제할까요?", () => {
@@ -439,7 +501,12 @@ function initPanels() {
 }
 
 /* ---------------- 태그 목록 뷰 ---------------- */
-const tagFilter = { p: "all", board: "all", node: "all", status: "all", q: "" };
+const tagFilter = { p: "all", board: "all", node: "all", status: "all", q: "", hideCommon: false };
+/* 공통 속성 숨기기 필터가 켜져 있으면 속성 목록에서 공통 속성을 뺀다 */
+function displayProps(t) {
+  const props = effectiveProps(t);
+  return tagFilter.hideCommon ? props.filter(p => !p.common) : props;
+}
 function boardOptions(cur) {
   return '<option value="all">모든 보드</option>' +
     state.boards.map((b, i) => '<option value="' + i + '"' + (String(cur) === String(i) ? " selected" : "") + ">" + esc(b.name) + "</option>").join("");
@@ -487,11 +554,14 @@ function renderTagView(force) {
   $("#tagTable").innerHTML =
     "<thead><tr><th>보드</th><th>페이지</th><th>플랫폼</th><th>이벤트</th><th>트리거 · 동작 · 영역</th><th>채널</th><th>속성</th><th>개발확인</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
     (rows.length ? rows.map(({ t, n, b }) =>
-      '<tr data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" data-tid="' + t.id + '">' +
+      '<tr data-tid="' + t.id + '">' +
         '<td class="nowrap" style="color:var(--ink-3)">' + esc(b.name) + "</td>" +
         '<td class="nowrap"><b>' + esc(n.name) + "</b>" + (n.path ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(n.path) + "</div>" : "") + "</td>" +
         "<td>" + platChips(platformsOf(t)) + "</td>" +
-        "<td>" + (t.eventKo ? '<div style="font-weight:600">' + esc(t.eventKo) + "</div>" : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span>" +
+        /* 여정 지도로 이동은 태그명(이 셀)을 눌렀을 때만 — 테스트 샘플 펼치기 등 다른 클릭까지 이동돼 버리는 걸 막는다 */
+        "<td>" + '<div class="tagname-link" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" title="여정 지도에서 보기">' +
+          (t.eventKo ? '<div style="font-weight:600">' + esc(t.eventKo) + "</div>" : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span>" +
+          "</div>" +
           (t.screenKo ? '<div class="hint">화면 · ' + esc(t.screenKo) + "</div>" : "") + (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") + "</td>" +
         '<td><div class="meta stack">' +
           "<span>트리거 <b>" + (TRIGGER[t.trigger] || t.trigger) + "</b></span>" +
@@ -499,9 +569,9 @@ function renderTagView(force) {
           (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
         "</div></td>" +
         '<td><div class="rowseg">' + (tchanChips(t.channels) || "—") + "</div></td>" +
-        "<td>" + (propLines(effectiveProps(t)) || "—") + "</td>" +
+        "<td>" + (propLines(displayProps(t)) || "—") + "</td>" +
         '<td class="nowrap"><span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span></td>" +
-        '<td style="max-width:240px">' + (sampleAccordion(t) || "—") + "</td>" +
+        "<td>" + (sampleAccordion(t) || "—") + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +
       "</tr>").join("")
       : '<tr><td colspan="10"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
@@ -516,6 +586,11 @@ function initTagView() {
   $("#tagNodeFilter").addEventListener("change", e => { tagFilter.node = e.target.value; renderTagView(true); });
   $("#tagStatusFilter").addEventListener("change", e => { tagFilter.status = e.target.value; renderTagView(true); });
   $("#tagSearch").addEventListener("input", e => { tagFilter.q = e.target.value.toLowerCase().trim(); renderTagView(true); });
+  $("#btnHideCommon").addEventListener("click", () => {
+    tagFilter.hideCommon = !tagFilter.hideCommon;
+    $("#btnHideCommon").classList.toggle("on", tagFilter.hideCommon);
+    renderTagView(true);
+  });
   $("#btnTagTemplate").addEventListener("click", tagCsvTemplate);
   $("#btnTagBulk").addEventListener("click", () => {
     if (!canEdit()) return;
@@ -536,7 +611,32 @@ function initTagView() {
 }
 
 /* ---------------- 캠페인 뷰 ---------------- */
-const campFilter = { chan: "all", board: "all", status: "all", q: "" };
+const campFilter = { chan: "all", board: "all", status: "all", cat1: "all", cat2: "all", q: "" };
+/* 구간(스윔레인) 배경은 지금 보고 있는 보드가 아닌 다른 보드일 수도 있어서,
+   B()(현재 보드) 전제인 laneRect() 대신 보드를 인자로 받는 버전을 따로 둔다 */
+function laneExtentYFor(b) {
+  const nodes = b.nodes;
+  if (!nodes.length) return { y1: -200, y2: 800 };
+  let y1 = Infinity, y2 = -Infinity;
+  nodes.forEach(n => { const q = nodeRect(n); y1 = Math.min(y1, q.y); y2 = Math.max(y2, q.y + q.h); });
+  return { y1: y1 - 160, y2: y2 + 160 };
+}
+function laneRectFor(b, l) {
+  if (l.y != null && l.h != null) return { x: l.x, y: l.y, w: l.w || 300, h: l.h };
+  const { y1, y2 } = laneExtentYFor(b);
+  return { x: l.x, y: y1, w: l.w || 900, h: Math.max(40, y2 - y1) };
+}
+function laneOfNode(b, n) {
+  const q = nodeRect(n), cx = q.x + q.w / 2, cy = q.y + (q.h || 150) / 2;
+  return (b.lanes || []).find(l => {
+    const r = laneRectFor(b, l);
+    return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
+  }) || null;
+}
+function camCatOptions(all, key, cur) {
+  const names = Array.from(new Set(all.map(x => (x.c[key] || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
+  return '<option value="all">전체</option>' + names.map(v => '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + ">" + esc(v) + "</option>").join("");
+}
 function renderCampView(force) {
   if (!force && !viewStale.camps) return;
   viewStale.camps = false;
@@ -547,11 +647,23 @@ function renderCampView(force) {
   }
   $("#campBoardFilter").innerHTML = boardOptions(campFilter.board);
   const all = allCamps();
+  if (!all.some(x => (x.c.cat1 || "") === campFilter.cat1)) campFilter.cat1 = "all";
+  if (!all.some(x => (x.c.cat2 || "") === campFilter.cat2)) campFilter.cat2 = "all";
+  $("#campCat1Filter").innerHTML = camCatOptions(all, "cat1", campFilter.cat1);
+  $("#campCat2Filter").innerHTML = camCatOptions(all, "cat2", campFilter.cat2);
   const rows = all.filter(({ c, n, b }) =>
     (campFilter.chan === "all" || c.chan === campFilter.chan) &&
     (campFilter.board === "all" || state.boards[+campFilter.board] === b) &&
     (campFilter.status === "all" || c.status === campFilter.status) &&
-    (!campFilter.q || (c.name + " " + c.segment + " " + c.timing + " " + c.extId + " " + n.name + " " + b.name).toLowerCase().includes(campFilter.q)));
+    (campFilter.cat1 === "all" || (c.cat1 || "") === campFilter.cat1) &&
+    (campFilter.cat2 === "all" || (c.cat2 || "") === campFilter.cat2) &&
+    (!campFilter.q || (c.name + " " + c.segment + " " + c.timing + " " + c.extId + " " + (c.cat1 || "") + " " + (c.cat2 || "") + " " + n.name + " " + b.name).toLowerCase().includes(campFilter.q)));
+  /* 여정 지도 상의 위치(왼쪽→오른쪽, 위쪽→아래쪽)를 따라 캠페인을 여정 순서대로 보여준다 */
+  rows.sort((x, y) => {
+    const bi = state.boards.indexOf(x.b) - state.boards.indexOf(y.b); if (bi) return bi;
+    const qx = nodeRect(x.n), qy = nodeRect(y.n);
+    return (qx.x - qy.x) || (qx.y - qy.y);
+  });
 
   $("#campStats").innerHTML =
     ['<div class="stat" style="--c:var(--camp)"><span class="n">' + all.length + '</span><span class="t">전체 캠페인</span></div>',
@@ -561,14 +673,18 @@ function renderCampView(force) {
 
   $("#campGrid").innerHTML = rows.length ? rows.map(({ c, n, b }) => {
     const pins = (n.layers || []).filter(l => l.campId === c.id).length;
+    const lane = laneOfNode(b, n);
     return '<div class="ccard" style="--c:' + (CHAN[c.chan] || CHAN.push).c + '">' +
       '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div><span class="chip" style="--c:' + CSTATUS_C[c.status] + '">' + CSTATUS[c.status] + "</span></div>" +
       "<h3>" + esc(c.name) + "</h3>" +
+      (c.cat1 || c.cat2 ? '<div class="rowseg">' + (c.cat1 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat1) + "</span>" : "") +
+        (c.cat2 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat2) + "</span>" : "") + "</div>" : "") +
       '<div class="meta">' + (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
         (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
       (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
       campLinkButtons(c) +
       '<div class="where"><span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(b.name) + " · " + esc(n.name) + "</span>" +
+        (lane ? '<span class="pagechip lanechip" style="--c:' + (lane.color || "var(--accent)") + '" title="여정 지도의 구간">' + ico("lanes", "xs") + " " + esc(lane.name || "구간") + "</span>" : "") +
         (pins ? '<span class="pagechip">' + ico("pin", "xs") + " 화면 배치 " + pins + "</span>" : "") + "</div>" +
       (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
     "</div>";
@@ -581,6 +697,8 @@ function initCampView() {
   });
   $("#campBoardFilter").addEventListener("change", e => { campFilter.board = e.target.value; renderCampView(true); });
   $("#campStatusFilter").addEventListener("change", e => { campFilter.status = e.target.value; renderCampView(true); });
+  $("#campCat1Filter").addEventListener("change", e => { campFilter.cat1 = e.target.value; renderCampView(true); });
+  $("#campCat2Filter").addEventListener("change", e => { campFilter.cat2 = e.target.value; renderCampView(true); });
   $("#campSearch").addEventListener("input", e => { campFilter.q = e.target.value.toLowerCase().trim(); renderCampView(true); });
   $("#btnCampTemplate").addEventListener("click", campCsvTemplate);
   $("#btnCampBulk").addEventListener("click", () => {
@@ -596,9 +714,9 @@ function initCampView() {
     if (g && g.dataset.bi != null) jumpTo(+g.dataset.bi, g.dataset.goto);
   });
   $("#btnCampCsv").addEventListener("click", () => {
-    const head = ["보드", "페이지", "캠페인명", "채널", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
+    const head = ["보드", "페이지", "캠페인명", "채널", "대분류", "소분류", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
     const q = s => '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"';
-    const body = allCamps().map(({ c, n, b }) => [b.name, n.name, c.name, (CHAN[c.chan] || CHAN.push).name, c.segment, c.timing, CSTATUS[c.status], c.extId, c.landing, c.note].map(q).join(","));
+    const body = allCamps().map(({ c, n, b }) => [b.name, n.name, c.name, (CHAN[c.chan] || CHAN.push).name, c.cat1 || "", c.cat2 || "", c.segment, c.timing, CSTATUS[c.status], c.extId, c.landing, c.note].map(q).join(","));
     saveFile("crm-campaigns.csv", "﻿" + [head.map(q).join(",")].concat(body).join("\r\n"), "text/csv");
   });
 }
