@@ -37,6 +37,7 @@ function propLines(props) {
   if (!props || !props.length) return "";
   return '<div class="proplines">' + props.map(p =>
     '<div class="propline">' +
+      (p.common ? '<span class="chip" style="--c:var(--camp)">공통</span>' : "") +
       (p.ko ? "<b>" + esc(p.ko) + "</b>" : "") + (p.en ? '<span class="mono">' + esc(p.en) + "</span>" : "") +
       '<span class="ptype">' + esc(PTYPE[p.type] || p.type || "") + "</span>" +
       (p.sample ? '<span class="psample mono">' + esc(p.sample) + "</span>" : "") +
@@ -49,9 +50,13 @@ function sampleAccordion(t) {
     rows.map(([k, label]) => '<div class="tsamp-row"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") +
   "</details>";
 }
-/* 이 화면(node)의 공통 태그는 저장 없이 항상 계산해서 보여준다 — 나중에 공통
-   태그가 추가·삭제돼도 이미 만들어진 캠페인에 자동으로 반영되게 하기 위해서다. */
-function commonTagsOf(n) { return (n.tags || []).filter(t => t.common); }
+/* 공통 속성(문서 전체에서 공유하는 속성)은 태그마다 복사해 저장하지 않고,
+   보여줄 때마다 그 태그만의 속성과 합쳐서 계산한다 — 어디서든 공통 속성을
+   추가·수정·삭제하면 모든 태그에 즉시 반영되게 하기 위해서다. */
+function effectiveProps(t) {
+  return (state.commonProps || []).map(p => Object.assign({}, p, { common: true }))
+    .concat((t.props || []).map(p => Object.assign({}, p, { common: false })));
+}
 
 /* ---------------- 태그/캠페인 CSV 일괄 업로드 · 샘플 양식 ----------------
    기존 CSV 내보내기(btnTagCsv/btnCampCsv)와 같은 컬럼·따옴표 규칙을 써서
@@ -97,8 +102,6 @@ function channelsToStr(codes) { return (codes || []).map(c => TCHAN[c] || c).joi
 function channelsFromStr(s) {
   return String(s || "").split(",").map(x => keyByLabel(TCHAN, x, null)).filter(Boolean);
 }
-function boolToStr(b) { return b ? "Y" : ""; }
-function strToBool(s) { return /^(y|yes|true|1|공통)$/i.test(String(s || "").trim()); }
 function resolveBoard(name) {
   const s = String(name || "").trim();
   if (!s) return B();
@@ -143,15 +146,15 @@ function bulkPreviewModal(opt) {
     if (e.target.closest("[data-run]")) { closeModal(); opt.onRun(); }
   });
 }
-const TAG_CSV_HEAD = ["보드", "페이지", "경로", "플랫폼", "공통여부", "화면이름(한글)", "이벤트(한글)", "이벤트(영어)", "영역", "트리거", "채널", "동작", "속성", "개발확인", "메모",
+const TAG_CSV_HEAD = ["보드", "페이지", "경로", "플랫폼", "화면이름(한글)", "이벤트(한글)", "이벤트(영어)", "영역", "트리거", "채널", "동작", "속성", "개발확인", "메모",
   "테스트샘플(web_pc)", "테스트샘플(web_mo)", "테스트샘플(app_aos)", "테스트샘플(app_ios)"];
 function tagToCsvRow(t, n, b) {
-  return [b.name, n.name, n.path, platformsToStr(platformsOf(t)), boolToStr(t.common), t.screenKo || "", t.eventKo || "", tagEventEn(t), tagArea(t),
-    TRIGGER[t.trigger] || t.trigger, channelsToStr(t.channels), t.action || "", serializePropsStr(t.props), TSTATUS[t.status], t.note,
+  return [b.name, n.name, n.path, platformsToStr(platformsOf(t)), t.screenKo || "", t.eventKo || "", tagEventEn(t), tagArea(t),
+    TRIGGER[t.trigger] || t.trigger, channelsToStr(t.channels), t.action || "", serializePropsStr(effectiveProps(t)), TSTATUS[t.status], t.note,
     t.testSampleWebPc || "", t.testSampleWebMo || "", t.testSampleAppAos || "", t.testSampleAppIos || ""];
 }
 function tagCsvTemplate() {
-  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "Y", "홈", "홈 화면 노출", "home_viewed", "", "화면 노출",
+  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "홈", "홈 화면 노출", "home_viewed", "", "화면 노출",
     "웹 PC, 웹 모바일, 앱 AOS, 앱 iOS", "화면 진입",
     "사용자 유형 :: user_type :: 문자열 :: guest | 배너 ID 목록 :: banner_ids :: 배열 :: ",
     "적용됨", "세션 첫 화면 진입 시 1회",
@@ -164,13 +167,13 @@ function openTagBulkModal(file) {
     const data = rows.slice(1);
     if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
     const parsed = data.map(r => {
-      const [boardName, pageName, path, platLabel, commonStr, screenKo, eventKo, eventEn, area, triggerLabel, channelsStr, action, propsStr, statusLabel, note,
+      const [boardName, pageName, path, platLabel, screenKo, eventKo, eventEn, area, triggerLabel, channelsStr, action, propsStr, statusLabel, note,
         webPc, webMo, appAos, appIos] = r;
       const platforms = platformsFromStr(platLabel);
       return {
         boardName: boardName || "", pageName: (pageName || "새 페이지").trim(), path: path || "",
         tag: {
-          platforms: platforms.length ? platforms : ["amplitude"], common: strToBool(commonStr),
+          platforms: platforms.length ? platforms : ["amplitude"],
           screenKo: screenKo || "", eventKo: eventKo || "", eventEn: eventEn || "unnamed_event", area: area || "",
           trigger: keyByLabel(TRIGGER, triggerLabel, "custom"), channels: channelsFromStr(channelsStr), action: action || "",
           props: parsePropsStr(propsStr), status: keyByLabel(TSTATUS, statusLabel, "todo"), note: note || "",
@@ -255,19 +258,19 @@ function renderTagPanel() {
   const minOrder = t => platformsOf(t).reduce((m, p) => Math.min(m, order[p] != null ? order[p] : 99), 99);
   box.innerHTML = n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t =>
     '<div class="card" data-tag="' + t.id + '">' +
-      '<div class="card-top">' + platChips(platformsOf(t)) + (t.common ? '<span class="chip" style="--c:var(--camp)">공통</span>' : "") +
+      '<div class="card-top">' + platChips(platformsOf(t)) +
         '<div class="spacer"></div>' + acts("tag", t.id) + "</div>" +
       '<div class="evt">' + esc(t.eventKo ? t.eventKo + " " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;opacity:.8">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
-      '<div class="meta">' +
+      '<div class="meta stack">' +
         (t.screenKo ? "<span>화면 <b>" + esc(t.screenKo) + "</b></span>" : "") +
-        (t.path ? '<span class="mono" style="font-size:10.5px">' + esc(t.path) + "</span>" : "") +
+        (t.path ? "<span>경로 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(t.path) + "</span></span>" : "") +
         "<span><span class=\"dot\" style=\"--c:" + TSTATUS_C[t.status] + "\"></span> " + TSTATUS[t.status] + "</span>" +
         "<span>트리거 <b>" + (TRIGGER[t.trigger] || t.trigger) + "</b></span>" +
         (t.action ? "<span>동작 <b>" + esc(t.action) + "</b></span>" : "") +
-        (tagArea(t) ? '<span class="mono" style="font-size:10.5px">' + esc(tagArea(t)) + "</span>" : "") +
+        (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
       "</div>" +
       (t.channels && t.channels.length ? '<div class="rowseg">' + tchanChips(t.channels) + "</div>" : "") +
-      propLines(t.props) +
+      propLines(effectiveProps(t)) +
       (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") +
       sampleAccordion(t) +
     "</div>").join("");
@@ -279,10 +282,7 @@ function renderCampPanel() {
   $("#campCount").textContent = n ? n.camps.length : 0;
   if (!n) { box.innerHTML = '<div class="empty">' + ico("mega") + "<div>페이지를 선택하세요</div></div>"; return; }
   const L = (n.layers || []).find(x => x.id === sel.layer);
-  const common = commonTagsOf(n);
-  const commonNote = common.length ? '<div class="hint">' + ico("tag", "xs") + " 공통 태그 " + common.length + "개가 이 화면의 모든 캠페인에 자동 적용됩니다: " +
-    common.map(t => esc(t.eventKo || tagEventEn(t))).join(", ") + "</div>" : "";
-  box.innerHTML = commonNote + (n.camps.length ? n.camps.map(c => {
+  box.innerHTML = (n.camps.length ? n.camps.map(c => {
     const linked = (n.layers || []).filter(l => l.campId === c.id);
     return '<div class="card' + (L && L.campId === c.id ? " pinned" : "") + '" data-camp="' + c.id + '">' +
       '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div>' + acts("camp", c.id) + "</div>" +
@@ -314,17 +314,21 @@ function renderPanels() { renderTagPanel(); renderCampPanel(); }
 function editTag(id) {
   const n = curNode(); if (!n || !canEdit()) return;
   const t = id ? n.tags.find(x => x.id === id) : {
-    platforms: ["amplitude"], common: false, screenKo: "", path: "", eventKo: "", eventEn: "",
+    platforms: ["amplitude"], screenKo: "", path: "", eventKo: "", eventEn: "",
     area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
   };
-  const values = id ? Object.assign({}, t, { eventEn: tagEventEn(t), area: tagArea(t), platforms: platformsOf(t) }) : t;
+  const values = Object.assign({}, t, {
+    eventEn: tagEventEn(t), area: tagArea(t), platforms: platformsOf(t),
+    path: t.path || n.path || "",           // 경로는 기본적으로 페이지에 지정된 경로를 그대로 따른다
+    props: effectiveProps(t)                // 문서 전체 공통 속성 + 이 태그만의 속성을 함께 보여준다
+  });
   openForm({
     title: id ? "태그 수정" : "태그 추가", icon: "tag",
-    note: "Amplitude · Braze · GA4에 실제로 심어진 이벤트 정의를 그대로 적어 두면 QA 때 이 화면이 기준이 됩니다.",
+    note: "Amplitude · Braze · GA4에 실제로 심어진 이벤트 정의를 그대로 적어 두면 QA 때 이 화면이 기준이 됩니다. " +
+      "속성 행의 '공통' 체크는 문서 전체 태그가 함께 쓰는 속성입니다 — 값을 바꾸거나 체크를 지우면 모든 태그에 똑같이 반영됩니다.",
     fields: [
       { k: "platforms", label: "플랫폼", type: "multi", opts: PLAT },
-      { k: "common", label: "공통 태그로 지정 (이 화면의 모든 캠페인에 자동 적용)", type: "check" },
       { k: "screenKo", label: "화면 이름(한글)", ph: "홈" },
       { k: "path", label: "경로", mono: true, ph: "/home" },
       { k: "eventKo", label: "이벤트명(한글)", ph: "장바구니 담기 클릭" },
@@ -345,7 +349,22 @@ function editTag(id) {
     ],
     values,
     onSave: v => {
-      const rec = Object.assign({}, t, v, { eventEn: v.eventEn || "unnamed_event", platforms: v.platforms && v.platforms.length ? v.platforms : ["amplitude"] });
+      /* 샘플이 비어 있는 속성은 저장 시점에 테스트 샘플에서 자동으로 채운다(반자동) —
+         이미 값이 있는 속성은 그대로 둔다. */
+      const samples = [v.testSampleWebPc, v.testSampleWebMo, v.testSampleAppAos, v.testSampleAppIos];
+      (v.props || []).forEach(p => {
+        if (!p.sample && p.en) { const found = findValueInSamples(samples, p.en); if (found !== undefined) p.sample = found; }
+      });
+      const commonProps = [], specificProps = [];
+      (v.props || []).forEach(p => {
+        const clean = { ko: p.ko, en: p.en, type: p.type, sample: p.sample };
+        (p.common ? commonProps : specificProps).push(clean);
+      });
+      state.commonProps = commonProps;
+      const rec = Object.assign({}, t, v, {
+        eventEn: v.eventEn || "unnamed_event", platforms: v.platforms && v.platforms.length ? v.platforms : ["amplitude"],
+        props: specificProps
+      });
       if (id) Object.assign(t, rec); else { rec.id = uid("t"); n.tags.push(rec); }
       markDirty(); renderFlow(); renderPanels(); renderTagView(true);
     },
@@ -455,7 +474,7 @@ function renderTagView(force) {
     (tagFilter.node === "all" || n.id === tagFilter.node) &&
     (tagFilter.status === "all" || t.status === tagFilter.status) &&
     (!tagFilter.q || (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + (t.screenKo || "") + " " + (t.action || "") + " " + t.note + " " +
-      (t.props || []).map(p => p.ko + p.en + p.sample).join(" ") + " " + n.name + " " + b.name).toLowerCase().includes(tagFilter.q))
+      effectiveProps(t).map(p => p.ko + p.en + p.sample).join(" ") + " " + n.name + " " + b.name).toLowerCase().includes(tagFilter.q))
   );
   const cnt = p => all.filter(x => platformsOf(x.t).indexOf(p) >= 0).length;
   $("#tagStats").innerHTML =
@@ -471,13 +490,16 @@ function renderTagView(force) {
       '<tr data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" data-tid="' + t.id + '">' +
         '<td class="nowrap" style="color:var(--ink-3)">' + esc(b.name) + "</td>" +
         '<td class="nowrap"><b>' + esc(n.name) + "</b>" + (n.path ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(n.path) + "</div>" : "") + "</td>" +
-        "<td>" + platChips(platformsOf(t)) + (t.common ? '<div class="chip" style="--c:var(--camp);margin-top:4px">공통</div>' : "") + "</td>" +
+        "<td>" + platChips(platformsOf(t)) + "</td>" +
         "<td>" + (t.eventKo ? '<div style="font-weight:600">' + esc(t.eventKo) + "</div>" : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span>" +
           (t.screenKo ? '<div class="hint">화면 · ' + esc(t.screenKo) + "</div>" : "") + (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") + "</td>" +
-        '<td class="nowrap">' + (TRIGGER[t.trigger] || t.trigger) + (t.action ? " · " + esc(t.action) : "") +
-          (tagArea(t) ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(tagArea(t)) + "</div>" : "") + "</td>" +
+        '<td><div class="meta stack">' +
+          "<span>트리거 <b>" + (TRIGGER[t.trigger] || t.trigger) + "</b></span>" +
+          (t.action ? "<span>동작 <b>" + esc(t.action) + "</b></span>" : "") +
+          (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
+        "</div></td>" +
         '<td><div class="rowseg">' + (tchanChips(t.channels) || "—") + "</div></td>" +
-        "<td>" + (propLines(t.props) || "—") + "</td>" +
+        "<td>" + (propLines(effectiveProps(t)) || "—") + "</td>" +
         '<td class="nowrap"><span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span></td>" +
         '<td style="max-width:240px">' + (sampleAccordion(t) || "—") + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +

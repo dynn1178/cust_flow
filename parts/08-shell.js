@@ -151,7 +151,7 @@ function importJson() {
 function normalizeTag(t) {
   t = t || {};
   const out = Object.assign({
-    platforms: [], common: false, screenKo: "", path: "", eventKo: "", eventEn: "", area: "", trigger: "click",
+    platforms: [], screenKo: "", path: "", eventKo: "", eventEn: "", area: "", trigger: "click",
     channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
   }, t);
@@ -200,6 +200,7 @@ function normalize(s) {
   s.title = s.title || "고객 여정 태그 맵";
   s.updatedAt = s.updatedAt || 0;
   s.cloud = s.cloud || null;          // 이미지 호스팅(Cloudinary) 설정 — 문서에 같이 저장돼 모두에게 적용된다
+  s.commonProps = (s.commonProps || []).map(p => ({ ko: p.ko || "", en: p.en || "", type: p.type || "string", sample: p.sample || "" }));
   s.v = 2;
   return s;
 }

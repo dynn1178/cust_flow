@@ -232,7 +232,7 @@ async function setShot(file, node, quiet) {
     const th = await readImage(file, 300, 0.6, false);
     n.shotData = big.src; n.shotW = big.w; n.shotH = big.h; n.shotType = big.type;
     n.thumb = th.src; n.shotDirty = true;
-    if (n.id === sel.node) stageZoom = null;
+    if (n.id === sel.node) stageZoom = 1;
     markDirty();
     if (!quiet) {
       renderFlow();

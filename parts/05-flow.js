@@ -302,7 +302,7 @@ function renderNodes() {
     el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
-      state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t) + t.common).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
+      state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t)).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
       el.innerHTML = nodeHtml(n);

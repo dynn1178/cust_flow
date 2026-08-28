@@ -77,7 +77,7 @@ function seed() {
   const T = (platform, event, trigger, selector, status, props, note, extra) => {
     const ex = extra || {}, ts = ex.testSamples || {};
     return {
-      id: uid("t"), platforms: ex.platforms || [platform], common: !!ex.common,
+      id: uid("t"), platforms: ex.platforms || [platform],
       screenKo: ex.screenKo || "", path: ex.path || "",
       eventKo: ex.eventKo || "", eventEn: event,
       area: selector || "", trigger, channels: ex.channels || [], action: ex.action || "",
@@ -109,10 +109,10 @@ function seed() {
 
   map.n2.tags = [
     T("amplitude", "home_viewed", "view", "", "live",
-      [{ ko: "사용자 유형", en: "user_type", type: "string", sample: "guest" }, { ko: "배너 ID 목록", en: "banner_ids", type: "array", sample: "" }],
+      [{ ko: "배너 ID 목록", en: "banner_ids", type: "array", sample: "" }],
       "세션 첫 화면 진입 시 1회",
       {
-        common: true, screenKo: "홈", eventKo: "홈 화면 노출", action: "화면 진입", channels: ["web_pc", "web_mo", "app_aos", "app_ios"],
+        screenKo: "홈", eventKo: "홈 화면 노출", action: "화면 진입", channels: ["web_pc", "web_mo", "app_aos", "app_ios"],
         testSamples: { web_pc: '{"user_type":"guest","banner_ids":["b1","b2","b3"]}', app_aos: '{"user_type":"member","banner_ids":["b1"]}' }
       }),
     T("amplitude", "home_banner_clicked", "click", ".main-banner .slide", "live", [{ k: "banner_id", v: "string" }, { k: "slot", v: "1|2|3" }],
@@ -176,14 +176,16 @@ function seed() {
   return {
     v: 2, title: "고객 여정 태그 맵", updatedAt: 0, bi: 0,
     boards: [{ id: "b1", name: "커머스 앱 · 구매 여정", nodes, edges, lanes: [], sel: "n2", view: { zoom: 0.72, panX: 24, panY: 12, fitted: false } }],
-    ui: { flowH: 372, leftW: 274, rightW: 300, focus: "all", snap: true }
+    ui: { flowH: 372, leftW: 274, rightW: 300, focus: "all", snap: true },
+    /* 문서 전체 태그가 공유하는 속성 — 어느 태그에서 값을 바꾸거나 체크를 해제해도 모든 태그에 반영된다 */
+    commonProps: [{ ko: "사용자 유형", en: "user_type", type: "string", sample: "guest" }]
   };
 }
 
 /* ---------------- 상태 ---------------- */
 let state = seed();
 let sel = { node: "n2", edge: null, layer: null };
-let stageZoom = null;            // null = 맞춤 모드 (stageFitMode 방식대로 자동 계산)
+let stageZoom = 1;               // 기본값 100% · null = 맞춤 모드 (stageFitMode 방식대로 자동 계산)
 let stageFitMode = "width";      // 맞춤 모드일 때 계산 방식: width(가로 맞춤, 기본) · height(세로 맞춤) · contain(전체 화면 맞춤)
 const STAGE_FIT = {
   width: { name: "가로 맞춤" },
@@ -448,21 +450,25 @@ function deepFindKey(obj, key) {
   }
   return undefined;
 }
-function findSampleValue(root, key) {
-  const keys = ["testSampleWebPc", "testSampleWebMo", "testSampleAppAos", "testSampleAppIos"];
-  for (const k of keys) {
-    const el = $('[data-k="' + k + '"]', root);
-    const raw = el && el.value.trim();
-    if (!raw) continue;
+/* samples: 원문 텍스트(JSON 또는 대충 쓴 key:value) 배열에서 key를 찾아 값을 돌려준다.
+   저장 시 자동 채우기(반자동)와 폼 안의 "자동" 버튼이 이 함수를 함께 쓴다. */
+function findValueInSamples(samples, key) {
+  for (const raw of (samples || [])) {
+    const s = raw && String(raw).trim();
+    if (!s) continue;
     try {
-      const v = deepFindKey(JSON.parse(raw), key);
+      const v = deepFindKey(JSON.parse(s), key);
       if (v !== undefined) return typeof v === "object" ? JSON.stringify(v) : String(v);
     } catch (e) {
-      const m = new RegExp('["\']?' + key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + '["\']?\\s*[:=]\\s*("(?:[^"\\\\]|\\\\.)*"|[^,\\n}]+)').exec(raw);
+      const m = new RegExp('["\']?' + key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + '["\']?\\s*[:=]\\s*("(?:[^"\\\\]|\\\\.)*"|[^,\\n}]+)').exec(s);
       if (m) return m[1].trim().replace(/^"(.*)"$/, "$1");
     }
   }
   return undefined;
+}
+function findSampleValue(root, key) {
+  const keys = ["testSampleWebPc", "testSampleWebMo", "testSampleAppAos", "testSampleAppIos"];
+  return findValueInSamples(keys.map(k => { const el = $('[data-k="' + k + '"]', root); return el ? el.value : ""; }), key);
 }
 function openForm(opt) {
   const vals = Object.assign({}, opt.values);
@@ -488,7 +494,8 @@ function openForm(opt) {
     $$("[data-kv]", root).forEach(box => {
       out[box.dataset.kv] = $$(".proprow", box).map(r => ({
         ko: $('[data-pf="ko"]', r).value.trim(), en: $('[data-pf="en"]', r).value.trim(),
-        type: $('[data-pf="type"]', r).value, sample: $('[data-pf="sample"]', r).value.trim()
+        type: $('[data-pf="type"]', r).value, sample: $('[data-pf="sample"]', r).value.trim(),
+        common: $('[data-pf="common"]', r).checked
       })).filter(p => p.ko || p.en || p.sample);
     });
     $$("[data-links]", root).forEach(box => {
@@ -576,6 +583,8 @@ function resolvePropType(raw) {
 }
 function kvRow(p) {
   return '<div class="proprow">' +
+    '<label class="propchk" title="공통 속성 — 체크하면 이 문서의 모든 태그에 같은 속성이 자동으로 표시되고, 값을 바꾸거나 체크를 지우면 모든 태그에 함께 반영됩니다">' +
+      '<input type="checkbox" data-pf="common"' + (p.common ? " checked" : "") + "></label>" +
     '<input class="field" data-pf="ko" value="' + esc(p.ko || "") + '" placeholder="속성명(한글)">' +
     '<input class="field mono" data-pf="en" value="' + esc(p.en || "") + '" placeholder="영문 key">' +
     '<select class="field" data-pf="type">' + Object.entries(PTYPE).map(([k, name]) =>
