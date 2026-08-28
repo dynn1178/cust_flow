@@ -65,7 +65,9 @@ function sampleChannelsBlock(t) {
       '<button type="button" class="tsamp-chhead" data-samp-toggle="' + key + '">' +
         '<span class="tsamp-caret">▸</span><span class="tsamp-chlabel">' + esc(label) + "</span>" +
       "</button>" +
-      (open ? '<pre class="mono">' + esc(has ? t[k] : "(비어 있음)") + "</pre>" : "") +
+      (open ? '<div class="tsamp-chbody"><pre class="mono">' + esc(has ? t[k] : "(비어 있음)") + "</pre>" +
+        (has ? '<button type="button" class="btn sm tsamp-copy" data-samp-copy-value="' + esc(t[k]) + '">' + ico("copy", "xs") + "복사</button>" : "") +
+      "</div>" : "") +
     "</div>";
   }).join("") + "</div>";
 }
@@ -573,7 +575,7 @@ function renderTagView(force) {
      '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.t.status === "todo").length + '</span><span class="t">작업 예정</span></div>'].join("");
 
   $("#tagTable").innerHTML =
-    "<thead><tr><th>위치 · 플랫폼 · 상태</th><th>태그명 · 트리거 · 이벤트</th><th>속성 · 테스트샘플</th><th></th></tr></thead><tbody>" +
+    "<thead><tr><th>위치 · 플랫폼 · 상태</th><th>태그명 · 트리거 · 이벤트</th><th>속성</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
     (rows.length ? rows.map(({ t, n, b }) =>
       '<tr data-tid="' + t.id + '">' +
         /* 보드·페이지·플랫폼·개발상태를 한 칸에 모아 태그의 "신원"을 보여준다 */
@@ -596,10 +598,11 @@ function renderTagView(force) {
           (t.channels && t.channels.length ? '<span class="rowseg">' + tchanChips(t.channels) + "</span>" : "") +
           (t.note ? '<span class="hint">' + esc(t.note) + "</span>" : "") +
         "</div></td>" +
-        "<td>" + (propLines(displayProps(t)) || "—") + sampleChannelsBlock(t) + "</td>" +
+        "<td>" + (propLines(displayProps(t)) || "—") + "</td>" +
+        "<td>" + sampleChannelsBlock(t) + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +
       "</tr>").join("")
-      : '<tr><td colspan="4"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
+      : '<tr><td colspan="5"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
     "</tbody>";
   updateSampleToggleBtn(rows);
 }
@@ -634,6 +637,13 @@ function initTagView() {
   $("#tagTable").addEventListener("click", e => {
     const ed = e.target.closest("[data-trow-edit]");
     if (ed) { jumpTo(+ed.dataset.bi, ed.dataset.node); editTag(ed.dataset.trowEdit); return; }
+    const cp = e.target.closest("[data-samp-copy-value]");
+    if (cp) {
+      navigator.clipboard.writeText(cp.dataset.sampCopyValue)
+        .then(() => toast("복사했습니다", "ok"))
+        .catch(() => toast("복사에 실패했습니다", "bad"));
+      return;
+    }
     const samp = e.target.closest("[data-samp-toggle]");
     if (samp) {
       const key = samp.dataset.sampToggle;

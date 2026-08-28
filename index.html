@@ -427,11 +427,14 @@ table.tbl td{padding:9px 12px; border-bottom:1px solid var(--stroke-2); vertical
 table.tbl tr:hover td{background:var(--glass-2)}
 table.tbl td.nowrap{white-space:nowrap}
 /* 태그 목록: 칸마다 균등하게 나누지 않고, 왼쪽 칸들은 내용에 필요한 만큼의 상한선(max-width)까지만
-   차지하게 하고(td1Cap/td2Cap), 너비를 지정하지 않은 "속성 · 테스트샘플" 칸이 남는 공간을 전부 흡수한다.
-   width:1%는 긴 값 하나가 있으면 그 단어 하나 너비까지 줄여버려 너무 좁아지므로 쓰지 않는다. */
+   차지하게 하고(td1cap/td2cap), 너비를 지정하지 않은 "테스트샘플" 칸이 남는 공간을 전부 흡수한다.
+   width:1%는 긴 값 하나가 있으면 그 단어 하나 너비까지 줄여버려 너무 좁아지므로 쓰지 않는다.
+   칼럼 사이는 여백 없이 세로 선으로만 구분해 이미지처럼 바로 붙여 보이게 한다. */
 #tagTable{table-layout:auto}
 #tagTable th{white-space:normal; line-height:1.3}
 #tagTable th:last-child,#tagTable td:last-child{width:34px}
+#tagTable td{padding:9px 10px; border-right:1px solid var(--stroke-2)}
+#tagTable td:last-child{border-right:0}
 .td1cap{max-width:190px}
 .td2cap{max-width:260px}
 .tdsplit{margin-top:6px; padding-top:6px; border-top:1px dashed var(--stroke-2)}
@@ -507,16 +510,20 @@ tr:hover .rowacts{opacity:1}
   border:1px solid var(--stroke-2); border-radius:6px; padding:6px 8px; color:var(--ink-2)}
 /* 태그 목록 표 안의 테스트 샘플 — 채널 4개가 항상 나란히 있되, 채널마다 따로 접고 펼 수 있다.
    값이 있는 채널은 평범하게, 없는 채널은 라벨을 빨간색으로 표시해 눈에 띄게 한다. */
-.tsamp-chset{display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start; margin-top:8px}
-.tsamp-ch{flex:0 1 140px; min-width:110px}
+.tsamp-chset{display:flex; flex-wrap:wrap; gap:10px; align-items:flex-start}
+.tsamp-ch{flex:0 1 170px; min-width:130px}
+.tsamp-ch.open{flex-basis:280px}
 .tsamp-chhead{display:flex; align-items:center; gap:4px; border:0; background:transparent; cursor:pointer;
   font:inherit; padding:2px 0; color:var(--ink-2)}
 .tsamp-caret{font-size:8px; color:var(--ink-3); transition:transform .12s; flex:none}
 .tsamp-ch.open .tsamp-caret{transform:rotate(90deg)}
 .tsamp-chlabel{font-size:10px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-2)}
 .tsamp-ch.tsamp-empty .tsamp-chlabel{color:var(--bad)}
-.tsamp-ch pre{margin:4px 0 0; font-size:10.5px; white-space:pre-wrap; word-break:break-all; background:var(--glass-2);
-  border:1px solid var(--stroke-2); border-radius:6px; padding:6px 8px; color:var(--ink-2); max-width:240px}
+/* 펼친 샘플 하나는 카드처럼 크게 보여주고, 안에 복사 버튼을 오른쪽 아래에 붙인다 */
+.tsamp-chbody{position:relative; margin-top:6px; min-height:74px; background:var(--glass-2);
+  border:1px solid var(--stroke-2); border-radius:8px; padding:10px}
+.tsamp-chbody pre{margin:0 0 30px; font-size:10.5px; white-space:pre-wrap; word-break:break-all; color:var(--ink-2)}
+.tsamp-copy{position:absolute; right:8px; bottom:8px}
 .popover{position:fixed; z-index:120; border-radius:var(--r-md); padding:10px; display:flex; flex-direction:column; gap:9px;
   width:250px; box-shadow:var(--shadow); max-height:88vh; overflow:auto}
 .popover.wide{width:302px}
@@ -2800,7 +2807,9 @@ function sampleChannelsBlock(t) {
       '<button type="button" class="tsamp-chhead" data-samp-toggle="' + key + '">' +
         '<span class="tsamp-caret">▸</span><span class="tsamp-chlabel">' + esc(label) + "</span>" +
       "</button>" +
-      (open ? '<pre class="mono">' + esc(has ? t[k] : "(비어 있음)") + "</pre>" : "") +
+      (open ? '<div class="tsamp-chbody"><pre class="mono">' + esc(has ? t[k] : "(비어 있음)") + "</pre>" +
+        (has ? '<button type="button" class="btn sm tsamp-copy" data-samp-copy-value="' + esc(t[k]) + '">' + ico("copy", "xs") + "복사</button>" : "") +
+      "</div>" : "") +
     "</div>";
   }).join("") + "</div>";
 }
@@ -3308,7 +3317,7 @@ function renderTagView(force) {
      '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.t.status === "todo").length + '</span><span class="t">작업 예정</span></div>'].join("");
 
   $("#tagTable").innerHTML =
-    "<thead><tr><th>위치 · 플랫폼 · 상태</th><th>태그명 · 트리거 · 이벤트</th><th>속성 · 테스트샘플</th><th></th></tr></thead><tbody>" +
+    "<thead><tr><th>위치 · 플랫폼 · 상태</th><th>태그명 · 트리거 · 이벤트</th><th>속성</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
     (rows.length ? rows.map(({ t, n, b }) =>
       '<tr data-tid="' + t.id + '">' +
         /* 보드·페이지·플랫폼·개발상태를 한 칸에 모아 태그의 "신원"을 보여준다 */
@@ -3331,10 +3340,11 @@ function renderTagView(force) {
           (t.channels && t.channels.length ? '<span class="rowseg">' + tchanChips(t.channels) + "</span>" : "") +
           (t.note ? '<span class="hint">' + esc(t.note) + "</span>" : "") +
         "</div></td>" +
-        "<td>" + (propLines(displayProps(t)) || "—") + sampleChannelsBlock(t) + "</td>" +
+        "<td>" + (propLines(displayProps(t)) || "—") + "</td>" +
+        "<td>" + sampleChannelsBlock(t) + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +
       "</tr>").join("")
-      : '<tr><td colspan="4"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
+      : '<tr><td colspan="5"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
     "</tbody>";
   updateSampleToggleBtn(rows);
 }
@@ -3369,6 +3379,13 @@ function initTagView() {
   $("#tagTable").addEventListener("click", e => {
     const ed = e.target.closest("[data-trow-edit]");
     if (ed) { jumpTo(+ed.dataset.bi, ed.dataset.node); editTag(ed.dataset.trowEdit); return; }
+    const cp = e.target.closest("[data-samp-copy-value]");
+    if (cp) {
+      navigator.clipboard.writeText(cp.dataset.sampCopyValue)
+        .then(() => toast("복사했습니다", "ok"))
+        .catch(() => toast("복사에 실패했습니다", "bad"));
+      return;
+    }
     const samp = e.target.closest("[data-samp-toggle]");
     if (samp) {
       const key = samp.dataset.sampToggle;
