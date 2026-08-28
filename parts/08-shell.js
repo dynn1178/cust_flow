@@ -34,31 +34,36 @@ function initSplitters() {
   addEventListener("resize", () => { applySizes(); if (!stageZoom) renderStage(); });
 }
 
-/* 영역 확장/축소 — 위쪽 여정 지도를 최소 높이로 줄이고 아래쪽 패널이 그만큼 위로 늘어난다.
+/* 영역 확장/축소 — 한쪽 패널이 아래 영역 전체(가로 끝에서 끝)를 혼자 차지하고,
+   위쪽 여정 지도는 최소 높이로 줄어든다. 즉 경계선을 끄는 것과 달리 판 자체가 바뀐다.
    지도를 아주 숨기지는 않는다 — 확장한 채로도 페이지를 골라 옮겨다녀야 하니까.
+   좌·우 중 하나만 확장할 수 있다(둘 다 전체 폭을 쓸 수는 없으므로).
    개인 화면 설정이라 문서가 아닌 이 브라우저에만 남긴다 */
 const PANE_EXP_KEY = "jta:paneExpand";
 const EXP_FLOW_H = 140;
-let paneExpand = { left: false, right: false };
-function paneExpandOn() { return !!(paneExpand.left || paneExpand.right); }
+let paneExpand = "";
+function paneExpandOn() { return paneExpand === "left" || paneExpand === "right"; }
 function applyPaneExpand() {
   const on = paneExpandOn();
+  if (on) $("#deck").setAttribute("data-expand", paneExpand);
+  else $("#deck").removeAttribute("data-expand");
   $("#flowPane").classList.toggle("mini", on);
   $("#splitH").style.display = on ? "none" : "";
-  $("#expLeftLabel").textContent = paneExpand.left ? "축소" : "확장";
-  $("#expRightLabel").textContent = paneExpand.right ? "축소" : "확장";
-  $("#btnExpLeft").classList.toggle("on", paneExpand.left);
-  $("#btnExpRight").classList.toggle("on", paneExpand.right);
+  $("#expLeftLabel").textContent = paneExpand === "left" ? "축소" : "확장";
+  $("#expRightLabel").textContent = paneExpand === "right" ? "축소" : "확장";
+  $("#btnExpLeft").classList.toggle("on", paneExpand === "left");
+  $("#btnExpRight").classList.toggle("on", paneExpand === "right");
 }
 function initPaneExpand() {
-  try { paneExpand = Object.assign({ left: false, right: false }, JSON.parse(localStorage.getItem(PANE_EXP_KEY) || "null")); }
-  catch (e) { paneExpand = { left: false, right: false }; }
+  /* 예전 판(좌우 각각 켜던 시절)의 값이 남아 있으면 그냥 접힌 상태로 시작한다 */
+  let v = ""; try { v = localStorage.getItem(PANE_EXP_KEY) || ""; } catch (e) {}
+  paneExpand = v === "left" || v === "right" ? v : "";
   applyPaneExpand();
   const toggle = side => {
-    paneExpand[side] = !paneExpand[side];
+    paneExpand = paneExpand === side ? "" : side;
     applyPaneExpand();
-    try { localStorage.setItem(PANE_EXP_KEY, JSON.stringify(paneExpand)); } catch (e) {}
-    applySizes(); if (!stageZoom) renderStage();
+    try { localStorage.setItem(PANE_EXP_KEY, paneExpand); } catch (e) {}
+    applySizes(); renderFlow(); if (!stageZoom) renderStage();
   };
   $("#btnExpLeft").addEventListener("click", () => toggle("left"));
   $("#btnExpRight").addEventListener("click", () => toggle("right"));

@@ -21,15 +21,19 @@ function docExtent(n) {
   });
   return { x1, y1, w: x2 - x1, h: y2 - y1 };
 }
+let lastFitScale = 1;
 function stageScale(n) {
   const d = docExtent(n);
   if (stageZoom) return stageZoom;
   const box = $("#stageScroll").getBoundingClientRect();
+  /* 패널 확장 중이라 스테이지가 숨겨져 있으면 크기가 0이다 — 배율을 새로 재지 않고
+     마지막 맞춤 배율을 그대로 쓴다(다시 펼치면 그때 제대로 계산된다) */
+  if (box.width < 1 || box.height < 1) return lastFitScale;
   const availW = box.width - 36, availH = box.height - 36;
   const s = stageFitMode === "height" ? availH / d.h
     : stageFitMode === "contain" ? Math.min(availW / d.w, availH / d.h)
     : availW / d.w;                  // "width" — 기본값
-  return clamp(s, 0.05, 4);
+  return (lastFitScale = clamp(s, 0.05, 4));
 }
 /* 이미지 자체는 항상 레이어 좌표계의 (0,0)~(base.w,base.h)에 있으므로, 범위가
    왼쪽·위로 넓어졌으면(x1/y1이 음수) 그만큼 이미지를 오른쪽·아래로 밀어서

@@ -331,6 +331,21 @@ select.field{cursor:pointer}
 .pane{border-radius:var(--r-lg); overflow:hidden; display:flex; flex-direction:column; min-width:0}
 .pane.side{flex:none}
 .pane.center{flex:1}
+/* 패널 확장 — 좌/우 패널 하나가 아래 영역 전체(가로 끝에서 끝)를 혼자 차지한다.
+   위 여정 지도는 .flow.mini로 줄어 있으니 세로로도 같이 넓어진다.
+   너비는 applySizes()가 인라인으로 박으므로 !important로 눌러야 한다 */
+#deck[data-expand="left"] #paneStage,
+#deck[data-expand="left"] #paneRight,
+#deck[data-expand="right"] #paneStage,
+#deck[data-expand="right"] #paneLeft,
+#deck[data-expand] #splitL,
+#deck[data-expand] #splitR{display:none}
+#deck[data-expand="left"] #paneLeft,
+#deck[data-expand="right"] #paneRight{flex:1 1 auto; width:auto !important; max-width:none}
+/* 넓어진 만큼 카드를 여러 열로 흘린다 — 한 줄짜리 카드가 화면 끝까지 늘어나면 오히려 읽기 나쁘다 */
+#deck[data-expand] .pane.side .pane-body{display:grid; align-content:start; align-items:start;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+#deck[data-expand] .pane.side .pane-body > .empty{grid-column:1/-1}
 .pane-head{display:flex; align-items:center; gap:8px; padding:9px 11px; flex:none;
   border-bottom:1px solid var(--stroke-2); background:var(--glass-2)}
 .pane-head h2{margin:0; font-size:12.5px; font-weight:600; letter-spacing:-.01em; display:flex; align-items:center; gap:7px}
@@ -692,7 +707,7 @@ tr:hover .rowacts{opacity:1}
           <h2><svg class="ico"><use href="#i-mega"/></svg>CRM 캠페인</h2>
           <span class="count" id="campCount">0</span>
           <div class="spacer"></div>
-          <button class="btn sm" id="btnExpLeft" title="위쪽 여정 지도를 줄이고 이 영역을 위로 넓게 확장합니다"><svg class="ico xs"><use href="#i-fit"/></svg><span id="expLeftLabel">확장</span></button>
+          <button class="btn sm" id="btnExpLeft" title="이 영역을 아래 전체(가로 끝에서 끝)로 넓히고 여정 지도는 줄입니다"><svg class="ico xs"><use href="#i-fit"/></svg><span id="expLeftLabel">확장</span></button>
           <button class="btn sm edit-only" id="btnAddCamp"><svg class="ico xs"><use href="#i-plus"/></svg>추가</button>
         </div>
         <div class="pane-body" id="campList"></div>
@@ -745,7 +760,7 @@ tr:hover .rowacts{opacity:1}
           <h2><svg class="ico"><use href="#i-tag"/></svg>태깅 설정</h2>
           <span class="count" id="tagCount">0</span>
           <div class="spacer"></div>
-          <button class="btn sm" id="btnExpRight" title="위쪽 여정 지도를 줄이고 이 영역을 위로 넓게 확장합니다"><svg class="ico xs"><use href="#i-fit"/></svg><span id="expRightLabel">확장</span></button>
+          <button class="btn sm" id="btnExpRight" title="이 영역을 아래 전체(가로 끝에서 끝)로 넓히고 여정 지도는 줄입니다"><svg class="ico xs"><use href="#i-fit"/></svg><span id="expRightLabel">확장</span></button>
           <button class="btn sm" id="btnToggleAllTags" title="모든 태그를 펼치거나 접습니다"><svg class="ico xs"><use href="#i-grid"/></svg>모두 펼치기</button>
           <button class="btn sm edit-only" id="btnAddTag"><svg class="ico xs"><use href="#i-plus"/></svg>추가</button>
         </div>
@@ -2298,15 +2313,19 @@ function docExtent(n) {
   });
   return { x1, y1, w: x2 - x1, h: y2 - y1 };
 }
+let lastFitScale = 1;
 function stageScale(n) {
   const d = docExtent(n);
   if (stageZoom) return stageZoom;
   const box = $("#stageScroll").getBoundingClientRect();
+  /* 패널 확장 중이라 스테이지가 숨겨져 있으면 크기가 0이다 — 배율을 새로 재지 않고
+     마지막 맞춤 배율을 그대로 쓴다(다시 펼치면 그때 제대로 계산된다) */
+  if (box.width < 1 || box.height < 1) return lastFitScale;
   const availW = box.width - 36, availH = box.height - 36;
   const s = stageFitMode === "height" ? availH / d.h
     : stageFitMode === "contain" ? Math.min(availW / d.w, availH / d.h)
     : availW / d.w;                  // "width" — 기본값
-  return clamp(s, 0.05, 4);
+  return (lastFitScale = clamp(s, 0.05, 4));
 }
 /* 이미지 자체는 항상 레이어 좌표계의 (0,0)~(base.w,base.h)에 있으므로, 범위가
    왼쪽·위로 넓어졌으면(x1/y1이 음수) 그만큼 이미지를 오른쪽·아래로 밀어서
@@ -5277,31 +5296,36 @@ function initSplitters() {
   addEventListener("resize", () => { applySizes(); if (!stageZoom) renderStage(); });
 }
 
-/* 영역 확장/축소 — 위쪽 여정 지도를 최소 높이로 줄이고 아래쪽 패널이 그만큼 위로 늘어난다.
+/* 영역 확장/축소 — 한쪽 패널이 아래 영역 전체(가로 끝에서 끝)를 혼자 차지하고,
+   위쪽 여정 지도는 최소 높이로 줄어든다. 즉 경계선을 끄는 것과 달리 판 자체가 바뀐다.
    지도를 아주 숨기지는 않는다 — 확장한 채로도 페이지를 골라 옮겨다녀야 하니까.
+   좌·우 중 하나만 확장할 수 있다(둘 다 전체 폭을 쓸 수는 없으므로).
    개인 화면 설정이라 문서가 아닌 이 브라우저에만 남긴다 */
 const PANE_EXP_KEY = "jta:paneExpand";
 const EXP_FLOW_H = 140;
-let paneExpand = { left: false, right: false };
-function paneExpandOn() { return !!(paneExpand.left || paneExpand.right); }
+let paneExpand = "";
+function paneExpandOn() { return paneExpand === "left" || paneExpand === "right"; }
 function applyPaneExpand() {
   const on = paneExpandOn();
+  if (on) $("#deck").setAttribute("data-expand", paneExpand);
+  else $("#deck").removeAttribute("data-expand");
   $("#flowPane").classList.toggle("mini", on);
   $("#splitH").style.display = on ? "none" : "";
-  $("#expLeftLabel").textContent = paneExpand.left ? "축소" : "확장";
-  $("#expRightLabel").textContent = paneExpand.right ? "축소" : "확장";
-  $("#btnExpLeft").classList.toggle("on", paneExpand.left);
-  $("#btnExpRight").classList.toggle("on", paneExpand.right);
+  $("#expLeftLabel").textContent = paneExpand === "left" ? "축소" : "확장";
+  $("#expRightLabel").textContent = paneExpand === "right" ? "축소" : "확장";
+  $("#btnExpLeft").classList.toggle("on", paneExpand === "left");
+  $("#btnExpRight").classList.toggle("on", paneExpand === "right");
 }
 function initPaneExpand() {
-  try { paneExpand = Object.assign({ left: false, right: false }, JSON.parse(localStorage.getItem(PANE_EXP_KEY) || "null")); }
-  catch (e) { paneExpand = { left: false, right: false }; }
+  /* 예전 판(좌우 각각 켜던 시절)의 값이 남아 있으면 그냥 접힌 상태로 시작한다 */
+  let v = ""; try { v = localStorage.getItem(PANE_EXP_KEY) || ""; } catch (e) {}
+  paneExpand = v === "left" || v === "right" ? v : "";
   applyPaneExpand();
   const toggle = side => {
-    paneExpand[side] = !paneExpand[side];
+    paneExpand = paneExpand === side ? "" : side;
     applyPaneExpand();
-    try { localStorage.setItem(PANE_EXP_KEY, JSON.stringify(paneExpand)); } catch (e) {}
-    applySizes(); if (!stageZoom) renderStage();
+    try { localStorage.setItem(PANE_EXP_KEY, paneExpand); } catch (e) {}
+    applySizes(); renderFlow(); if (!stageZoom) renderStage();
   };
   $("#btnExpLeft").addEventListener("click", () => toggle("left"));
   $("#btnExpRight").addEventListener("click", () => toggle("right"));

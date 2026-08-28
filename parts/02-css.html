@@ -4,6 +4,21 @@
 .pane{border-radius:var(--r-lg); overflow:hidden; display:flex; flex-direction:column; min-width:0}
 .pane.side{flex:none}
 .pane.center{flex:1}
+/* 패널 확장 — 좌/우 패널 하나가 아래 영역 전체(가로 끝에서 끝)를 혼자 차지한다.
+   위 여정 지도는 .flow.mini로 줄어 있으니 세로로도 같이 넓어진다.
+   너비는 applySizes()가 인라인으로 박으므로 !important로 눌러야 한다 */
+#deck[data-expand="left"] #paneStage,
+#deck[data-expand="left"] #paneRight,
+#deck[data-expand="right"] #paneStage,
+#deck[data-expand="right"] #paneLeft,
+#deck[data-expand] #splitL,
+#deck[data-expand] #splitR{display:none}
+#deck[data-expand="left"] #paneLeft,
+#deck[data-expand="right"] #paneRight{flex:1 1 auto; width:auto !important; max-width:none}
+/* 넓어진 만큼 카드를 여러 열로 흘린다 — 한 줄짜리 카드가 화면 끝까지 늘어나면 오히려 읽기 나쁘다 */
+#deck[data-expand] .pane.side .pane-body{display:grid; align-content:start; align-items:start;
+  grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+#deck[data-expand] .pane.side .pane-body > .empty{grid-column:1/-1}
 .pane-head{display:flex; align-items:center; gap:8px; padding:9px 11px; flex:none;
   border-bottom:1px solid var(--stroke-2); background:var(--glass-2)}
 .pane-head h2{margin:0; font-size:12.5px; font-weight:600; letter-spacing:-.01em; display:flex; align-items:center; gap:7px}
