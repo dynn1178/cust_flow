@@ -55,11 +55,28 @@ function sampleAccordion(t) {
     rows.map(([k, label]) => '<div class="tsamp-row"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") +
   "</details>";
 }
-/* 태그 목록(전체 표)에서는 접지 않고 채널별 샘플을 항상 옆으로 나란히(칼럼) 펼쳐서 보여준다 */
-function sampleColumns(t) {
-  const rows = sampleRowsOf(t);
-  if (!rows.length) return "";
-  return '<div class="tsamp-cols">' + rows.map(([k, label]) => '<div class="tsamp-col"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") + "</div>";
+/* 태그 목록(전체 표)에서는 4개 채널을 항상 나란히 두되, 채널마다 따로 접었다 펼 수 있게 한다 —
+   값이 있는 채널은 그대로 보여주고, 없는 채널은 빨간 라벨로 눈에 띄게 표시한다. */
+let expandedSamples = new Set();
+function sampleChannelsBlock(t) {
+  return '<div class="tsamp-chset">' + Object.entries(TSAMPLE_KEYS).map(([k, label]) => {
+    const has = !!t[k], key = t.id + "::" + k, open = expandedSamples.has(key);
+    return '<div class="tsamp-ch' + (open ? " open" : "") + (has ? "" : " tsamp-empty") + '">' +
+      '<button type="button" class="tsamp-chhead" data-samp-toggle="' + key + '">' +
+        '<span class="tsamp-caret">▸</span><span class="tsamp-chlabel">' + esc(label) + "</span>" +
+      "</button>" +
+      (open ? '<pre class="mono">' + esc(has ? t[k] : "(비어 있음)") + "</pre>" : "") +
+    "</div>";
+  }).join("") + "</div>";
+}
+function updateSampleToggleBtn(rows) {
+  const btn = $("#btnToggleAllSamples"); if (!btn) return;
+  const keys = [];
+  rows.forEach(({ t }) => Object.keys(TSAMPLE_KEYS).forEach(k => keys.push(t.id + "::" + k)));
+  const allOpen = keys.length > 0 && keys.every(k => expandedSamples.has(k));
+  btn.innerHTML = ico(allOpen ? "density" : "grid", "xs") + (allOpen ? "샘플 모두 접기" : "샘플 모두 펼치기");
+  btn.disabled = !keys.length;
+  btn.dataset.keys = JSON.stringify(keys);
 }
 /* 공통 속성(문서 전체에서 공유하는 속성)은 태그마다 복사해 저장하지 않고,
    보여줄 때마다 그 태그만의 속성과 합쳐서 계산한다 — 어디서든 공통 속성을
@@ -556,17 +573,20 @@ function renderTagView(force) {
      '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.t.status === "todo").length + '</span><span class="t">작업 예정</span></div>'].join("");
 
   $("#tagTable").innerHTML =
-    "<thead><tr><th>보드</th><th>페이지</th><th>플랫폼</th><th>태그명 · 트리거</th><th>이벤트 · 영역 · 채널</th><th>속성</th><th>개발확인</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
+    "<thead><tr><th>보드</th><th>페이지</th><th>태그 정보</th><th>이벤트 · 영역 · 채널</th><th>속성</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
     (rows.length ? rows.map(({ t, n, b }) =>
       '<tr data-tid="' + t.id + '">' +
         '<td class="nowrap" style="color:var(--ink-3)">' + esc(b.name) + "</td>" +
         '<td class="nowrap"><b>' + esc(n.name) + "</b>" + (n.path ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(n.path) + "</div>" : "") + "</td>" +
-        "<td>" + platChips(platformsOf(t)) + "</td>" +
-        /* 동작(태그명)+트리거가 이 태그를 대표하는 제목 역할 — 여기를 눌러야만 여정 지도로 이동한다.
-           테스트 샘플 펼치기 등 다른 클릭까지 이동시키지 않기 위해 이동은 이 칸에만 건다. */
+        /* 플랫폼·동작(태그명)+트리거·개발확인을 한 칸에 모아 태그를 대표하는 제목 역할을 한다 —
+           여기를 눌러야만 여정 지도로 이동한다(테스트 샘플 펼치기 등 다른 클릭까지 이동시키지 않기 위해). */
         "<td>" + '<div class="tagname-link" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" title="여정 지도에서 보기">' +
+          '<div class="rowseg">' + platChips(platformsOf(t)) + "</div>" +
           '<div style="font-weight:600">' + esc(t.action || "(태그명 없음)") + "</div>" +
-          '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
+          '<div class="rowseg">' +
+            '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
+            '<span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span>" +
+          "</div>" +
         "</div></td>" +
         '<td><div class="meta stack">' +
           "<span>" + (t.eventKo ? '<b style="color:var(--ink)">' + esc(t.eventKo) + "</b> " : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span></span>" +
@@ -575,12 +595,12 @@ function renderTagView(force) {
           (t.note ? '<span class="hint">' + esc(t.note) + "</span>" : "") +
         "</div></td>" +
         "<td>" + (propLines(displayProps(t)) || "—") + "</td>" +
-        '<td class="nowrap"><span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span></td>" +
-        "<td>" + (sampleColumns(t) || "—") + "</td>" +
+        "<td>" + sampleChannelsBlock(t) + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +
       "</tr>").join("")
-      : '<tr><td colspan="9"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
+      : '<tr><td colspan="7"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
     "</tbody>";
+  updateSampleToggleBtn(rows);
 }
 function initTagView() {
   $("#tagPlatFilter").addEventListener("click", e => {
@@ -596,6 +616,13 @@ function initTagView() {
     $("#btnHideCommon").classList.toggle("on", tagFilter.hideCommon);
     renderTagView(true);
   });
+  $("#btnToggleAllSamples").addEventListener("click", () => {
+    const btn = $("#btnToggleAllSamples");
+    const keys = JSON.parse(btn.dataset.keys || "[]"); if (!keys.length) return;
+    const allOpen = keys.every(k => expandedSamples.has(k));
+    keys.forEach(k => { if (allOpen) expandedSamples.delete(k); else expandedSamples.add(k); });
+    renderTagView(true);
+  });
   $("#btnTagTemplate").addEventListener("click", tagCsvTemplate);
   $("#btnTagBulk").addEventListener("click", () => {
     if (!canEdit()) return;
@@ -606,6 +633,12 @@ function initTagView() {
   $("#tagTable").addEventListener("click", e => {
     const ed = e.target.closest("[data-trow-edit]");
     if (ed) { jumpTo(+ed.dataset.bi, ed.dataset.node); editTag(ed.dataset.trowEdit); return; }
+    const samp = e.target.closest("[data-samp-toggle]");
+    if (samp) {
+      const key = samp.dataset.sampToggle;
+      if (expandedSamples.has(key)) expandedSamples.delete(key); else expandedSamples.add(key);
+      return renderTagView(true);
+    }
     const tr = e.target.closest("[data-goto]");
     if (tr) jumpTo(+tr.dataset.bi, tr.dataset.goto);
   });
