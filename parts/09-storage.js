@@ -24,8 +24,8 @@ function cloudFolder(boardName) {
 function cloudTags(pageName) { return String(pageName || "page").replace(/,/g, " ").trim() || "page"; }
 /* Blob(파일이 아닌)을 FormData에 파일명 없이 append하면 브라우저가 문자 그대로
    "blob"을 파일명으로 보낸다 — Cloudinary가 그걸 원본 파일명으로 그대로
-   돌려줘서 앨범에 의미 없는 "blob"이 뜨는 원인이었다. 항상 뜻이 있는 이름을
-   지정해서 보낸다(페이지 이름 기반). */
+   돌려줘서 Cloudinary 미디어 라이브러리에 의미 없는 "blob"만 쌓인다. 항상
+   뜻이 있는 이름을 지정해서 보낸다(페이지 이름 기반). */
 function safeFilename(s) { return String(s || "image").replace(/["\r\n]/g, "").trim() || "image"; }
 async function cloudUpload(blob, opts) {
   const cfg = cloudCfg();

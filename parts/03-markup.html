@@ -64,7 +64,6 @@
       <button class="btn on" data-view="map"><svg class="ico xs"><use href="#i-map"/></svg>여정 지도</button>
       <button class="btn" data-view="tags"><svg class="ico xs"><use href="#i-tag"/></svg>태그 목록</button>
       <button class="btn" data-view="camps"><svg class="ico xs"><use href="#i-mega"/></svg>캠페인</button>
-      <button class="btn" data-view="album"><svg class="ico xs"><use href="#i-image"/></svg>앨범</button>
     </div>
     <div class="spacer"></div>
     <button class="btn icon" id="btnQuickSearch" title="빠른 검색 (Ctrl+F)"><svg class="ico"><use href="#i-search"/></svg></button>
@@ -244,25 +243,6 @@
       </div>
       <div class="statgrid" id="campStats"></div>
       <div class="scroller"><div class="grid-cards" id="campGrid"></div></div>
-    </div>
-  </section>
-
-  <!-- ============== ALBUM VIEW ============== -->
-  <section class="view" id="view-album">
-    <div class="listwrap glass">
-      <div class="toolrow">
-        <select class="field" id="albumBoardFilter"></select>
-        <select class="field" id="albumTagFilter"></select>
-        <select class="field" id="albumSort">
-          <option value="new">최신 업로드순</option>
-          <option value="old">오래된순</option>
-          <option value="name">파일명순</option>
-        </select>
-        <input class="field" id="albumSearch" placeholder="파일명 · 태그 · 보드 검색" style="flex:1; min-width:150px">
-        <button class="btn sm on" id="btnAlbumGroup" title="태그(페이지)별로 묶어서 보기"><svg class="ico xs"><use href="#i-layers"/></svg>태그별로 묶기</button>
-      </div>
-      <div class="statgrid" id="albumStats"></div>
-      <div class="scroller"><div id="albumBody"></div></div>
     </div>
   </section>
 </div>

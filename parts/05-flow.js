@@ -294,6 +294,7 @@ function renderNodes() {
   const layer = $("#nodeLayer");
   const have = {};
   $$(".node", layer).forEach(el => { have[el.dataset.node] = el; });
+  const drawn = [];
   B().nodes.forEach(n => {
     let el = have[n.id];
     if (!el) { el = document.createElement("div"); el.dataset.node = n.id; layer.appendChild(el); }
@@ -310,10 +311,15 @@ function renderNodes() {
       el.dataset.sig = sig;
     }
     el.style.left = n.x + "px"; el.style.top = n.y + "px";
-    const frameEl = el.querySelector(".node-frame");
-    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150, frameH: frameEl ? frameEl.offsetHeight : 0 };
+    drawn.push([n, el]);
   });
   Object.keys(have).forEach(id => { have[id].remove(); delete NSZ[id]; });
+  /* 크기 재기는 쓰기가 다 끝난 뒤에 한 번에 — 카드마다 "쓰고 바로 읽으면"
+     그때마다 브라우저가 레이아웃을 다시 계산해서, 카드 수만큼 멈칫거린다 */
+  drawn.forEach(pair => {
+    const n = pair[0], el = pair[1], frameEl = el.querySelector(".node-frame");
+    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150, frameH: frameEl ? frameEl.offsetHeight : 0 };
+  });
   paintSelection();
 }
 function paintSelection() {
@@ -337,23 +343,29 @@ function renderFlow() { renderLanes(); renderNodes(); drawEdges(); renderMinimap
 
 /* 움직이는 동안에는 GPU 레이어로 부드럽게, 멈추면 레이어를 풀어
    브라우저가 현재 배율로 글자를 다시 그리게 한다(확대 시 흐려짐 방지). */
-let settleTimer = 0;
+let settleTimer = 0, zoomVar = null;
 function settleTransform() {
   const v = B().view, w = $("#flowWorld");
   w.style.willChange = "auto";
+  /* --zoom은 카드 폭·글자 크기 계산식(.node)에 들어간다. 즉 이 값을 써넣을 때마다
+     캔버스 안 카드 전부의 스타일과 레이아웃이 다시 계산된다 — 끌거나 확대하는 매
+     프레임마다 그러고 있었던 것이 끊김의 가장 큰 원인이었다. 움직이는 동안에는
+     GPU가 화면만 옮기고, 손을 뗀 뒤(=여기서) 한 번만 보정한다. */
+  if (zoomVar !== v.zoom) { w.style.setProperty("--zoom", v.zoom); zoomVar = v.zoom; }
   w.style.transform = "translate(" + v.panX + "px," + v.panY + "px) scale(" + v.zoom + ")";
+  renderMinimap();                          /* 움직임이 멈춘 뒤 한 번만 제대로 그린다 */
 }
 function applyTransform(live) {
   const v = B().view, w = $("#flowWorld");
   clearTimeout(settleTimer);
-  w.style.setProperty("--zoom", v.zoom);   /* 카드 글씨가 축소 배율만큼 작아지지 않도록 CSS에서 보정 */
   if (live) {
     w.style.willChange = "transform";
     w.style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
     settleTimer = setTimeout(settleTransform, 160);
+    updateMinimapView();                    /* 움직이는 중엔 미니맵의 "보이는 범위"만 옮긴다 */
   } else settleTransform();
-  $("#zVal").textContent = Math.round(v.zoom * 100) + "%";
-  renderMinimap();
+  const zt = Math.round(v.zoom * 100) + "%";
+  if ($("#zVal").textContent !== zt) $("#zVal").textContent = zt;
 }
 const applyTransformSoon = onFrame(function () { applyTransform(true); });
 function zoomTo(z, cx, cy) {

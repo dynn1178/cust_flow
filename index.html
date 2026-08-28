@@ -79,6 +79,12 @@ body.viewer .staff-only{display:none !important}
   -webkit-backdrop-filter:blur(22px) saturate(150%); backdrop-filter:blur(22px) saturate(150%);
   box-shadow:var(--shadow);
 }
+/* 큰 판(상단바·지도·패널·목록)에서는 유리 blur를 뺀다.
+   뒤에 있는 것은 움직이지 않는 그라데이션 한 장뿐이라 흐려도 눈에 띄는 차이가
+   없는 반면, 그 안에서 스크롤하거나 지도를 끌 때마다 브라우저가 그 넓은 면적을
+   매 프레임 다시 블러 합성해야 해서 프레임이 크게 떨어진다. blur는 내용 위에
+   겹쳐 뜨는 작은 조각(미니맵·툴바·메뉴·팝오버·토스트)에만 남긴다. */
+.topbar.glass,.flow.glass,.pane.glass,.listwrap.glass{-webkit-backdrop-filter:none; backdrop-filter:none}
 .btn{
   display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 11px;
   border-radius:var(--r-sm); border:1px solid var(--stroke); background:var(--glass-2);
@@ -190,7 +196,10 @@ select.field{cursor:pointer}
 #edgeHandles .wpadd{fill:var(--accent); opacity:.32; stroke:var(--bg-3); stroke-width:1.5}
 #edgeHandles .wpadd:hover{opacity:.95}
 #guideG .guide{stroke:var(--accent); stroke-width:1; stroke-dasharray:4 4; opacity:.85}
-.flow.busy .node{box-shadow:none}
+/* 끌고 있는 동안에는 그림자·전환 효과를 끈다 — 카드마다 그림자를 다시
+   그리느라 이동이 끊기지 않도록. 그림자는 .node가 아니라 .node-frame에 있다 */
+.flow.busy .node,.flow.busy .node-frame{transition:none}
+.flow.busy .node-frame{box-shadow:none}
 
 /* ============ 노드 카드 — "액자형" ============
    카드 자체는 배경·테두리 없는 투명한 그릇이고, 이름은 이미지 프레임 위,
@@ -430,9 +439,11 @@ select.field{cursor:pointer}
 .toolrow .field{width:auto; min-width:120px}
 .scroller{flex:1; min-height:0; overflow:auto; padding:2px 0 12px}
 table.tbl{width:100%; border-collapse:separate; border-spacing:0; font-size:12.5px}
+/* 고정 머리글은 불투명색으로 — 반투명 + blur이면 수백 줄을 스크롤하는 내내
+   머리글 뒤를 다시 블러 합성해야 해서 목록이 눈에 띄게 끊긴다 */
 table.tbl th{position:sticky; top:0; z-index:2; text-align:left; padding:9px 12px; font-size:10.5px; font-weight:600;
-  letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); background:var(--glass-3);
-  -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); border-bottom:1px solid var(--stroke); white-space:nowrap}
+  letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); background:var(--bg-3);
+  border-bottom:1px solid var(--stroke); white-space:nowrap}
 table.tbl td{padding:9px 12px; border-bottom:1px solid var(--stroke-2); vertical-align:top; overflow-wrap:anywhere}
 table.tbl tr:hover td{background:var(--glass-2)}
 table.tbl td.nowrap{white-space:nowrap}
@@ -473,13 +484,6 @@ tr:hover .rowacts{opacity:1}
   display:flex; flex-direction:column; gap:2px}
 .stat .n{font-family:var(--f-mono); font-size:20px; font-weight:600; letter-spacing:-.02em; color:var(--c,var(--ink))}
 .stat .t{font-size:11px; color:var(--ink-3)}
-.album-group-title{margin:14px 12px 4px; font-size:13px; font-weight:700; letter-spacing:-.01em; color:var(--ink)}
-.acard{border-radius:var(--r-md); border:1px solid var(--stroke); background:var(--glass-2); overflow:hidden; cursor:pointer; transition:border-color .15s}
-.acard:hover{border-color:var(--accent)}
-.acard img{width:100%; aspect-ratio:4/3; object-fit:cover; display:block; background:var(--glass-3)}
-.a-meta{padding:8px 10px}
-.a-name{font-size:11.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.a-sub{font-size:10.5px; color:var(--ink-3); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 
 /* ============ modal / popover / toast ============ */
 .scrim{position:fixed; inset:0; z-index:100; background:color-mix(in srgb,var(--bg) 55%,transparent);
@@ -637,7 +641,6 @@ tr:hover .rowacts{opacity:1}
       <button class="btn on" data-view="map"><svg class="ico xs"><use href="#i-map"/></svg>여정 지도</button>
       <button class="btn" data-view="tags"><svg class="ico xs"><use href="#i-tag"/></svg>태그 목록</button>
       <button class="btn" data-view="camps"><svg class="ico xs"><use href="#i-mega"/></svg>캠페인</button>
-      <button class="btn" data-view="album"><svg class="ico xs"><use href="#i-image"/></svg>앨범</button>
     </div>
     <div class="spacer"></div>
     <button class="btn icon" id="btnQuickSearch" title="빠른 검색 (Ctrl+F)"><svg class="ico"><use href="#i-search"/></svg></button>
@@ -817,25 +820,6 @@ tr:hover .rowacts{opacity:1}
       </div>
       <div class="statgrid" id="campStats"></div>
       <div class="scroller"><div class="grid-cards" id="campGrid"></div></div>
-    </div>
-  </section>
-
-  <!-- ============== ALBUM VIEW ============== -->
-  <section class="view" id="view-album">
-    <div class="listwrap glass">
-      <div class="toolrow">
-        <select class="field" id="albumBoardFilter"></select>
-        <select class="field" id="albumTagFilter"></select>
-        <select class="field" id="albumSort">
-          <option value="new">최신 업로드순</option>
-          <option value="old">오래된순</option>
-          <option value="name">파일명순</option>
-        </select>
-        <input class="field" id="albumSearch" placeholder="파일명 · 태그 · 보드 검색" style="flex:1; min-width:150px">
-        <button class="btn sm on" id="btnAlbumGroup" title="태그(페이지)별로 묶어서 보기"><svg class="ico xs"><use href="#i-layers"/></svg>태그별로 묶기</button>
-      </div>
-      <div class="statgrid" id="albumStats"></div>
-      <div class="scroller"><div id="albumBody"></div></div>
     </div>
   </section>
 </div>
@@ -1796,6 +1780,7 @@ function renderNodes() {
   const layer = $("#nodeLayer");
   const have = {};
   $$(".node", layer).forEach(el => { have[el.dataset.node] = el; });
+  const drawn = [];
   B().nodes.forEach(n => {
     let el = have[n.id];
     if (!el) { el = document.createElement("div"); el.dataset.node = n.id; layer.appendChild(el); }
@@ -1812,10 +1797,15 @@ function renderNodes() {
       el.dataset.sig = sig;
     }
     el.style.left = n.x + "px"; el.style.top = n.y + "px";
-    const frameEl = el.querySelector(".node-frame");
-    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150, frameH: frameEl ? frameEl.offsetHeight : 0 };
+    drawn.push([n, el]);
   });
   Object.keys(have).forEach(id => { have[id].remove(); delete NSZ[id]; });
+  /* 크기 재기는 쓰기가 다 끝난 뒤에 한 번에 — 카드마다 "쓰고 바로 읽으면"
+     그때마다 브라우저가 레이아웃을 다시 계산해서, 카드 수만큼 멈칫거린다 */
+  drawn.forEach(pair => {
+    const n = pair[0], el = pair[1], frameEl = el.querySelector(".node-frame");
+    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150, frameH: frameEl ? frameEl.offsetHeight : 0 };
+  });
   paintSelection();
 }
 function paintSelection() {
@@ -1839,23 +1829,29 @@ function renderFlow() { renderLanes(); renderNodes(); drawEdges(); renderMinimap
 
 /* 움직이는 동안에는 GPU 레이어로 부드럽게, 멈추면 레이어를 풀어
    브라우저가 현재 배율로 글자를 다시 그리게 한다(확대 시 흐려짐 방지). */
-let settleTimer = 0;
+let settleTimer = 0, zoomVar = null;
 function settleTransform() {
   const v = B().view, w = $("#flowWorld");
   w.style.willChange = "auto";
+  /* --zoom은 카드 폭·글자 크기 계산식(.node)에 들어간다. 즉 이 값을 써넣을 때마다
+     캔버스 안 카드 전부의 스타일과 레이아웃이 다시 계산된다 — 끌거나 확대하는 매
+     프레임마다 그러고 있었던 것이 끊김의 가장 큰 원인이었다. 움직이는 동안에는
+     GPU가 화면만 옮기고, 손을 뗀 뒤(=여기서) 한 번만 보정한다. */
+  if (zoomVar !== v.zoom) { w.style.setProperty("--zoom", v.zoom); zoomVar = v.zoom; }
   w.style.transform = "translate(" + v.panX + "px," + v.panY + "px) scale(" + v.zoom + ")";
+  renderMinimap();                          /* 움직임이 멈춘 뒤 한 번만 제대로 그린다 */
 }
 function applyTransform(live) {
   const v = B().view, w = $("#flowWorld");
   clearTimeout(settleTimer);
-  w.style.setProperty("--zoom", v.zoom);   /* 카드 글씨가 축소 배율만큼 작아지지 않도록 CSS에서 보정 */
   if (live) {
     w.style.willChange = "transform";
     w.style.transform = "translate3d(" + v.panX + "px," + v.panY + "px,0) scale(" + v.zoom + ")";
     settleTimer = setTimeout(settleTransform, 160);
+    updateMinimapView();                    /* 움직이는 중엔 미니맵의 "보이는 범위"만 옮긴다 */
   } else settleTransform();
-  $("#zVal").textContent = Math.round(v.zoom * 100) + "%";
-  renderMinimap();
+  const zt = Math.round(v.zoom * 100) + "%";
+  if ($("#zVal").textContent !== zt) $("#zVal").textContent = zt;
 }
 const applyTransformSoon = onFrame(function () { applyTransform(true); });
 function zoomTo(z, cx, cy) {
@@ -2766,8 +2762,8 @@ function selectNode(id) {
 /* ========================================================================
    좌: CRM 캠페인 · 우: 태깅 설정 · 목록 뷰(모든 보드 통합)
    ======================================================================== */
-const viewStale = { tags: true, camps: true, album: true };
-function invalidateViews() { viewStale.tags = true; viewStale.camps = true; viewStale.album = true; }
+const viewStale = { tags: true, camps: true };
+function invalidateViews() { viewStale.tags = true; viewStale.camps = true; }
 
 function platChip(p) { return '<span class="chip" style="--c:' + PLAT[p].c + '">' + ico(PLAT[p].ico, "xs") + PLAT[p].name + "</span>"; }
 /* 태그는 이제 플랫폼을 여러 개 체크할 수 있다. 예전 문서(단일 t.platform)도
@@ -3540,99 +3536,6 @@ function initCampView() {
   });
 }
 
-/* ---------------- 앨범 뷰 — 문서에 등록된 Cloudinary 이미지 모아보기 ----------------
-   Cloudinary Admin API(계정 전체 조회)는 API Secret이 필요해 쓰지 않는다. 대신
-   이 문서의 노드·레이어에 이미 걸려 있는 Cloudinary URL만 모아 보여준다 —
-   업로드 태그(=페이지 이름)로 자동 분류되고, 문서에서 지운 이미지는 당연히 빠진다. */
-function fallbackName(url) { try { return decodeURIComponent(String(url).split("/").pop() || "image"); } catch (e) { return "image"; } }
-/* Blob을 파일명 없이 올렸던 예전 업로드는 Cloudinary가 문자 그대로 "blob"을
-   원본 파일명으로 돌려준다 — 뜻이 없으니 화면에는 페이지 이름으로 대신 보여준다.
-   새로 올리는 이미지는 cloudUpload()가 항상 페이지 이름 기반 파일명을 보내므로
-   이 문제가 생기지 않는다. */
-function displayFilename(rawName, url, pageName) {
-  if (rawName && rawName !== "blob") return rawName;
-  return pageName || fallbackName(url);
-}
-function allCloudImages() {
-  const out = [];
-  state.boards.forEach(b => b.nodes.forEach(n => {
-    if (n.shot && n.shot.url) out.push({
-      kind: "shot", url: n.shot.url, tag: n.name, node: n, board: b,
-      uploadedAt: n.shot.uploadedAt || null, filename: displayFilename(n.shot.filename, n.shot.url, n.name)
-    });
-    (n.layers || []).forEach(l => {
-      if (l.kind === "image" && l.src && /^https?:/.test(l.src)) out.push({
-        kind: "layer", url: l.src, tag: n.name, node: n, board: b, layer: l,
-        uploadedAt: l.uploadedAt || null, filename: displayFilename(l.filename, l.src, n.name)
-      });
-    });
-  }));
-  return out;
-}
-const albumFilter = { board: "all", tag: "all", q: "", sort: "new", group: true };
-function albumTagOptions(all, cur) {
-  const names = Array.from(new Set(all.map(x => x.tag))).sort((a, b) => a.localeCompare(b, "ko"));
-  return '<option value="all">모든 태그</option>' + names.map(n => '<option value="' + esc(n) + '"' + (cur === n ? " selected" : "") + ">" + esc(n) + "</option>").join("");
-}
-function albumCard(x) {
-  return '<div class="acard" data-goto="' + x.node.id + '" data-bi="' + state.boards.indexOf(x.board) + '">' +
-    '<img src="' + esc(x.url) + '" alt="" loading="lazy" draggable="false">' +
-    '<div class="a-meta">' +
-      '<div class="a-name">' + esc(x.filename) + "</div>" +
-      '<div class="a-sub">' + esc(x.board.name) + " · " + esc(x.tag) + (x.uploadedAt ? " · " + timeAgo(new Date(x.uploadedAt).getTime()) : "") + "</div>" +
-    "</div></div>";
-}
-function renderAlbumView(force) {
-  if (!force && !viewStale.album) return;
-  viewStale.album = false;
-  const all = allCloudImages();
-  $("#albumBoardFilter").innerHTML = boardOptions(albumFilter.board);
-  if (!all.some(x => x.tag === albumFilter.tag)) albumFilter.tag = "all";
-  $("#albumTagFilter").innerHTML = albumTagOptions(all, albumFilter.tag);
-
-  const rows = all.filter(x =>
-    (albumFilter.board === "all" || state.boards[+albumFilter.board] === x.board) &&
-    (albumFilter.tag === "all" || x.tag === albumFilter.tag) &&
-    (!albumFilter.q || (x.filename + " " + x.tag + " " + x.board.name).toLowerCase().includes(albumFilter.q))
-  );
-  const byDate = (a, b) => (a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0) - (b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0);
-  if (albumFilter.sort === "new") rows.sort((a, b) => byDate(b, a));
-  else if (albumFilter.sort === "old") rows.sort(byDate);
-  else rows.sort((a, b) => a.filename.localeCompare(b.filename, "ko"));
-
-  $("#albumStats").innerHTML =
-    ['<div class="stat" style="--c:var(--accent)"><span class="n">' + all.length + '</span><span class="t">전체 이미지</span></div>',
-     '<div class="stat" style="--c:var(--camp)"><span class="n">' + new Set(all.map(x => x.tag)).size + '</span><span class="t">태그(페이지) 수</span></div>',
-     '<div class="stat" style="--c:var(--ok)"><span class="n">' + rows.length + '</span><span class="t">현재 조건에 맞는 이미지</span></div>'].join("");
-
-  const body = $("#albumBody");
-  if (!rows.length) { body.innerHTML = '<div class="empty">' + ico("image") + "<div>조건에 맞는 이미지가 없습니다<br>Cloudinary로 변환된 이미지만 여기 모입니다</div></div>"; return; }
-  if (albumFilter.group) {
-    const groups = {};
-    rows.forEach(x => (groups[x.tag] = groups[x.tag] || []).push(x));
-    body.innerHTML = Object.keys(groups).sort((a, b) => a.localeCompare(b, "ko")).map(tag =>
-      '<h3 class="album-group-title">' + esc(tag) + ' <span class="hint">(' + groups[tag].length + ")</span></h3>" +
-      '<div class="grid-cards">' + groups[tag].map(albumCard).join("") + "</div>"
-    ).join("");
-  } else {
-    body.innerHTML = '<div class="grid-cards">' + rows.map(albumCard).join("") + "</div>";
-  }
-}
-function initAlbumView() {
-  $("#albumBoardFilter").addEventListener("change", e => { albumFilter.board = e.target.value; renderAlbumView(true); });
-  $("#albumTagFilter").addEventListener("change", e => { albumFilter.tag = e.target.value; renderAlbumView(true); });
-  $("#albumSort").addEventListener("change", e => { albumFilter.sort = e.target.value; renderAlbumView(true); });
-  $("#albumSearch").addEventListener("input", e => { albumFilter.q = e.target.value.toLowerCase().trim(); renderAlbumView(true); });
-  $("#btnAlbumGroup").addEventListener("click", () => {
-    albumFilter.group = !albumFilter.group;
-    $("#btnAlbumGroup").classList.toggle("on", albumFilter.group);
-    renderAlbumView(true);
-  });
-  $("#albumBody").addEventListener("click", e => {
-    const g = e.target.closest("[data-goto]");
-    if (g && g.dataset.bi != null) jumpTo(+g.dataset.bi, g.dataset.goto);
-  });
-}
 
 /* ========================================================================
    저장 위치 — Artifact 공유본 · 서버(Supabase) · JSON 파일
@@ -3659,8 +3562,8 @@ function cloudFolder(boardName) {
 function cloudTags(pageName) { return String(pageName || "page").replace(/,/g, " ").trim() || "page"; }
 /* Blob(파일이 아닌)을 FormData에 파일명 없이 append하면 브라우저가 문자 그대로
    "blob"을 파일명으로 보낸다 — Cloudinary가 그걸 원본 파일명으로 그대로
-   돌려줘서 앨범에 의미 없는 "blob"이 뜨는 원인이었다. 항상 뜻이 있는 이름을
-   지정해서 보낸다(페이지 이름 기반). */
+   돌려줘서 Cloudinary 미디어 라이브러리에 의미 없는 "blob"만 쌓인다. 항상
+   뜻이 있는 이름을 지정해서 보낸다(페이지 이름 기반). */
 function safeFilename(s) { return String(s || "image").replace(/["\r\n]/g, "").trim() || "image"; }
 async function cloudUpload(blob, opts) {
   const cfg = cloudCfg();
@@ -4456,8 +4359,38 @@ function openQuickSearch() {
 }
 
 /* ---------------- 미니맵 ---------------- */
+/* 흐름 캔버스의 크기 — 미니맵을 그릴 때마다 getBoundingClientRect()를 부르면
+   그때마다 레이아웃을 강제로 다시 계산하게 된다(끌고 있는 동안엔 매 프레임).
+   실제로 크기가 바뀔 때만 ResizeObserver로 받아 캐시해 둔다. */
+let flowBox = { w: 0, h: 0 };
+function watchFlowSize() {
+  const surf = $("#flowSurface"); if (!surf) return;
+  const read = () => { flowBox = { w: surf.clientWidth, h: surf.clientHeight }; };
+  read();
+  if (window.ResizeObserver) new ResizeObserver(() => { read(); updateMinimapView(); }).observe(surf);
+  else addEventListener("resize", read);
+}
+function minimapHidden() { const m = $("#minimap"); return !m || m.style.display === "none"; }
+/* 미니맵 좌표계(마지막 그리기 기준)로 지금 보이는 범위를 사각형으로 환산한다 */
+function minimapViewRect() {
+  const d = $("#minimapSvg").dataset, v = B().view;
+  if (!d.s || !flowBox.w || !flowBox.h || !v.zoom) return null;
+  const s = +d.s, x1 = +d.x1, y1 = +d.y1, ox = +d.ox, oy = +d.oy;
+  const px = ox + (-v.panX / v.zoom - x1) * s, py = oy + (-v.panY / v.zoom - y1) * s;
+  return { x: px, y: py, w: Math.max(0, flowBox.w / v.zoom * s), h: Math.max(0, flowBox.h / v.zoom * s) };
+}
+/* 지도를 끄는 동안 부르는 가벼운 갱신 — 노드 사각형은 그대로이므로 SVG를 다시
+   만들지 않고(문자열 조립 + 파싱 없음) 보이는 범위 사각형 하나만 옮긴다 */
+function updateMinimapView() {
+  if (minimapHidden()) return;
+  const el = $("#minimapSvg .mm-view");
+  if (!el) { renderMinimap(); return; }
+  const r = minimapViewRect(); if (!r) return;
+  el.setAttribute("x", r.x.toFixed(1)); el.setAttribute("y", r.y.toFixed(1));
+  el.setAttribute("width", r.w.toFixed(1)); el.setAttribute("height", r.h.toFixed(1));
+}
 function renderMinimap() {
-  const svg = $("#minimapSvg"); if (!svg) return;
+  const svg = $("#minimapSvg"); if (!svg || minimapHidden()) return;
   const nodes = B().nodes;
   const mapW = 168, mapH = 112, pad = 10;
   if (!nodes.length) { svg.innerHTML = ""; return; }
@@ -4466,35 +4399,28 @@ function renderMinimap() {
   const bw = Math.max(1, x2 - x1), bh = Math.max(1, y2 - y1);
   const s = Math.min((mapW - pad * 2) / bw, (mapH - pad * 2) / bh);
   const ox = pad + (mapW - pad * 2 - bw * s) / 2, oy = pad + (mapH - pad * 2 - bh * s) / 2;
-  const toMap = (x, y) => ({ x: ox + (x - x1) * s, y: oy + (y - y1) * s });
   let html = nodes.map(n => {
-    const q = nodeRect(n), p = toMap(q.x, q.y);
-    return '<rect x="' + p.x.toFixed(1) + '" y="' + p.y.toFixed(1) + '" width="' + Math.max(2, q.w * s).toFixed(1) + '" height="' + Math.max(2, q.h * s).toFixed(1) +
+    const q = nodeRect(n), px = ox + (q.x - x1) * s, py = oy + (q.y - y1) * s;
+    return '<rect x="' + px.toFixed(1) + '" y="' + py.toFixed(1) + '" width="' + Math.max(2, q.w * s).toFixed(1) + '" height="' + Math.max(2, q.h * s).toFixed(1) +
       '" rx="1.5" fill="' + (n.id === sel.node ? "var(--accent)" : hueOf(n.hue)) + '" opacity="' + (n.id === sel.node ? 1 : 0.7) + '"></rect>';
   }).join("");
-  const surf = $("#flowSurface");
-  if (surf) {
-    const r = surf.getBoundingClientRect(), v = B().view;
-    if (r.width && r.height && v.zoom) {
-      const wx1 = -v.panX / v.zoom, wy1 = -v.panY / v.zoom, wx2 = wx1 + r.width / v.zoom, wy2 = wy1 + r.height / v.zoom;
-      const vp1 = toMap(wx1, wy1), vp2 = toMap(wx2, wy2);
-      html += '<rect class="mm-view" x="' + vp1.x.toFixed(1) + '" y="' + vp1.y.toFixed(1) + '" width="' + Math.max(0, vp2.x - vp1.x).toFixed(1) +
-        '" height="' + Math.max(0, vp2.y - vp1.y).toFixed(1) + '"></rect>';
-    }
-  }
-  svg.innerHTML = html;
   svg.dataset.x1 = x1; svg.dataset.y1 = y1; svg.dataset.s = s; svg.dataset.ox = ox; svg.dataset.oy = oy;
+  const vr = minimapViewRect();
+  if (vr) html += '<rect class="mm-view" x="' + vr.x.toFixed(1) + '" y="' + vr.y.toFixed(1) +
+    '" width="' + vr.w.toFixed(1) + '" height="' + vr.h.toFixed(1) + '"></rect>';
+  svg.innerHTML = html;
 }
 function initMinimap() {
   const svg = $("#minimapSvg"); if (!svg) return;
+  watchFlowSize();
   const jump = ev => {
     const r = svg.getBoundingClientRect();
     const s = +svg.dataset.s; if (!s) return;
     const mx = (ev.clientX - r.left) * (168 / r.width), my = (ev.clientY - r.top) * (112 / r.height);
     const ox = +svg.dataset.ox, oy = +svg.dataset.oy, x1 = +svg.dataset.x1, y1 = +svg.dataset.y1;
     const wx = x1 + (mx - ox) / s, wy = y1 + (my - oy) / s;
-    const sr = $("#flowSurface").getBoundingClientRect(), v = B().view;
-    v.panX = sr.width / 2 - wx * v.zoom; v.panY = sr.height / 2 - wy * v.zoom;
+    const v = B().view;
+    v.panX = flowBox.w / 2 - wx * v.zoom; v.panY = flowBox.h / 2 - wy * v.zoom;
     applyTransform(); markDirty();
   };
   svg.addEventListener("pointerdown", e => {
@@ -4509,6 +4435,7 @@ function initMinimap() {
     minimapOn = !minimapOn;
     $("#minimap").style.display = minimapOn ? "" : "none";
     $("#btnMinimap").classList.toggle("on", minimapOn);
+    if (minimapOn) renderMinimap();          /* 꺼둔 동안엔 그리지 않으므로 켤 때 한 번 채운다 */
   });
   $("#btnMinimap").classList.toggle("on", minimapOn);
 }
@@ -5355,7 +5282,6 @@ function switchView(v) {
   $$("#viewTabs .btn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   if (v === "tags") renderTagView();
   if (v === "camps") renderCampView();
-  if (v === "album") renderAlbumView();
   if (v === "map") { applySizes(); applyTransform(); if (!stageZoom) renderStage(); }
 }
 
@@ -5520,7 +5446,7 @@ function renderAll() {
 }
 
 async function boot() {
-  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initAlbumView(); initShell(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
+  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initShell(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
   initMinimap(); wireUndoRedoButtons(); initLaneInteractions();
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */

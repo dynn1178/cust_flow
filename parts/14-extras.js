@@ -182,8 +182,38 @@ function openQuickSearch() {
 }
 
 /* ---------------- 미니맵 ---------------- */
+/* 흐름 캔버스의 크기 — 미니맵을 그릴 때마다 getBoundingClientRect()를 부르면
+   그때마다 레이아웃을 강제로 다시 계산하게 된다(끌고 있는 동안엔 매 프레임).
+   실제로 크기가 바뀔 때만 ResizeObserver로 받아 캐시해 둔다. */
+let flowBox = { w: 0, h: 0 };
+function watchFlowSize() {
+  const surf = $("#flowSurface"); if (!surf) return;
+  const read = () => { flowBox = { w: surf.clientWidth, h: surf.clientHeight }; };
+  read();
+  if (window.ResizeObserver) new ResizeObserver(() => { read(); updateMinimapView(); }).observe(surf);
+  else addEventListener("resize", read);
+}
+function minimapHidden() { const m = $("#minimap"); return !m || m.style.display === "none"; }
+/* 미니맵 좌표계(마지막 그리기 기준)로 지금 보이는 범위를 사각형으로 환산한다 */
+function minimapViewRect() {
+  const d = $("#minimapSvg").dataset, v = B().view;
+  if (!d.s || !flowBox.w || !flowBox.h || !v.zoom) return null;
+  const s = +d.s, x1 = +d.x1, y1 = +d.y1, ox = +d.ox, oy = +d.oy;
+  const px = ox + (-v.panX / v.zoom - x1) * s, py = oy + (-v.panY / v.zoom - y1) * s;
+  return { x: px, y: py, w: Math.max(0, flowBox.w / v.zoom * s), h: Math.max(0, flowBox.h / v.zoom * s) };
+}
+/* 지도를 끄는 동안 부르는 가벼운 갱신 — 노드 사각형은 그대로이므로 SVG를 다시
+   만들지 않고(문자열 조립 + 파싱 없음) 보이는 범위 사각형 하나만 옮긴다 */
+function updateMinimapView() {
+  if (minimapHidden()) return;
+  const el = $("#minimapSvg .mm-view");
+  if (!el) { renderMinimap(); return; }
+  const r = minimapViewRect(); if (!r) return;
+  el.setAttribute("x", r.x.toFixed(1)); el.setAttribute("y", r.y.toFixed(1));
+  el.setAttribute("width", r.w.toFixed(1)); el.setAttribute("height", r.h.toFixed(1));
+}
 function renderMinimap() {
-  const svg = $("#minimapSvg"); if (!svg) return;
+  const svg = $("#minimapSvg"); if (!svg || minimapHidden()) return;
   const nodes = B().nodes;
   const mapW = 168, mapH = 112, pad = 10;
   if (!nodes.length) { svg.innerHTML = ""; return; }
@@ -192,35 +222,28 @@ function renderMinimap() {
   const bw = Math.max(1, x2 - x1), bh = Math.max(1, y2 - y1);
   const s = Math.min((mapW - pad * 2) / bw, (mapH - pad * 2) / bh);
   const ox = pad + (mapW - pad * 2 - bw * s) / 2, oy = pad + (mapH - pad * 2 - bh * s) / 2;
-  const toMap = (x, y) => ({ x: ox + (x - x1) * s, y: oy + (y - y1) * s });
   let html = nodes.map(n => {
-    const q = nodeRect(n), p = toMap(q.x, q.y);
-    return '<rect x="' + p.x.toFixed(1) + '" y="' + p.y.toFixed(1) + '" width="' + Math.max(2, q.w * s).toFixed(1) + '" height="' + Math.max(2, q.h * s).toFixed(1) +
+    const q = nodeRect(n), px = ox + (q.x - x1) * s, py = oy + (q.y - y1) * s;
+    return '<rect x="' + px.toFixed(1) + '" y="' + py.toFixed(1) + '" width="' + Math.max(2, q.w * s).toFixed(1) + '" height="' + Math.max(2, q.h * s).toFixed(1) +
       '" rx="1.5" fill="' + (n.id === sel.node ? "var(--accent)" : hueOf(n.hue)) + '" opacity="' + (n.id === sel.node ? 1 : 0.7) + '"></rect>';
   }).join("");
-  const surf = $("#flowSurface");
-  if (surf) {
-    const r = surf.getBoundingClientRect(), v = B().view;
-    if (r.width && r.height && v.zoom) {
-      const wx1 = -v.panX / v.zoom, wy1 = -v.panY / v.zoom, wx2 = wx1 + r.width / v.zoom, wy2 = wy1 + r.height / v.zoom;
-      const vp1 = toMap(wx1, wy1), vp2 = toMap(wx2, wy2);
-      html += '<rect class="mm-view" x="' + vp1.x.toFixed(1) + '" y="' + vp1.y.toFixed(1) + '" width="' + Math.max(0, vp2.x - vp1.x).toFixed(1) +
-        '" height="' + Math.max(0, vp2.y - vp1.y).toFixed(1) + '"></rect>';
-    }
-  }
-  svg.innerHTML = html;
   svg.dataset.x1 = x1; svg.dataset.y1 = y1; svg.dataset.s = s; svg.dataset.ox = ox; svg.dataset.oy = oy;
+  const vr = minimapViewRect();
+  if (vr) html += '<rect class="mm-view" x="' + vr.x.toFixed(1) + '" y="' + vr.y.toFixed(1) +
+    '" width="' + vr.w.toFixed(1) + '" height="' + vr.h.toFixed(1) + '"></rect>';
+  svg.innerHTML = html;
 }
 function initMinimap() {
   const svg = $("#minimapSvg"); if (!svg) return;
+  watchFlowSize();
   const jump = ev => {
     const r = svg.getBoundingClientRect();
     const s = +svg.dataset.s; if (!s) return;
     const mx = (ev.clientX - r.left) * (168 / r.width), my = (ev.clientY - r.top) * (112 / r.height);
     const ox = +svg.dataset.ox, oy = +svg.dataset.oy, x1 = +svg.dataset.x1, y1 = +svg.dataset.y1;
     const wx = x1 + (mx - ox) / s, wy = y1 + (my - oy) / s;
-    const sr = $("#flowSurface").getBoundingClientRect(), v = B().view;
-    v.panX = sr.width / 2 - wx * v.zoom; v.panY = sr.height / 2 - wy * v.zoom;
+    const v = B().view;
+    v.panX = flowBox.w / 2 - wx * v.zoom; v.panY = flowBox.h / 2 - wy * v.zoom;
     applyTransform(); markDirty();
   };
   svg.addEventListener("pointerdown", e => {
@@ -235,6 +258,7 @@ function initMinimap() {
     minimapOn = !minimapOn;
     $("#minimap").style.display = minimapOn ? "" : "none";
     $("#btnMinimap").classList.toggle("on", minimapOn);
+    if (minimapOn) renderMinimap();          /* 꺼둔 동안엔 그리지 않으므로 켤 때 한 번 채운다 */
   });
   $("#btnMinimap").classList.toggle("on", minimapOn);
 }
