@@ -165,6 +165,9 @@ select.field{cursor:pointer}
 
 /* ============ flow canvas ============ */
 .flow{position:relative; border-radius:var(--r-lg); overflow:hidden; flex:none; min-height:130px}
+/* 패널 확장 중 — 지도가 얇아지므로 미니맵은 접어두고 도구 막대만 남긴다 */
+.flow.mini{min-height:0}
+.flow.mini .minimap{display:none}
 .flow-grid{position:absolute; inset:0;
   background-image:radial-gradient(circle at 1px 1px,var(--grid) 1px,transparent 0);
   background-size:22px 22px; pointer-events:none}

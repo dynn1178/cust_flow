@@ -7,7 +7,8 @@ function applySizes() {
   u.flowH = clamp(u.flowH, 130, Math.max(180, innerHeight - 260));
   u.leftW = clamp(u.leftW, 190, 520);
   u.rightW = clamp(u.rightW, 190, 560);
-  $("#flowPane").style.height = u.flowH + "px";
+  /* 패널을 확장한 동안에는 여정 지도를 최소 높이로 줄여, 아래 패널이 그만큼 위로 넓어지게 한다 */
+  $("#flowPane").style.height = (paneExpandOn() ? Math.min(EXP_FLOW_H, u.flowH) : u.flowH) + "px";
   $("#paneLeft").style.width = u.leftW + "px";
   $("#paneRight").style.width = u.rightW + "px";
 }
@@ -33,14 +34,17 @@ function initSplitters() {
   addEventListener("resize", () => { applySizes(); if (!stageZoom) renderStage(); });
 }
 
-/* 영역 확장/축소 — 여정 지도를 잠시 숨겨 아래쪽 패널이 세로로 더 넓게 보이도록 한다.
+/* 영역 확장/축소 — 위쪽 여정 지도를 최소 높이로 줄이고 아래쪽 패널이 그만큼 위로 늘어난다.
+   지도를 아주 숨기지는 않는다 — 확장한 채로도 페이지를 골라 옮겨다녀야 하니까.
    개인 화면 설정이라 문서가 아닌 이 브라우저에만 남긴다 */
 const PANE_EXP_KEY = "jta:paneExpand";
+const EXP_FLOW_H = 140;
 let paneExpand = { left: false, right: false };
+function paneExpandOn() { return !!(paneExpand.left || paneExpand.right); }
 function applyPaneExpand() {
-  const hide = paneExpand.left || paneExpand.right;
-  $("#flowPane").style.display = hide ? "none" : "";
-  $("#splitH").style.display = hide ? "none" : "";
+  const on = paneExpandOn();
+  $("#flowPane").classList.toggle("mini", on);
+  $("#splitH").style.display = on ? "none" : "";
   $("#expLeftLabel").textContent = paneExpand.left ? "축소" : "확장";
   $("#expRightLabel").textContent = paneExpand.right ? "축소" : "확장";
   $("#btnExpLeft").classList.toggle("on", paneExpand.left);

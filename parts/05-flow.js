@@ -244,11 +244,12 @@ function nodeHtml(n) {
   n.tags.forEach(t => platformsOf(t).forEach(p => { if (cnt[p] != null) cnt[p]++; }));
   let bd = "";
   if (f === "all" || f === "simple") {
+    /* 배지는 "플랫폼별 태그 수 + 캠페인 수"만 보여준다 — 숫자 하나하나가
+       무엇을 센 것인지 카드만 보고 알 수 있어야 한다 */
     Object.keys(PLAT).forEach(p => {
       if (cnt[p]) bd += '<span class="bdg" style="--c:' + PLAT[p].c + '" title="' + PLAT[p].name + " 태그 " + cnt[p] + '개">' + ico(PLAT[p].ico, "xs") + "<b>" + cnt[p] + "</b></span>";
     });
-    if (n.layers && n.layers.length) bd += '<span class="bdg" style="--c:var(--ink-3)" title="레이어 ' + n.layers.length + '개">' + ico("layers", "xs") + "<b>" + n.layers.length + "</b></span>";
-    if (f === "simple" && n.camps.length)
+    if (n.camps.length)
       bd += '<span class="bdg" style="--c:var(--camp)" title="CRM 캠페인 ' + n.camps.length + '개">' + ico("mega", "xs") + "<b>" + n.camps.length + "</b></span>";
   } else {
     const meta = FOCUS[f];
