@@ -6,10 +6,26 @@ const viewStale = { tags: true, camps: true, album: true };
 function invalidateViews() { viewStale.tags = true; viewStale.camps = true; viewStale.album = true; }
 
 function platChip(p) { return '<span class="chip" style="--c:' + PLAT[p].c + '">' + ico(PLAT[p].ico, "xs") + PLAT[p].name + "</span>"; }
+/* 태그는 이제 플랫폼을 여러 개 체크할 수 있다. 예전 문서(단일 t.platform)도
+   배열로 감싸 그대로 보여준다. */
+function platformsOf(t) {
+  if (t.platforms && t.platforms.length) return t.platforms;
+  return t.platform ? [t.platform] : [];
+}
+function platChips(codes) { return (codes || []).map(platChip).join(""); }
+function platformsToStr(codes) { return (codes || []).map(c => (PLAT[c] || {}).name || c).join(", "); }
+function platformsFromStr(s) { return String(s || "").split(",").map(x => keyByLabel(PLAT, x, null)).filter(Boolean); }
 function chanChip(c) { const h = CHAN[c] || CHAN.push; return '<span class="chip" style="--c:' + h.c + '">' + ico(h.ico, "xs") + h.name + "</span>"; }
 function acts(kind, id) {
   return '<div class="card-acts edit-only"><button class="btn icon sm" data-' + kind + '-edit="' + id + '" title="수정">' + ico("edit", "xs") +
     '</button><button class="btn icon sm danger" data-' + kind + '-del="' + id + '" title="삭제">' + ico("trash", "xs") + "</button></div>";
+}
+function campLinkButtons(c) {
+  const links = (c.links || []).filter(l => l.url);
+  if (!links.length) return "";
+  return '<div class="rowseg">' + links.map((l, i) =>
+    '<button class="btn sm" data-goto-url="' + esc(l.url) + '" type="button" title="' + esc(l.url) + '">' +
+      ico("link", "xs") + esc(l.label || "바로가기 " + (i + 1)) + "</button>").join("") + "</div>";
 }
 /* ---------------- 태그 표시 헬퍼 (이벤트명·영역은 신규 필드로, 예전 문서 호환을 위해 옛 필드로 폴백) ---------------- */
 function tagEventEn(t) { return t.eventEn != null && t.eventEn !== "" ? t.eventEn : (t.event || ""); }
@@ -130,7 +146,7 @@ function bulkPreviewModal(opt) {
 const TAG_CSV_HEAD = ["보드", "페이지", "경로", "플랫폼", "공통여부", "화면이름(한글)", "이벤트(한글)", "이벤트(영어)", "영역", "트리거", "채널", "동작", "속성", "개발확인", "메모",
   "테스트샘플(web_pc)", "테스트샘플(web_mo)", "테스트샘플(app_aos)", "테스트샘플(app_ios)"];
 function tagToCsvRow(t, n, b) {
-  return [b.name, n.name, n.path, PLAT[t.platform].name, boolToStr(t.common), t.screenKo || "", t.eventKo || "", tagEventEn(t), tagArea(t),
+  return [b.name, n.name, n.path, platformsToStr(platformsOf(t)), boolToStr(t.common), t.screenKo || "", t.eventKo || "", tagEventEn(t), tagArea(t),
     TRIGGER[t.trigger] || t.trigger, channelsToStr(t.channels), t.action || "", serializePropsStr(t.props), TSTATUS[t.status], t.note,
     t.testSampleWebPc || "", t.testSampleWebMo || "", t.testSampleAppAos || "", t.testSampleAppIos || ""];
 }
@@ -150,10 +166,11 @@ function openTagBulkModal(file) {
     const parsed = data.map(r => {
       const [boardName, pageName, path, platLabel, commonStr, screenKo, eventKo, eventEn, area, triggerLabel, channelsStr, action, propsStr, statusLabel, note,
         webPc, webMo, appAos, appIos] = r;
+      const platforms = platformsFromStr(platLabel);
       return {
         boardName: boardName || "", pageName: (pageName || "새 페이지").trim(), path: path || "",
         tag: {
-          platform: keyByLabel(PLAT, platLabel, "amplitude"), common: strToBool(commonStr),
+          platforms: platforms.length ? platforms : ["amplitude"], common: strToBool(commonStr),
           screenKo: screenKo || "", eventKo: eventKo || "", eventEn: eventEn || "unnamed_event", area: area || "",
           trigger: keyByLabel(TRIGGER, triggerLabel, "custom"), channels: channelsFromStr(channelsStr), action: action || "",
           props: parsePropsStr(propsStr), status: keyByLabel(TSTATUS, statusLabel, "todo"), note: note || "",
@@ -168,7 +185,7 @@ function openTagBulkModal(file) {
       if (!b.nodes.some(n => n.name === p.pageName) && !seen.has(key)) { newPages++; seen.add(key); }
     });
     bulkPreviewModal({
-      title: "태그 일괄 업로드", rows: parsed.map(p => esc(p.pageName) + "<em>" + esc((PLAT[p.tag.platform] || PLAT.amplitude).name) + " · " + esc(p.tag.eventEn) + "</em>"),
+      title: "태그 일괄 업로드", rows: parsed.map(p => esc(p.pageName) + "<em>" + esc(platformsToStr(p.tag.platforms)) + " · " + esc(p.tag.eventEn) + "</em>"),
       newPages,
       onRun: () => {
         parsed.forEach(p => {
@@ -235,9 +252,10 @@ function renderTagPanel() {
     return;
   }
   const order = { amplitude: 0, braze: 1, ga4: 2 };
-  box.innerHTML = n.tags.slice().sort((a, b) => order[a.platform] - order[b.platform]).map(t =>
+  const minOrder = t => platformsOf(t).reduce((m, p) => Math.min(m, order[p] != null ? order[p] : 99), 99);
+  box.innerHTML = n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t =>
     '<div class="card" data-tag="' + t.id + '">' +
-      '<div class="card-top">' + platChip(t.platform) + (t.common ? '<span class="chip" style="--c:var(--camp)">공통</span>' : "") +
+      '<div class="card-top">' + platChips(platformsOf(t)) + (t.common ? '<span class="chip" style="--c:var(--camp)">공통</span>' : "") +
         '<div class="spacer"></div>' + acts("tag", t.id) + "</div>" +
       '<div class="evt">' + esc(t.eventKo ? t.eventKo + " " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;opacity:.8">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
       '<div class="meta">' +
@@ -273,6 +291,7 @@ function renderCampPanel() {
         (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
         (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
       (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
+      campLinkButtons(c) +
       (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
       (linked.length ? '<div class="linkline">' + ico("pin", "xs") + "화면 레이어 " + linked.length + "곳에 배치됨</div>" : "") +
       (L && canEdit() ? '<button class="btn sm edit-only" data-link="' + c.id + '" style="align-self:flex-start">' +
@@ -295,16 +314,16 @@ function renderPanels() { renderTagPanel(); renderCampPanel(); }
 function editTag(id) {
   const n = curNode(); if (!n || !canEdit()) return;
   const t = id ? n.tags.find(x => x.id === id) : {
-    platform: "amplitude", common: false, screenKo: "", path: "", eventKo: "", eventEn: "",
+    platforms: ["amplitude"], common: false, screenKo: "", path: "", eventKo: "", eventEn: "",
     area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
   };
-  const values = id ? Object.assign({}, t, { eventEn: tagEventEn(t), area: tagArea(t) }) : t;
+  const values = id ? Object.assign({}, t, { eventEn: tagEventEn(t), area: tagArea(t), platforms: platformsOf(t) }) : t;
   openForm({
     title: id ? "태그 수정" : "태그 추가", icon: "tag",
     note: "Amplitude · Braze · GA4에 실제로 심어진 이벤트 정의를 그대로 적어 두면 QA 때 이 화면이 기준이 됩니다.",
     fields: [
-      { k: "platform", label: "플랫폼", type: "select", opts: { amplitude: "Amplitude", braze: "Braze", ga4: "GA4" } },
+      { k: "platforms", label: "플랫폼", type: "multi", opts: PLAT },
       { k: "common", label: "공통 태그로 지정 (이 화면의 모든 캠페인에 자동 적용)", type: "check" },
       { k: "screenKo", label: "화면 이름(한글)", ph: "홈" },
       { k: "path", label: "경로", mono: true, ph: "/home" },
@@ -326,7 +345,7 @@ function editTag(id) {
     ],
     values,
     onSave: v => {
-      const rec = Object.assign({}, t, v, { eventEn: v.eventEn || "unnamed_event" });
+      const rec = Object.assign({}, t, v, { eventEn: v.eventEn || "unnamed_event", platforms: v.platforms && v.platforms.length ? v.platforms : ["amplitude"] });
       if (id) Object.assign(t, rec); else { rec.id = uid("t"); n.tags.push(rec); }
       markDirty(); renderFlow(); renderPanels(); renderTagView(true);
     },
@@ -337,7 +356,8 @@ function editTag(id) {
 }
 function editCamp(id) {
   const n = curNode(); if (!n || !canEdit()) return;
-  const c = id ? n.camps.find(x => x.id === id) : { name: "", chan: "push", segment: "", timing: "", status: "draft", extId: "", landing: "", note: "" };
+  const c = id ? n.camps.find(x => x.id === id) : { name: "", chan: "push", segment: "", timing: "", status: "draft", extId: "", landing: "", note: "", links: [] };
+  const values = Object.assign({}, c, { links: c.links && c.links.length ? c.links : [{ label: "", url: "" }, { label: "", url: "" }] });
   openForm({
     title: id ? "캠페인 수정" : "캠페인 추가", icon: "mega",
     note: "이 화면에 노출되거나 이 화면으로 유입시키는 CRM 캠페인을 등록합니다.",
@@ -349,9 +369,10 @@ function editCamp(id) {
       { k: "status", label: "상태", type: "select", opts: CSTATUS },
       { k: "extId", label: "캠페인 ID", mono: true, ph: "BRZ-PUSH-2871" },
       { k: "landing", label: "랜딩 · 딥링크", mono: true, ph: "/cart" },
+      { k: "links", label: "관련 링크", type: "links" },
       { k: "note", label: "메모", type: "textarea" }
     ],
-    values: c,
+    values,
     onSave: v => {
       const rec = Object.assign({}, c, v, { name: v.name || "이름 없는 캠페인" });
       if (id) Object.assign(c, rec); else { rec.id = uid("c"); n.camps.push(rec); }
@@ -379,6 +400,8 @@ function initPanels() {
   });
   $("#campList").addEventListener("click", e => {
     const ed = e.target.closest("[data-camp-edit]"), dl = e.target.closest("[data-camp-del]"), lk = e.target.closest("[data-link]");
+    const go = e.target.closest("[data-goto-url]");
+    if (go) return openUrl(go.dataset.gotoUrl);
     if (ed) return editCamp(ed.dataset.campEdit);
     if (dl && canEdit()) {
       const n = curNode(), c = n.camps.find(x => x.id === dl.dataset.campDel);
@@ -427,14 +450,14 @@ function renderTagView(force) {
 
   const all = allTags();
   const rows = all.filter(({ t, n, b }) =>
-    (tagFilter.p === "all" || t.platform === tagFilter.p) &&
+    (tagFilter.p === "all" || platformsOf(t).indexOf(tagFilter.p) >= 0) &&
     (tagFilter.board === "all" || state.boards[+tagFilter.board] === b) &&
     (tagFilter.node === "all" || n.id === tagFilter.node) &&
     (tagFilter.status === "all" || t.status === tagFilter.status) &&
     (!tagFilter.q || (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + (t.screenKo || "") + " " + (t.action || "") + " " + t.note + " " +
       (t.props || []).map(p => p.ko + p.en + p.sample).join(" ") + " " + n.name + " " + b.name).toLowerCase().includes(tagFilter.q))
   );
-  const cnt = p => all.filter(x => x.t.platform === p).length;
+  const cnt = p => all.filter(x => platformsOf(x.t).indexOf(p) >= 0).length;
   $("#tagStats").innerHTML =
     ['<div class="stat" style="--c:var(--amp)"><span class="n">' + cnt("amplitude") + '</span><span class="t">Amplitude 이벤트</span></div>',
      '<div class="stat" style="--c:var(--braze)"><span class="n">' + cnt("braze") + '</span><span class="t">Braze 이벤트</span></div>',
@@ -448,7 +471,7 @@ function renderTagView(force) {
       '<tr data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" data-tid="' + t.id + '">' +
         '<td class="nowrap" style="color:var(--ink-3)">' + esc(b.name) + "</td>" +
         '<td class="nowrap"><b>' + esc(n.name) + "</b>" + (n.path ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(n.path) + "</div>" : "") + "</td>" +
-        "<td>" + platChip(t.platform) + (t.common ? '<div class="chip" style="--c:var(--camp);margin-top:4px">공통</div>' : "") + "</td>" +
+        "<td>" + platChips(platformsOf(t)) + (t.common ? '<div class="chip" style="--c:var(--camp);margin-top:4px">공통</div>' : "") + "</td>" +
         "<td>" + (t.eventKo ? '<div style="font-weight:600">' + esc(t.eventKo) + "</div>" : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span>" +
           (t.screenKo ? '<div class="hint">화면 · ' + esc(t.screenKo) + "</div>" : "") + (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") + "</td>" +
         '<td class="nowrap">' + (TRIGGER[t.trigger] || t.trigger) + (t.action ? " · " + esc(t.action) : "") +
@@ -522,6 +545,7 @@ function renderCampView(force) {
       '<div class="meta">' + (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
         (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
       (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
+      campLinkButtons(c) +
       '<div class="where"><span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(b.name) + " · " + esc(n.name) + "</span>" +
         (pins ? '<span class="pagechip">' + ico("pin", "xs") + " 화면 배치 " + pins + "</span>" : "") + "</div>" +
       (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
@@ -544,6 +568,8 @@ function initCampView() {
     inp.click();
   });
   $("#campGrid").addEventListener("click", e => {
+    const go = e.target.closest("[data-goto-url]");
+    if (go) return openUrl(go.dataset.gotoUrl);
     const g = e.target.closest("[data-goto]");
     if (g && g.dataset.bi != null) jumpTo(+g.dataset.bi, g.dataset.goto);
   });

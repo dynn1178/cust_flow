@@ -77,7 +77,7 @@ function seed() {
   const T = (platform, event, trigger, selector, status, props, note, extra) => {
     const ex = extra || {}, ts = ex.testSamples || {};
     return {
-      id: uid("t"), platform, common: !!ex.common,
+      id: uid("t"), platforms: ex.platforms || [platform], common: !!ex.common,
       screenKo: ex.screenKo || "", path: ex.path || "",
       eventKo: ex.eventKo || "", eventEn: event,
       area: selector || "", trigger, channels: ex.channels || [], action: ex.action || "",
@@ -422,6 +422,11 @@ function fieldRow(f, vals) {
     return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="proplist" data-kv="' + f.k + '">' + items +
       '</div><button class="btn sm" data-addkv="' + f.k + '" type="button">' + ico("plus", "xs") + "속성 추가</button></div>";
   }
+  if (f.type === "links") {
+    const items = (v || []).map(linkRow).join("");
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="linklist" data-links="' + f.k + '">' + items +
+      '</div><button class="btn sm" data-addlink="' + f.k + '" type="button">' + ico("plus", "xs") + "링크 추가</button></div>";
+  }
   if (f.type === "check")
     return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
   if (f.type === "action")
@@ -486,13 +491,21 @@ function openForm(opt) {
         type: $('[data-pf="type"]', r).value, sample: $('[data-pf="sample"]', r).value.trim()
       })).filter(p => p.ko || p.en || p.sample);
     });
+    $$("[data-links]", root).forEach(box => {
+      out[box.dataset.links] = $$(".linkrow", box).map(r => ({
+        label: $('[data-lf="label"]', r).value.trim(), url: $('[data-lf="url"]', r).value.trim()
+      })).filter(l => l.label || l.url);
+    });
     return out;
   };
   root.addEventListener("click", e => {
     const t = e.target;
-    if (t.closest("[data-x]") || t.classList.contains("scrim")) return closeModal();
+    /* 입력 중인 수정 창은 배경(scrim)을 눌러도 닫히지 않게 한다 — 편집 도중
+       실수로 바깥을 눌러 작성 중이던 내용을 잃어버리는 사고를 막기 위함.
+       닫으려면 X · 취소 버튼이나 Esc를 쓴다. */
+    if (t.closest("[data-x]")) { closeModal(); if (opt.onClose) opt.onClose(); return; }
     const act = t.closest("[data-action]");
-    if (act && opt.onAction) { opt.onAction(act.dataset.action); return; }
+    if (act && opt.onAction) { opt.onAction(act.dataset.action, collect); return; }
     const hue = t.closest(".hue");
     if (hue) { $$(".hue", hue.parentNode).forEach(h => h.classList.toggle("on", h === hue)); return; }
     if (t.closest("[data-addkv]")) {
@@ -509,11 +522,57 @@ function openForm(opt) {
       else { sampleEl.value = found; toast("샘플값을 채웠습니다", "ok"); }
       return;
     }
+    if (t.closest("[data-addlink]")) {
+      const k = t.closest("[data-addlink]").dataset.addlink;
+      $('[data-links="' + k + '"]', root).insertAdjacentHTML("beforeend", linkRow({ label: "", url: "" }));
+    }
+    if (t.closest("[data-rmlink]")) t.closest(".linkrow").remove();
+    const goLink = t.closest("[data-gotolink]");
+    if (goLink) {
+      const row = goLink.closest(".linkrow"), url = $('[data-lf="url"]', row).value.trim();
+      if (!url) toast("링크를 먼저 입력하세요", "bad"); else openUrl(url);
+      return;
+    }
     if (t.closest("[data-del]")) { closeModal(); opt.onDelete(); }
     if (t.closest("[data-ok]")) { const d = collect(); closeModal(); opt.onSave(d); }
   });
-  root.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+  /* 스프레드시트에서 여러 줄(한글\t영문\t타입\t샘플)을 그대로 복사해 붙여넣으면
+     칸마다 자동으로 나눠 채우고, 모자란 줄은 새 속성 행으로 늘려준다. */
+  root.addEventListener("paste", e => {
+    const el = e.target;
+    if (!el.matches || !el.matches('[data-pf]')) return;
+    const text = (e.clipboardData || window.clipboardData).getData("text");
+    if (!text || (text.indexOf("\t") < 0 && text.indexOf("\n") < 0)) return;   // 일반 값 하나는 기본 붙여넣기 그대로 둔다
+    e.preventDefault();
+    const box = el.closest("[data-kv]"); if (!box) return;
+    const colOrder = ["ko", "en", "type", "sample"];
+    const startIdx = colOrder.indexOf(el.dataset.pf);
+    const startRowIdx = $$(".proprow", box).indexOf(el.closest(".proprow"));
+    const lines = text.replace(/\r/g, "").split("\n").filter(l => l.length);
+    lines.forEach((line, i) => {
+      let rows = $$(".proprow", box), row = rows[startRowIdx + i];
+      if (!row) { box.insertAdjacentHTML("beforeend", kvRow({ ko: "", en: "", type: "string", sample: "" })); rows = $$(".proprow", box); row = rows[rows.length - 1]; }
+      line.split("\t").forEach((val, ci) => {
+        const col = colOrder[startIdx + ci], input = col && $('[data-pf="' + col + '"]', row);
+        if (!input) return;
+        input.value = col === "type" ? resolvePropType(val) : val.trim();
+      });
+    });
+    toast(lines.length + "개 속성을 붙여넣었습니다", "ok");
+  });
+  root.addEventListener("keydown", e => { if (e.key === "Escape") { closeModal(); if (opt.onClose) opt.onClose(); } });
   const first = $(".field", root); if (first) first.focus();
+}
+/* 붙여넣은 타입 텍스트를 select의 실제 값으로 매칭한다 — 한글 라벨(문자열·숫자…)과
+   스프레드시트에서 흔한 영어 타입 이름(String·Number…) 둘 다 인식한다. */
+const PTYPE_ALIAS = { string: "string", str: "string", text: "string", number: "number", num: "number", int: "number",
+  float: "number", boolean: "boolean", bool: "boolean", array: "array", list: "array", object: "object", obj: "object", json: "object" };
+function resolvePropType(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "string";
+  const byLabel = keyByLabel(PTYPE, s, null);
+  if (byLabel) return byLabel;
+  return PTYPE_ALIAS[s.toLowerCase()] || "string";
 }
 function kvRow(p) {
   return '<div class="proprow">' +
@@ -525,6 +584,20 @@ function kvRow(p) {
     '<button class="btn icon sm" data-autoprop type="button" title="테스트 샘플에서 자동 채우기">' + ico("search", "xs") + "</button>" +
     '<button class="btn icon sm" data-rmkv type="button" title="삭제">' + ico("close", "xs") + "</button>" +
   "</div>";
+}
+function linkRow(l) {
+  return '<div class="linkrow">' +
+    '<input class="field" data-lf="label" value="' + esc(l.label || "") + '" placeholder="링크 이름 (예: 소재 시안)">' +
+    '<input class="field mono" data-lf="url" value="' + esc(l.url || "") + '" placeholder="https://...">' +
+    '<button class="btn icon sm" data-gotolink type="button" title="바로가기">' + ico("link", "xs") + "</button>" +
+    '<button class="btn icon sm" data-rmlink type="button" title="삭제">' + ico("close", "xs") + "</button>" +
+  "</div>";
+}
+/* http(s) 접두어 없이 입력해도 새 탭에서 열리게 보정한다 */
+function openUrl(url) {
+  const u = String(url || "").trim();
+  if (!u) return;
+  window.open(/^[a-z][a-z0-9+.-]*:/i.test(u) ? u : "https://" + u, "_blank", "noopener");
 }
 function confirmDel(msg, fn) {
   const root = modalHost();

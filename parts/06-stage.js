@@ -259,21 +259,26 @@ function removeShot(node) {
   n.shotData = null; n.shot = null; n.thumb = null; n.shotW = DOC_W; n.shotH = DOC_H; n.shotDirty = false;
   markDirty(); renderFlow(); if (n.id === sel.node) renderStage();
 }
-/* 화면 이미지 올리기/교체/삭제 — 노드 카드의 "설정"과 스테이지 카메라 버튼이 함께 쓴다 */
-function openShotModal(n) {
+/* 화면 이미지 올리기/교체/삭제 — 노드 카드의 "설정"과 스테이지 카메라 버튼이 함께 쓴다.
+   onDone은 이 흐름(올리기·교체·삭제·그냥 닫기)이 끝난 뒤 한 번 불린다 — 페이지
+   정보 수정 창에서 열었을 때 그 창을 다시 띄워 입력하던 내용을 이어가게 하기 위함. */
+function openShotModal(n, onDone) {
+  const done = () => { if (onDone) onDone(); };
   if (n && shotSrc(n)) {
     openForm({
       title: "화면 이미지", icon: "image", okText: "새 이미지 올리기",
       fields: [], note: "현재 등록된 화면을 교체하거나 삭제합니다. 레이어는 그대로 유지됩니다.",
-      values: {}, onSave: () => pickFile(f => setShot(f, n)),
-      onDelete: () => confirmDel("이 화면의 이미지를 삭제할까요?", () => removeShot(n))
+      values: {}, onSave: () => pickFile(f => setShot(f, n).then(done), done),
+      onDelete: () => confirmDel("이 화면의 이미지를 삭제할까요?", () => { removeShot(n); done(); }),
+      onClose: done
     });
-  } else pickFile(f => setShot(f, n));
+  } else pickFile(f => setShot(f, n).then(done), done);
 }
-function pickFile(cb) {
+function pickFile(cb, onCancel) {
   const inp = $("#filePick");
   inp.value = "";
-  inp.onchange = () => { if (inp.files && inp.files[0]) cb(inp.files[0]); };
+  inp.onchange = () => { if (inp.files && inp.files[0]) cb(inp.files[0]); else if (onCancel) onCancel(); };
+  inp.oncancel = () => { if (onCancel) onCancel(); };   // 최신 브라우저: 선택 취소도 감지
   inp.click();
 }
 

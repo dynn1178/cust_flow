@@ -151,12 +151,13 @@ function importJson() {
 function normalizeTag(t) {
   t = t || {};
   const out = Object.assign({
-    common: false, screenKo: "", path: "", eventKo: "", eventEn: "", area: "", trigger: "click",
+    platforms: [], common: false, screenKo: "", path: "", eventKo: "", eventEn: "", area: "", trigger: "click",
     channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
   }, t);
   if (!out.eventEn && t.event) out.eventEn = t.event;
   if (!out.area && t.selector) out.area = t.selector;
+  if (!out.platforms.length && t.platform) out.platforms = [t.platform];   // 플랫폼 단일선택 → 다중선택 개편(2026-08) 이전 문서 호환
   out.props = (out.props || []).map(p => (p && (p.en != null || p.ko != null || p.sample != null))
     ? { ko: p.ko || "", en: p.en || "", type: p.type || "string", sample: p.sample || "" }
     : { ko: "", en: (p && p.k) || "", type: "string", sample: (p && p.v) || "" });

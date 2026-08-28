@@ -214,7 +214,7 @@ function campRow(c) {
   return gRow(ch.c, c.name);
 }
 function tagRowsBig(n, plat) {
-  const list = n.tags.filter(t => t.platform === plat);
+  const list = n.tags.filter(t => platformsOf(t).indexOf(plat) >= 0);
   if (!list.length) return '<div class="g-empty">' + PLAT[plat].name + " 태그 없음</div>";
   return '<div class="node-list">' + list.slice(0, 6).map(t =>
     gRow(TSTATUS_C[t.status], tagEventEn(t), (TRIGGER[t.trigger] || t.trigger) + " · " + TSTATUS[t.status] + (tagArea(t) ? " · " + esc(tagArea(t)) : ""), true)
@@ -235,13 +235,13 @@ function incompleteRowsBig(n) {
 function focusCount(n, f) {
   if (f === "camp") return n.camps.length;
   if (f === "incomplete") return completeness(n).length;
-  if (PLAT[f]) return n.tags.filter(t => t.platform === f).length;
+  if (PLAT[f]) return n.tags.filter(t => platformsOf(t).indexOf(f) >= 0).length;
   return 0;
 }
 function nodeHtml(n) {
   const f = state.ui.focus || "all";
   const cnt = { amplitude: 0, braze: 0, ga4: 0 };
-  n.tags.forEach(t => { if (cnt[t.platform] != null) cnt[t.platform]++; });
+  n.tags.forEach(t => platformsOf(t).forEach(p => { if (cnt[p] != null) cnt[p]++; }));
   let bd = "";
   if (f === "all" || f === "simple") {
     Object.keys(PLAT).forEach(p => {
@@ -302,7 +302,7 @@ function renderNodes() {
     el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
-      state.ui.focus, n.tags.map(t => t.platform + t.status + tagEventEn(t) + t.common).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
+      state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t) + t.common).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
       el.innerHTML = nodeHtml(n);
@@ -683,7 +683,16 @@ function editNode(id) {
       Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
       markDirty(); renderFlow(); renderPanels();
     },
-    onAction: k => { if (k === "shot") { closeModal(); openShotModal(n); } },
+    onAction: (k, getValues) => {
+      if (k !== "shot") return;
+      /* 사진을 올리는 동안 다른 칸에 입력해 둔 내용을 잃지 않도록, 이 창을
+         닫기 전에 지금까지 입력한 값을 먼저 반영해 둔다. */
+      const v = getValues();
+      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
+      markDirty(); renderFlow(); renderPanels();
+      closeModal();
+      openShotModal(n, () => editNode(n.id));
+    },
     onDelete: () => confirmDel('"' + n.name + '" 페이지를 삭제할까요?', () => deleteNode(id))
   });
 }
