@@ -33,24 +33,27 @@ function initSplitters() {
   addEventListener("resize", () => { applySizes(); if (!stageZoom) renderStage(); });
 }
 
-/* 영역 확장/축소 — 개인 화면 설정이라 문서가 아닌 이 브라우저에만 남긴다 */
+/* 영역 확장/축소 — 여정 지도를 잠시 숨겨 아래쪽 패널이 세로로 더 넓게 보이도록 한다.
+   개인 화면 설정이라 문서가 아닌 이 브라우저에만 남긴다 */
 const PANE_EXP_KEY = "jta:paneExpand";
-let paneExpand = "";
+let paneExpand = { left: false, right: false };
 function applyPaneExpand() {
-  if (paneExpand === "left" || paneExpand === "right") $("#deck").setAttribute("data-expand", paneExpand);
-  else $("#deck").removeAttribute("data-expand");
-  $("#expLeftLabel").textContent = paneExpand === "left" ? "축소" : "확장";
-  $("#expRightLabel").textContent = paneExpand === "right" ? "축소" : "확장";
-  $("#btnExpLeft").classList.toggle("on", paneExpand === "left");
-  $("#btnExpRight").classList.toggle("on", paneExpand === "right");
+  const hide = paneExpand.left || paneExpand.right;
+  $("#flowPane").style.display = hide ? "none" : "";
+  $("#splitH").style.display = hide ? "none" : "";
+  $("#expLeftLabel").textContent = paneExpand.left ? "축소" : "확장";
+  $("#expRightLabel").textContent = paneExpand.right ? "축소" : "확장";
+  $("#btnExpLeft").classList.toggle("on", paneExpand.left);
+  $("#btnExpRight").classList.toggle("on", paneExpand.right);
 }
 function initPaneExpand() {
-  try { paneExpand = localStorage.getItem(PANE_EXP_KEY) || ""; } catch (e) { paneExpand = ""; }
+  try { paneExpand = Object.assign({ left: false, right: false }, JSON.parse(localStorage.getItem(PANE_EXP_KEY) || "null")); }
+  catch (e) { paneExpand = { left: false, right: false }; }
   applyPaneExpand();
   const toggle = side => {
-    paneExpand = paneExpand === side ? "" : side;
+    paneExpand[side] = !paneExpand[side];
     applyPaneExpand();
-    try { localStorage.setItem(PANE_EXP_KEY, paneExpand); } catch (e) {}
+    try { localStorage.setItem(PANE_EXP_KEY, JSON.stringify(paneExpand)); } catch (e) {}
     applySizes(); if (!stageZoom) renderStage();
   };
   $("#btnExpLeft").addEventListener("click", () => toggle("left"));
