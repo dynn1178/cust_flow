@@ -112,6 +112,19 @@ select.field{cursor:pointer}
 .hue{width:22px; height:22px; border-radius:7px; cursor:pointer; padding:0;
   border:1px solid var(--stroke); background:color-mix(in srgb,var(--h) 80%,transparent)}
 .hue.on{outline:2px solid var(--ink); outline-offset:1px}
+.seg-check{display:flex; gap:5px; flex-wrap:wrap}
+.chkbtn{display:inline-flex; align-items:center; gap:5px; height:27px; padding:0 10px; border-radius:var(--r-sm);
+  border:1px solid var(--stroke-2); background:var(--glass-2); font-size:12px; cursor:pointer; user-select:none}
+.chkbtn input{margin:0}
+.chkbtn:has(input:checked){background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.fgroup{border:1px solid var(--stroke-2); border-radius:var(--r-md); background:var(--glass-2)}
+.fgroup > summary{cursor:pointer; padding:9px 10px; font-size:11.5px; font-weight:600; color:var(--ink-2);
+  list-style:none; display:flex; align-items:center; gap:6px}
+.fgroup > summary::-webkit-details-marker{display:none}
+.fgroup > summary::before{content:"▸"; font-size:10px; color:var(--ink-3); transition:transform .12s}
+.fgroup[open] > summary::before{transform:rotate(90deg)}
+.fgroup-body{display:flex; flex-direction:column; gap:10px; padding:0 10px 10px}
+.proplist{display:flex; flex-direction:column; gap:6px}
 .empty{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
   padding:26px 16px; color:var(--ink-3); font-size:12.5px; text-align:center}
 .empty .ico{width:22px;height:22px;opacity:.55}

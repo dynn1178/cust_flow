@@ -129,8 +129,23 @@ tr:hover .rowacts{opacity:1}
 .hint{font-size:11px; color:var(--ink-3)}
 .pbar{height:8px; border-radius:99px; background:var(--glass-2); overflow:hidden; margin-bottom:8px}
 .pbar-fill{height:100%; background:var(--accent); transition:width .15s}
-.proprow{display:flex; gap:6px; align-items:center}
-.proprow .field{font-family:var(--f-mono); font-size:12px}
+.proprow{display:grid; grid-template-columns:1fr 1fr 96px 1fr auto auto; gap:6px; align-items:center}
+.proprow input.field.mono,.proprow select.field{font-family:var(--f-mono); font-size:12px}
+.proplines{display:flex; flex-direction:column; gap:5px}
+.propline{display:flex; flex-wrap:wrap; align-items:baseline; gap:5px; font-size:11.5px; color:var(--ink-2); line-height:1.4}
+.propline b{font-weight:600; color:var(--ink)}
+.propline .mono{font-family:var(--f-mono); font-size:10.5px}
+.propline .ptype{color:var(--ink-3)}
+.propline .psample{background:var(--glass-2); border:1px solid var(--stroke-2); border-radius:5px; padding:1px 5px}
+.tsamp{border-top:1px solid var(--stroke-2); margin-top:2px; padding-top:6px}
+.tsamp > summary{cursor:pointer; font-size:11px; color:var(--ink-3); list-style:none; display:flex; align-items:center; gap:5px}
+.tsamp > summary::-webkit-details-marker{display:none}
+.tsamp > summary::before{content:"▸"; font-size:9px; transition:transform .12s}
+.tsamp[open] > summary::before{transform:rotate(90deg)}
+.tsamp-row{margin-top:6px}
+.tsamp-k{font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); display:block; margin-bottom:2px}
+.tsamp-row pre{margin:0; font-size:10.5px; white-space:pre-wrap; word-break:break-all; background:var(--glass-2);
+  border:1px solid var(--stroke-2); border-radius:6px; padding:6px 8px; color:var(--ink-2)}
 .popover{position:fixed; z-index:120; border-radius:var(--r-md); padding:10px; display:flex; flex-direction:column; gap:9px;
   width:250px; box-shadow:var(--shadow); max-height:88vh; overflow:auto}
 .popover.wide{width:302px}

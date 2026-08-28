@@ -11,6 +11,31 @@ function acts(kind, id) {
   return '<div class="card-acts edit-only"><button class="btn icon sm" data-' + kind + '-edit="' + id + '" title="수정">' + ico("edit", "xs") +
     '</button><button class="btn icon sm danger" data-' + kind + '-del="' + id + '" title="삭제">' + ico("trash", "xs") + "</button></div>";
 }
+/* ---------------- 태그 표시 헬퍼 (이벤트명·영역은 신규 필드로, 예전 문서 호환을 위해 옛 필드로 폴백) ---------------- */
+function tagEventEn(t) { return t.eventEn != null && t.eventEn !== "" ? t.eventEn : (t.event || ""); }
+function tagArea(t) { return t.area != null && t.area !== "" ? t.area : (t.selector || ""); }
+function tchanChips(codes) {
+  return (codes || []).map(c => '<span class="chip" style="--c:var(--ink-3)">' + esc(TCHAN[c] || c) + "</span>").join("");
+}
+function propLines(props) {
+  if (!props || !props.length) return "";
+  return '<div class="proplines">' + props.map(p =>
+    '<div class="propline">' +
+      (p.ko ? "<b>" + esc(p.ko) + "</b>" : "") + (p.en ? '<span class="mono">' + esc(p.en) + "</span>" : "") +
+      '<span class="ptype">' + esc(PTYPE[p.type] || p.type || "") + "</span>" +
+      (p.sample ? '<span class="psample mono">' + esc(p.sample) + "</span>" : "") +
+    "</div>").join("") + "</div>";
+}
+function sampleAccordion(t) {
+  const rows = Object.entries(TSAMPLE_KEYS).filter(([k]) => t[k]);
+  if (!rows.length) return "";
+  return '<details class="tsamp"><summary>테스트 샘플 보기 (' + rows.length + ")</summary>" +
+    rows.map(([k, label]) => '<div class="tsamp-row"><span class="tsamp-k">' + esc(label) + '</span><pre class="mono">' + esc(t[k]) + "</pre></div>").join("") +
+  "</details>";
+}
+/* 이 화면(node)의 공통 태그는 저장 없이 항상 계산해서 보여준다 — 나중에 공통
+   태그가 추가·삭제돼도 이미 만들어진 캠페인에 자동으로 반영되게 하기 위해서다. */
+function commonTagsOf(n) { return (n.tags || []).filter(t => t.common); }
 
 /* ---------------- 태그/캠페인 CSV 일괄 업로드 · 샘플 양식 ----------------
    기존 CSV 내보내기(btnTagCsv/btnCampCsv)와 같은 컬럼·따옴표 규칙을 써서
@@ -41,12 +66,23 @@ function keyByLabel(map, label, fallback) {
   const hit = Object.entries(map).find(([, v]) => (typeof v === "string" ? v : v.name) === s);
   return hit ? hit[0] : fallback;
 }
+/* 속성 한 줄 = "한글 :: 영문key :: 타입 :: 샘플", 속성 사이는 " | "로 구분한다 */
+function serializePropsStr(props) {
+  return (props || []).map(p => [p.ko || "", p.en || "", PTYPE[p.type] || p.type || PTYPE.string, p.sample || ""].join(" :: ")).join(" | ");
+}
 function parsePropsStr(s) {
-  return String(s || "").split(" / ").map(x => x.trim()).filter(Boolean).map(x => {
-    const i = x.indexOf("=");
-    return i < 0 ? { k: x, v: "" } : { k: x.slice(0, i).trim(), v: x.slice(i + 1).trim() };
+  /* 항목 끝의 공백은 " :: " 구분자의 일부(샘플이 빈 값일 때)일 수 있어 trim하지 않는다 */
+  return String(s || "").split(" | ").filter(x => x.trim()).map(x => {
+    const parts = x.split(" :: ").map(v => v.trim());
+    return { ko: parts[0] || "", en: parts[1] || "", type: keyByLabel(PTYPE, parts[2], "string"), sample: parts[3] || "" };
   });
 }
+function channelsToStr(codes) { return (codes || []).map(c => TCHAN[c] || c).join(", "); }
+function channelsFromStr(s) {
+  return String(s || "").split(",").map(x => keyByLabel(TCHAN, x, null)).filter(Boolean);
+}
+function boolToStr(b) { return b ? "Y" : ""; }
+function strToBool(s) { return /^(y|yes|true|1|공통)$/i.test(String(s || "").trim()); }
 function resolveBoard(name) {
   const s = String(name || "").trim();
   if (!s) return B();
@@ -91,11 +127,20 @@ function bulkPreviewModal(opt) {
     if (e.target.closest("[data-run]")) { closeModal(); opt.onRun(); }
   });
 }
+const TAG_CSV_HEAD = ["보드", "페이지", "경로", "플랫폼", "공통여부", "화면이름(한글)", "이벤트(한글)", "이벤트(영어)", "영역", "트리거", "채널", "동작", "속성", "개발확인", "메모",
+  "테스트샘플(web_pc)", "테스트샘플(web_mo)", "테스트샘플(app_aos)", "테스트샘플(app_ios)"];
+function tagToCsvRow(t, n, b) {
+  return [b.name, n.name, n.path, PLAT[t.platform].name, boolToStr(t.common), t.screenKo || "", t.eventKo || "", tagEventEn(t), tagArea(t),
+    TRIGGER[t.trigger] || t.trigger, channelsToStr(t.channels), t.action || "", serializePropsStr(t.props), TSTATUS[t.status], t.note,
+    t.testSampleWebPc || "", t.testSampleWebMo || "", t.testSampleAppAos || "", t.testSampleAppIos || ""];
+}
 function tagCsvTemplate() {
-  const head = ["보드", "페이지", "경로", "플랫폼", "이벤트", "트리거", "위치", "속성", "상태", "메모"];
-  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "home_viewed", "화면 노출", "",
-    "user_type=guest | member", "적용됨", "세션 첫 화면 진입 시 1회"];
-  saveFile("tag-upload-template.csv", "﻿" + [csvLine(head), csvLine(example)].join("\r\n"), "text/csv");
+  const example = [B().name, (B().nodes[0] || {}).name || "홈", "/home", "Amplitude", "Y", "홈", "홈 화면 노출", "home_viewed", "", "화면 노출",
+    "웹 PC, 웹 모바일, 앱 AOS, 앱 iOS", "화면 진입",
+    "사용자 유형 :: user_type :: 문자열 :: guest | 배너 ID 목록 :: banner_ids :: 배열 :: ",
+    "적용됨", "세션 첫 화면 진입 시 1회",
+    '{"user_type":"guest","banner_ids":["b1","b2"]}', "", "", ""];
+  saveFile("tag-upload-template.csv", "﻿" + [csvLine(TAG_CSV_HEAD), csvLine(example)].join("\r\n"), "text/csv");
 }
 function openTagBulkModal(file) {
   readTextFile(file, text => {
@@ -103,13 +148,16 @@ function openTagBulkModal(file) {
     const data = rows.slice(1);
     if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
     const parsed = data.map(r => {
-      const [boardName, pageName, path, platLabel, event, triggerLabel, selector, propsStr, statusLabel, note] = r;
+      const [boardName, pageName, path, platLabel, commonStr, screenKo, eventKo, eventEn, area, triggerLabel, channelsStr, action, propsStr, statusLabel, note,
+        webPc, webMo, appAos, appIos] = r;
       return {
         boardName: boardName || "", pageName: (pageName || "새 페이지").trim(), path: path || "",
         tag: {
-          platform: keyByLabel(PLAT, platLabel, "amplitude"), event: event || "unnamed_event",
-          trigger: keyByLabel(TRIGGER, triggerLabel, "custom"), selector: selector || "",
-          props: parsePropsStr(propsStr), status: keyByLabel(TSTATUS, statusLabel, "todo"), note: note || ""
+          platform: keyByLabel(PLAT, platLabel, "amplitude"), common: strToBool(commonStr),
+          screenKo: screenKo || "", eventKo: eventKo || "", eventEn: eventEn || "unnamed_event", area: area || "",
+          trigger: keyByLabel(TRIGGER, triggerLabel, "custom"), channels: channelsFromStr(channelsStr), action: action || "",
+          props: parsePropsStr(propsStr), status: keyByLabel(TSTATUS, statusLabel, "todo"), note: note || "",
+          testSampleWebPc: webPc || "", testSampleWebMo: webMo || "", testSampleAppAos: appAos || "", testSampleAppIos: appIos || ""
         }
       };
     });
@@ -120,7 +168,7 @@ function openTagBulkModal(file) {
       if (!b.nodes.some(n => n.name === p.pageName) && !seen.has(key)) { newPages++; seen.add(key); }
     });
     bulkPreviewModal({
-      title: "태그 일괄 업로드", rows: parsed.map(p => esc(p.pageName) + "<em>" + esc((PLAT[p.tag.platform] || PLAT.amplitude).name) + " · " + esc(p.tag.event) + "</em>"),
+      title: "태그 일괄 업로드", rows: parsed.map(p => esc(p.pageName) + "<em>" + esc((PLAT[p.tag.platform] || PLAT.amplitude).name) + " · " + esc(p.tag.eventEn) + "</em>"),
       newPages,
       onRun: () => {
         parsed.forEach(p => {
@@ -189,13 +237,21 @@ function renderTagPanel() {
   const order = { amplitude: 0, braze: 1, ga4: 2 };
   box.innerHTML = n.tags.slice().sort((a, b) => order[a.platform] - order[b.platform]).map(t =>
     '<div class="card" data-tag="' + t.id + '">' +
-      '<div class="card-top">' + platChip(t.platform) + '<div class="spacer"></div>' + acts("tag", t.id) + "</div>" +
-      '<div class="evt">' + esc(t.event) + "</div>" +
-      '<div class="meta"><span><span class="dot" style="--c:' + TSTATUS_C[t.status] + '"></span> ' + TSTATUS[t.status] + "</span>" +
+      '<div class="card-top">' + platChip(t.platform) + (t.common ? '<span class="chip" style="--c:var(--camp)">공통</span>' : "") +
+        '<div class="spacer"></div>' + acts("tag", t.id) + "</div>" +
+      '<div class="evt">' + esc(t.eventKo ? t.eventKo + " " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;opacity:.8">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
+      '<div class="meta">' +
+        (t.screenKo ? "<span>화면 <b>" + esc(t.screenKo) + "</b></span>" : "") +
+        (t.path ? '<span class="mono" style="font-size:10.5px">' + esc(t.path) + "</span>" : "") +
+        "<span><span class=\"dot\" style=\"--c:" + TSTATUS_C[t.status] + "\"></span> " + TSTATUS[t.status] + "</span>" +
         "<span>트리거 <b>" + (TRIGGER[t.trigger] || t.trigger) + "</b></span>" +
-        (t.selector ? '<span class="mono" style="font-size:10.5px">' + esc(t.selector) + "</span>" : "") + "</div>" +
-      (t.props && t.props.length ? '<div class="kv">' + t.props.map(p => "<span>" + esc(p.k) + (p.v ? ": " + esc(p.v) : "") + "</span>").join("") + "</div>" : "") +
+        (t.action ? "<span>동작 <b>" + esc(t.action) + "</b></span>" : "") +
+        (tagArea(t) ? '<span class="mono" style="font-size:10.5px">' + esc(tagArea(t)) + "</span>" : "") +
+      "</div>" +
+      (t.channels && t.channels.length ? '<div class="rowseg">' + tchanChips(t.channels) + "</div>" : "") +
+      propLines(t.props) +
       (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") +
+      sampleAccordion(t) +
     "</div>").join("");
 }
 
@@ -205,7 +261,10 @@ function renderCampPanel() {
   $("#campCount").textContent = n ? n.camps.length : 0;
   if (!n) { box.innerHTML = '<div class="empty">' + ico("mega") + "<div>페이지를 선택하세요</div></div>"; return; }
   const L = (n.layers || []).find(x => x.id === sel.layer);
-  box.innerHTML = n.camps.length ? n.camps.map(c => {
+  const common = commonTagsOf(n);
+  const commonNote = common.length ? '<div class="hint">' + ico("tag", "xs") + " 공통 태그 " + common.length + "개가 이 화면의 모든 캠페인에 자동 적용됩니다: " +
+    common.map(t => esc(t.eventKo || tagEventEn(t))).join(", ") + "</div>" : "";
+  box.innerHTML = commonNote + (n.camps.length ? n.camps.map(c => {
     const linked = (n.layers || []).filter(l => l.campId === c.id);
     return '<div class="card' + (L && L.campId === c.id ? " pinned" : "") + '" data-camp="' + c.id + '">' +
       '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div>' + acts("camp", c.id) + "</div>" +
@@ -220,7 +279,7 @@ function renderCampPanel() {
         ico(L.campId === c.id ? "check" : "pin", "xs") + (L.campId === c.id ? "연결됨 · 해제" : "선택한 레이어에 연결") + "</button>" : "") +
     "</div>";
   }).join("") : '<div class="empty">' + ico("mega") + "<div>이 화면에 붙는 CRM 캠페인이 없습니다" +
-    (canEdit() ? "<br>추가 버튼으로 등록하세요" : "") + "</div></div>";
+    (canEdit() ? "<br>추가 버튼으로 등록하세요" : "") + "</div></div>");
 
   const foot = $("#layerLinkFoot");
   if (L) {
@@ -235,26 +294,43 @@ function renderPanels() { renderTagPanel(); renderCampPanel(); }
 /* ---------------- CRUD ---------------- */
 function editTag(id) {
   const n = curNode(); if (!n || !canEdit()) return;
-  const t = id ? n.tags.find(x => x.id === id) : { platform: "amplitude", event: "", trigger: "click", selector: "", status: "todo", props: [], note: "" };
+  const t = id ? n.tags.find(x => x.id === id) : {
+    platform: "amplitude", common: false, screenKo: "", path: "", eventKo: "", eventEn: "",
+    area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
+    testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
+  };
+  const values = id ? Object.assign({}, t, { eventEn: tagEventEn(t), area: tagArea(t) }) : t;
   openForm({
     title: id ? "태그 수정" : "태그 추가", icon: "tag",
     note: "Amplitude · Braze · GA4에 실제로 심어진 이벤트 정의를 그대로 적어 두면 QA 때 이 화면이 기준이 됩니다.",
     fields: [
       { k: "platform", label: "플랫폼", type: "select", opts: { amplitude: "Amplitude", braze: "Braze", ga4: "GA4" } },
-      { k: "event", label: "이벤트명", mono: true, ph: "add_to_cart_clicked" },
+      { k: "common", label: "공통 태그로 지정 (이 화면의 모든 캠페인에 자동 적용)", type: "check" },
+      { k: "screenKo", label: "화면 이름(한글)", ph: "홈" },
+      { k: "path", label: "경로", mono: true, ph: "/home" },
+      { k: "eventKo", label: "이벤트명(한글)", ph: "장바구니 담기 클릭" },
+      { k: "eventEn", label: "이벤트명(영어)", mono: true, ph: "add_to_cart_clicked" },
+      { k: "area", label: "영역", mono: true, ph: "#btn-cart" },
       { k: "trigger", label: "트리거", type: "select", opts: TRIGGER },
-      { k: "selector", label: "발생 위치 · 셀렉터", mono: true, ph: "#btn-cart" },
-      { k: "status", label: "상태", type: "select", opts: TSTATUS },
-      { k: "props", label: "전송 속성", type: "kv" },
-      { k: "note", label: "메모", type: "textarea" }
+      { k: "channels", label: "채널", type: "multi", opts: TCHAN },
+      { k: "action", label: "동작", ph: "버튼 클릭" },
+      { k: "props", label: "속성", type: "kv" },
+      { k: "status", label: "개발확인", type: "select", opts: TSTATUS },
+      { k: "note", label: "메모", type: "textarea" },
+      { type: "group", label: "테스트 샘플 (web_pc · web_mo · app_aos · app_ios)", fields: [
+        { k: "testSampleWebPc", label: "web_pc", type: "textarea", mono: true, ph: '{"user_type":"guest"}' },
+        { k: "testSampleWebMo", label: "web_mo", type: "textarea", mono: true, ph: '{"user_type":"guest"}' },
+        { k: "testSampleAppAos", label: "app_aos", type: "textarea", mono: true, ph: '{"user_type":"guest"}' },
+        { k: "testSampleAppIos", label: "app_ios", type: "textarea", mono: true, ph: '{"user_type":"guest"}' }
+      ] }
     ],
-    values: t,
+    values,
     onSave: v => {
-      const rec = Object.assign({}, t, v, { event: v.event || "unnamed_event" });
+      const rec = Object.assign({}, t, v, { eventEn: v.eventEn || "unnamed_event" });
       if (id) Object.assign(t, rec); else { rec.id = uid("t"); n.tags.push(rec); }
       markDirty(); renderFlow(); renderPanels(); renderTagView(true);
     },
-    onDelete: id ? () => confirmDel("태그 " + t.event + " 를 삭제할까요?", () => {
+    onDelete: id ? () => confirmDel("태그 " + tagEventEn(t) + " 를 삭제할까요?", () => {
       n.tags = n.tags.filter(x => x.id !== id); markDirty(); renderFlow(); renderPanels(); renderTagView(true);
     }) : null
   });
@@ -296,7 +372,7 @@ function initPanels() {
     if (ed) return editTag(ed.dataset.tagEdit);
     if (dl && canEdit()) {
       const n = curNode(), t = n.tags.find(x => x.id === dl.dataset.tagDel);
-      return confirmDel("태그 " + t.event + " 를 삭제할까요?", () => {
+      return confirmDel("태그 " + tagEventEn(t) + " 를 삭제할까요?", () => {
         n.tags = n.tags.filter(x => x.id !== t.id); markDirty(); renderFlow(); renderPanels(); renderTagView(true);
       });
     }
@@ -355,7 +431,8 @@ function renderTagView(force) {
     (tagFilter.board === "all" || state.boards[+tagFilter.board] === b) &&
     (tagFilter.node === "all" || n.id === tagFilter.node) &&
     (tagFilter.status === "all" || t.status === tagFilter.status) &&
-    (!tagFilter.q || (t.event + " " + t.selector + " " + t.note + " " + (t.props || []).map(p => p.k + p.v).join(" ") + " " + n.name + " " + b.name).toLowerCase().includes(tagFilter.q))
+    (!tagFilter.q || (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + (t.screenKo || "") + " " + (t.action || "") + " " + t.note + " " +
+      (t.props || []).map(p => p.ko + p.en + p.sample).join(" ") + " " + n.name + " " + b.name).toLowerCase().includes(tagFilter.q))
   );
   const cnt = p => all.filter(x => x.t.platform === p).length;
   $("#tagStats").innerHTML =
@@ -366,20 +443,23 @@ function renderTagView(force) {
      '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.t.status === "todo").length + '</span><span class="t">작업 예정</span></div>'].join("");
 
   $("#tagTable").innerHTML =
-    "<thead><tr><th>보드</th><th>페이지</th><th>플랫폼</th><th>이벤트</th><th>트리거</th><th>위치</th><th>속성</th><th>상태</th><th></th></tr></thead><tbody>" +
+    "<thead><tr><th>보드</th><th>페이지</th><th>플랫폼</th><th>이벤트</th><th>트리거 · 동작 · 영역</th><th>채널</th><th>속성</th><th>개발확인</th><th>테스트샘플</th><th></th></tr></thead><tbody>" +
     (rows.length ? rows.map(({ t, n, b }) =>
       '<tr data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" data-tid="' + t.id + '">' +
         '<td class="nowrap" style="color:var(--ink-3)">' + esc(b.name) + "</td>" +
         '<td class="nowrap"><b>' + esc(n.name) + "</b>" + (n.path ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(n.path) + "</div>" : "") + "</td>" +
-        "<td>" + platChip(t.platform) + "</td>" +
-        '<td><span class="evt">' + esc(t.event) + "</span>" + (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") + "</td>" +
-        '<td class="nowrap">' + (TRIGGER[t.trigger] || t.trigger) + "</td>" +
-        '<td class="mono" style="font-size:11px">' + esc(t.selector || "—") + "</td>" +
-        '<td><div class="kv">' + (t.props || []).map(p => "<span>" + esc(p.k) + (p.v ? ": " + esc(p.v) : "") + "</span>").join("") + "</div></td>" +
+        "<td>" + platChip(t.platform) + (t.common ? '<div class="chip" style="--c:var(--camp);margin-top:4px">공통</div>' : "") + "</td>" +
+        "<td>" + (t.eventKo ? '<div style="font-weight:600">' + esc(t.eventKo) + "</div>" : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span>" +
+          (t.screenKo ? '<div class="hint">화면 · ' + esc(t.screenKo) + "</div>" : "") + (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") + "</td>" +
+        '<td class="nowrap">' + (TRIGGER[t.trigger] || t.trigger) + (t.action ? " · " + esc(t.action) : "") +
+          (tagArea(t) ? '<div class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(tagArea(t)) + "</div>" : "") + "</td>" +
+        '<td><div class="rowseg">' + (tchanChips(t.channels) || "—") + "</div></td>" +
+        "<td>" + (propLines(t.props) || "—") + "</td>" +
         '<td class="nowrap"><span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span></td>" +
+        '<td style="max-width:240px">' + (sampleAccordion(t) || "—") + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +
       "</tr>").join("")
-      : '<tr><td colspan="9"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
+      : '<tr><td colspan="10"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
     "</tbody>";
 }
 function initTagView() {
@@ -405,11 +485,8 @@ function initTagView() {
     if (tr) jumpTo(+tr.dataset.bi, tr.dataset.goto);
   });
   $("#btnTagCsv").addEventListener("click", () => {
-    const head = ["보드", "페이지", "경로", "플랫폼", "이벤트", "트리거", "위치", "속성", "상태", "메모"];
-    const q = s => '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"';
-    const body = allTags().map(({ t, n, b }) => [b.name, n.name, n.path, PLAT[t.platform].name, t.event, TRIGGER[t.trigger] || t.trigger, t.selector,
-      (t.props || []).map(p => p.k + (p.v ? "=" + p.v : "")).join(" / "), TSTATUS[t.status], t.note].map(q).join(","));
-    saveFile("tag-list.csv", "﻿" + [head.map(q).join(",")].concat(body).join("\r\n"), "text/csv");
+    const body = allTags().map(({ t, n, b }) => csvLine(tagToCsvRow(t, n, b)));
+    saveFile("tag-list.csv", "﻿" + [csvLine(TAG_CSV_HEAD)].concat(body).join("\r\n"), "text/csv");
   });
 }
 

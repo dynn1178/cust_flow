@@ -134,7 +134,7 @@ function globalSearchResults(q) {
   state.boards.forEach(b => b.nodes.forEach(n => {
     if ((n.name + " " + (n.path || "")).toLowerCase().indexOf(q) >= 0) nodes.push({ n, b });
   }));
-  const tags = allTags().filter(({ t, n }) => (t.event + " " + (t.selector || "") + " " + n.name).toLowerCase().indexOf(q) >= 0);
+  const tags = allTags().filter(({ t, n }) => (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + n.name).toLowerCase().indexOf(q) >= 0);
   const camps = allCamps().filter(({ c, n }) => (c.name + " " + n.name).toLowerCase().indexOf(q) >= 0);
   return { nodes: nodes.slice(0, 20), tags: tags.slice(0, 20), camps: camps.slice(0, 20) };
 }
@@ -162,7 +162,7 @@ function openQuickSearch() {
     if (r.nodes.length) html += '<div class="qs-group">페이지 · ' + r.nodes.length + "개</div>" +
       r.nodes.map(({ n, b }) => qsRow("map", n.name, b.name + (n.path ? " · " + n.path : ""), state.boards.indexOf(b), n.id)).join("");
     if (r.tags.length) html += '<div class="qs-group">태그 · ' + r.tags.length + "개</div>" +
-      r.tags.map(({ t, n, b }) => qsRow("tag", t.event, b.name + " · " + n.name, state.boards.indexOf(b), n.id)).join("");
+      r.tags.map(({ t, n, b }) => qsRow("tag", tagEventEn(t), b.name + " · " + n.name, state.boards.indexOf(b), n.id)).join("");
     if (r.camps.length) html += '<div class="qs-group">캠페인 · ' + r.camps.length + "개</div>" +
       r.camps.map(({ c, n, b }) => qsRow("mega", c.name, b.name + " · " + n.name, state.boards.indexOf(b), n.id)).join("");
     out.innerHTML = html;

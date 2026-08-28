@@ -217,7 +217,7 @@ function tagRowsBig(n, plat) {
   const list = n.tags.filter(t => t.platform === plat);
   if (!list.length) return '<div class="g-empty">' + PLAT[plat].name + " 태그 없음</div>";
   return '<div class="node-list">' + list.slice(0, 6).map(t =>
-    gRow(TSTATUS_C[t.status], t.event, (TRIGGER[t.trigger] || t.trigger) + " · " + TSTATUS[t.status] + (t.selector ? " · " + esc(t.selector) : ""), true)
+    gRow(TSTATUS_C[t.status], tagEventEn(t), (TRIGGER[t.trigger] || t.trigger) + " · " + TSTATUS[t.status] + (tagArea(t) ? " · " + esc(tagArea(t)) : ""), true)
   ).join("") + (list.length > 6 ? '<div class="g-more">+' + (list.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function campRowsBig(n) {
@@ -302,7 +302,7 @@ function renderNodes() {
     el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
-      state.ui.focus, n.tags.map(t => t.platform + t.status + t.event).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
+      state.ui.focus, n.tags.map(t => t.platform + t.status + tagEventEn(t) + t.common).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
       el.innerHTML = nodeHtml(n);

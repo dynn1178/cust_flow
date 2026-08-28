@@ -19,6 +19,9 @@ const PLAT = {
 const TRIGGER = { view: "화면 노출", click: "클릭", submit: "제출/전송", scroll: "스크롤", timer: "체류", custom: "커스텀" };
 const TSTATUS = { live: "적용됨", todo: "작업 예정", deprecated: "폐기" };
 const TSTATUS_C = { live: "var(--ok)", todo: "var(--warn)", deprecated: "var(--ink-3)" };
+const TCHAN = { web_pc: "웹 PC", web_mo: "웹 모바일", app_aos: "앱 AOS", app_ios: "앱 iOS" };
+const PTYPE = { string: "문자열", number: "숫자", boolean: "불리언", array: "배열", object: "객체" };
+const TSAMPLE_KEYS = { testSampleWebPc: "web_pc", testSampleWebMo: "web_mo", testSampleAppAos: "app_aos", testSampleAppIos: "app_ios" };
 const CHAN = {
   push:   { name: "앱 푸시", c: "var(--braze)", ico: "braze" },
   inapp:  { name: "인앱 메시지", c: "var(--camp)", ico: "mega" },
@@ -71,8 +74,23 @@ function seed() {
     id, kind, name, path, x, y, note: note || "", shot: null, shotData: null, thumb: null,
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
   }, style || {});
-  const T = (platform, event, trigger, selector, status, props, note) =>
-    ({ id: uid("t"), platform, event, trigger, selector: selector || "", status, props: props || [], note: note || "" });
+  const T = (platform, event, trigger, selector, status, props, note, extra) => {
+    const ex = extra || {}, ts = ex.testSamples || {};
+    return {
+      id: uid("t"), platform, common: !!ex.common,
+      screenKo: ex.screenKo || "", path: ex.path || "",
+      eventKo: ex.eventKo || "", eventEn: event,
+      area: selector || "", trigger, channels: ex.channels || [], action: ex.action || "",
+      props: (props || []).map(p => ({
+        ko: p.ko || "", en: p.en || p.k || "",
+        type: p.type || (PTYPE[p.v] ? p.v : "string"),
+        sample: p.sample != null ? p.sample : (PTYPE[p.v] ? "" : (p.v || ""))
+      })),
+      status, note: note || "",
+      testSampleWebPc: ts.web_pc || "", testSampleWebMo: ts.web_mo || "",
+      testSampleAppAos: ts.app_aos || "", testSampleAppIos: ts.app_ios || ""
+    };
+  };
   const C = (name, chan, segment, timing, status, extId, landing, note) =>
     ({ id: uid("c"), name, chan, segment, timing, status, extId: extId || "", landing: landing || "", note: note || "" });
 
@@ -90,8 +108,15 @@ function seed() {
   const map = Object.fromEntries(nodes.map(n => [n.id, n]));
 
   map.n2.tags = [
-    T("amplitude", "home_viewed", "view", "", "live", [{ k: "user_type", v: "guest | member" }, { k: "banner_ids", v: "array" }], "세션 첫 화면 진입 시 1회"),
-    T("amplitude", "home_banner_clicked", "click", ".main-banner .slide", "live", [{ k: "banner_id", v: "string" }, { k: "slot", v: "1|2|3" }]),
+    T("amplitude", "home_viewed", "view", "", "live",
+      [{ ko: "사용자 유형", en: "user_type", type: "string", sample: "guest" }, { ko: "배너 ID 목록", en: "banner_ids", type: "array", sample: "" }],
+      "세션 첫 화면 진입 시 1회",
+      {
+        common: true, screenKo: "홈", eventKo: "홈 화면 노출", action: "화면 진입", channels: ["web_pc", "web_mo", "app_aos", "app_ios"],
+        testSamples: { web_pc: '{"user_type":"guest","banner_ids":["b1","b2","b3"]}', app_aos: '{"user_type":"member","banner_ids":["b1"]}' }
+      }),
+    T("amplitude", "home_banner_clicked", "click", ".main-banner .slide", "live", [{ k: "banner_id", v: "string" }, { k: "slot", v: "1|2|3" }],
+      "", { screenKo: "홈", eventKo: "홈 배너 클릭", action: "배너 슬라이드 탭", channels: ["web_pc", "web_mo"] }),
     T("braze", "Home Screen Viewed", "view", "", "live", [{ k: "is_logged_in", v: "boolean" }], "인앱 메시지 트리거 이벤트"),
     T("ga4", "screen_view", "view", "", "live", [{ k: "screen_name", v: "home" }, { k: "screen_class", v: "HomeActivity" }]),
     T("ga4", "select_promotion", "click", ".main-banner .slide", "todo", [{ k: "promotion_name", v: "string" }], "GA4 표준 이벤트로 교체 예정")
@@ -373,33 +398,70 @@ function modalHost() {                    // 이전 모달의 이벤트 리스�
   return fresh;
 }
 function closeModal() { modalHost(); }
+function fieldRow(f, vals) {
+  const v = vals[f.k];
+  if (f.type === "select") {
+    const os = Object.entries(f.opts).map(([k, o]) => '<option value="' + k + '"' + (v === k ? " selected" : "") + ">" + esc(typeof o === "string" ? o : o.name) + "</option>").join("");
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><select class="field" data-k="' + f.k + '">' + os + "</select></div>";
+  }
+  if (f.type === "swatch") {
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="hues" data-hue="' + f.k + '">' +
+      Object.entries(HUE).map(([k, h]) => '<button type="button" class="hue' + (v === k ? " on" : "") + '" data-v="' + k + '" title="' + h.name +
+        '" style="--h:' + h.c + '"></button>').join("") + "</div></div>";
+  }
+  if (f.type === "multi") {
+    const sel = v || [];
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="seg-check" data-multi="' + f.k + '">' +
+      Object.entries(f.opts).map(([k, o]) => '<label class="chkbtn"><input type="checkbox" data-mc="' + f.k + '" value="' + k + '"' +
+        (sel.indexOf(k) >= 0 ? " checked" : "") + ">" + esc(typeof o === "string" ? o : o.name) + "</label>").join("") + "</div></div>";
+  }
+  if (f.type === "textarea")
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><textarea class="field' + (f.mono ? " mono" : "") + '" data-k="' + f.k + '" placeholder="' + esc(f.ph || "") + '">' + esc(v || "") + "</textarea></div>";
+  if (f.type === "kv") {
+    const items = (v || []).map(kvRow).join("");
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="proplist" data-kv="' + f.k + '">' + items +
+      '</div><button class="btn sm" data-addkv="' + f.k + '" type="button">' + ico("plus", "xs") + "속성 추가</button></div>";
+  }
+  if (f.type === "check")
+    return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
+  if (f.type === "action")
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><button type="button" class="btn sm" data-action="' + f.k + '">' +
+      (f.icon ? ico(f.icon, "xs") : "") + esc(f.actionLabel || f.label) + "</button></div>";
+  if (f.type === "group")
+    return '<details class="fgroup"' + (f.open ? " open" : "") + "><summary>" + esc(f.label) + '</summary><div class="fgroup-body">' +
+      f.fields.map(sub => fieldRow(sub, vals)).join("") + "</div></details>";
+  return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><input class="field' + (f.mono ? " mono" : "") + '" data-k="' + f.k + '" value="' + esc(v || "") + '" placeholder="' + esc(f.ph || "") + '"></div>';
+}
+/* 속성(영문 key)로 테스트 샘플 JSON 안을 재귀 탐색해 값을 자동으로 채운다 */
+function deepFindKey(obj, key) {
+  if (obj && typeof obj === "object") {
+    if (!Array.isArray(obj) && Object.prototype.hasOwnProperty.call(obj, key)) return obj[key];
+    for (const k of Object.keys(obj)) {
+      const r = deepFindKey(obj[k], key);
+      if (r !== undefined) return r;
+    }
+  }
+  return undefined;
+}
+function findSampleValue(root, key) {
+  const keys = ["testSampleWebPc", "testSampleWebMo", "testSampleAppAos", "testSampleAppIos"];
+  for (const k of keys) {
+    const el = $('[data-k="' + k + '"]', root);
+    const raw = el && el.value.trim();
+    if (!raw) continue;
+    try {
+      const v = deepFindKey(JSON.parse(raw), key);
+      if (v !== undefined) return typeof v === "object" ? JSON.stringify(v) : String(v);
+    } catch (e) {
+      const m = new RegExp('["\']?' + key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + '["\']?\\s*[:=]\\s*("(?:[^"\\\\]|\\\\.)*"|[^,\\n}]+)').exec(raw);
+      if (m) return m[1].trim().replace(/^"(.*)"$/, "$1");
+    }
+  }
+  return undefined;
+}
 function openForm(opt) {
   const vals = Object.assign({}, opt.values);
-  const rows = opt.fields.map(f => {
-    const v = vals[f.k];
-    if (f.type === "select") {
-      const os = Object.entries(f.opts).map(([k, o]) => '<option value="' + k + '"' + (v === k ? " selected" : "") + ">" + esc(typeof o === "string" ? o : o.name) + "</option>").join("");
-      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><select class="field" data-k="' + f.k + '">' + os + "</select></div>";
-    }
-    if (f.type === "swatch") {
-      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="hues" data-hue="' + f.k + '">' +
-        Object.entries(HUE).map(([k, h]) => '<button type="button" class="hue' + (v === k ? " on" : "") + '" data-v="' + k + '" title="' + h.name +
-          '" style="--h:' + h.c + '"></button>').join("") + "</div></div>";
-    }
-    if (f.type === "textarea")
-      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><textarea class="field" data-k="' + f.k + '" placeholder="' + esc(f.ph || "") + '">' + esc(v || "") + "</textarea></div>";
-    if (f.type === "kv") {
-      const items = (v || []).map(kvRow).join("");
-      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="frow" data-kv="' + f.k + '" style="gap:6px">' + items +
-        '</div><button class="btn sm" data-addkv="' + f.k + '" type="button">' + ico("plus", "xs") + "속성 추가</button></div>";
-    }
-    if (f.type === "check")
-      return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
-    if (f.type === "action")
-      return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><button type="button" class="btn sm" data-action="' + f.k + '">' +
-        (f.icon ? ico(f.icon, "xs") : "") + esc(f.actionLabel || f.label) + "</button></div>";
-    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><input class="field' + (f.mono ? " mono" : "") + '" data-k="' + f.k + '" value="' + esc(v || "") + '" placeholder="' + esc(f.ph || "") + '"></div>';
-  }).join("");
+  const rows = opt.fields.map(f => fieldRow(f, vals)).join("");
 
   const root = modalHost();
   root.innerHTML =
@@ -415,8 +477,14 @@ function openForm(opt) {
     $$("[data-k]", root).forEach(el => { out[el.dataset.k] = el.value.trim(); });
     $$("[data-c]", root).forEach(el => { out[el.dataset.c] = el.checked; });
     $$("[data-hue]", root).forEach(box => { const on = $(".hue.on", box); out[box.dataset.hue] = on ? on.dataset.v : "none"; });
+    const multiGroups = {};
+    $$("[data-mc]", root).forEach(el => { (multiGroups[el.dataset.mc] = multiGroups[el.dataset.mc] || []).push(el); });
+    Object.entries(multiGroups).forEach(([k, els]) => { out[k] = els.filter(e => e.checked).map(e => e.value); });
     $$("[data-kv]", root).forEach(box => {
-      out[box.dataset.kv] = $$(".proprow", box).map(r => ({ k: $$("input", r)[0].value.trim(), v: $$("input", r)[1].value.trim() })).filter(p => p.k || p.v);
+      out[box.dataset.kv] = $$(".proprow", box).map(r => ({
+        ko: $('[data-pf="ko"]', r).value.trim(), en: $('[data-pf="en"]', r).value.trim(),
+        type: $('[data-pf="type"]', r).value, sample: $('[data-pf="sample"]', r).value.trim()
+      })).filter(p => p.ko || p.en || p.sample);
     });
     return out;
   };
@@ -429,9 +497,18 @@ function openForm(opt) {
     if (hue) { $$(".hue", hue.parentNode).forEach(h => h.classList.toggle("on", h === hue)); return; }
     if (t.closest("[data-addkv]")) {
       const k = t.closest("[data-addkv]").dataset.addkv;
-      $('[data-kv="' + k + '"]', root).insertAdjacentHTML("beforeend", kvRow({ k: "", v: "" }));
+      $('[data-kv="' + k + '"]', root).insertAdjacentHTML("beforeend", kvRow({ ko: "", en: "", type: "string", sample: "" }));
     }
     if (t.closest("[data-rmkv]")) t.closest(".proprow").remove();
+    const auto = t.closest("[data-autoprop]");
+    if (auto) {
+      const row = auto.closest(".proprow"), en = $('[data-pf="en"]', row).value.trim(), sampleEl = $('[data-pf="sample"]', row);
+      if (!en) { toast("영문 key를 먼저 입력하세요", "bad"); return; }
+      const found = findSampleValue(root, en);
+      if (found === undefined) toast("테스트 샘플에서 '" + en + "' 키를 찾지 못했습니다", "bad");
+      else { sampleEl.value = found; toast("샘플값을 채웠습니다", "ok"); }
+      return;
+    }
     if (t.closest("[data-del]")) { closeModal(); opt.onDelete(); }
     if (t.closest("[data-ok]")) { const d = collect(); closeModal(); opt.onSave(d); }
   });
@@ -439,8 +516,15 @@ function openForm(opt) {
   const first = $(".field", root); if (first) first.focus();
 }
 function kvRow(p) {
-  return '<div class="proprow"><input class="field" value="' + esc(p.k) + '" placeholder="속성 key"><input class="field" value="' + esc(p.v) + '" placeholder="타입 · 예시값">' +
-    '<button class="btn icon sm" data-rmkv type="button">' + ico("close", "xs") + "</button></div>";
+  return '<div class="proprow">' +
+    '<input class="field" data-pf="ko" value="' + esc(p.ko || "") + '" placeholder="속성명(한글)">' +
+    '<input class="field mono" data-pf="en" value="' + esc(p.en || "") + '" placeholder="영문 key">' +
+    '<select class="field" data-pf="type">' + Object.entries(PTYPE).map(([k, name]) =>
+      '<option value="' + k + '"' + ((p.type || "string") === k ? " selected" : "") + ">" + name + "</option>").join("") + "</select>" +
+    '<input class="field mono" data-pf="sample" value="' + esc(p.sample || "") + '" placeholder="샘플값">' +
+    '<button class="btn icon sm" data-autoprop type="button" title="테스트 샘플에서 자동 채우기">' + ico("search", "xs") + "</button>" +
+    '<button class="btn icon sm" data-rmkv type="button" title="삭제">' + ico("close", "xs") + "</button>" +
+  "</div>";
 }
 function confirmDel(msg, fn) {
   const root = modalHost();

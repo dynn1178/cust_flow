@@ -145,7 +145,23 @@ function importJson() {
   inp.click();
 }
 
-/* ---------------- 데이터 정규화 ---------------- */
+/* ---------------- 데이터 정규화 ----------------
+   태그 스키마 개편(2026-08) 이전 문서를 열어도 깨지지 않도록, 예전 필드
+   (event/selector, props의 k/v)를 신규 필드로 옮겨 채운다. */
+function normalizeTag(t) {
+  t = t || {};
+  const out = Object.assign({
+    common: false, screenKo: "", path: "", eventKo: "", eventEn: "", area: "", trigger: "click",
+    channels: [], action: "", props: [], status: "todo", note: "",
+    testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
+  }, t);
+  if (!out.eventEn && t.event) out.eventEn = t.event;
+  if (!out.area && t.selector) out.area = t.selector;
+  out.props = (out.props || []).map(p => (p && (p.en != null || p.ko != null || p.sample != null))
+    ? { ko: p.ko || "", en: p.en || "", type: p.type || "string", sample: p.sample || "" }
+    : { ko: "", en: (p && p.k) || "", type: "string", sample: (p && p.v) || "" });
+  return out;
+}
 function normalizeBoard(b) {
   b = b || {};
   b.id = b.id || uid("b");
@@ -155,6 +171,7 @@ function normalizeBoard(b) {
     kind: "page", path: "", note: "", shot: null, shotData: null, thumb: null,
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
   }, n));
+  b.nodes.forEach(n => { n.tags = (n.tags || []).map(normalizeTag); });
   b.edges = (b.edges || []).map(e => Object.assign({
     label: "", style: "solid", kind: "arrow", route: "curve", hue: "none", width: 2, head: "m", a1: "auto", a2: "auto", points: []
   }, e));
