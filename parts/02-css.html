@@ -102,11 +102,15 @@ table.tbl th{position:sticky; top:0; z-index:2; text-align:left; padding:9px 12p
 table.tbl td{padding:9px 12px; border-bottom:1px solid var(--stroke-2); vertical-align:top; overflow-wrap:anywhere}
 table.tbl tr:hover td{background:var(--glass-2)}
 table.tbl td.nowrap{white-space:nowrap}
-/* 태그 목록: 칸마다 균등하게 나누지 않고, 왼쪽부터 각자 필요한 만큼만 너비를 쓰고
-   나머지(주로 마지막 "속성 · 테스트샘플" 칸)에 남는 공간이 몰리도록 auto 레이아웃을 쓴다 */
+/* 태그 목록: 칸마다 균등하게 나누지 않고, 왼쪽 칸들은 내용에 필요한 만큼의 상한선(max-width)까지만
+   차지하게 하고(td1Cap/td2Cap), 너비를 지정하지 않은 "속성 · 테스트샘플" 칸이 남는 공간을 전부 흡수한다.
+   width:1%는 긴 값 하나가 있으면 그 단어 하나 너비까지 줄여버려 너무 좁아지므로 쓰지 않는다. */
 #tagTable{table-layout:auto}
 #tagTable th{white-space:normal; line-height:1.3}
 #tagTable th:last-child,#tagTable td:last-child{width:34px}
+.td1cap{max-width:190px}
+.td2cap{max-width:260px}
+.tdsplit{margin-top:6px; padding-top:6px; border-top:1px dashed var(--stroke-2)}
 .tagname-link{cursor:pointer; border-radius:6px; margin:-3px -5px; padding:3px 5px; transition:background .12s}
 .tagname-link:hover{background:var(--glass-2)}
 .tagname-link:hover .evt{text-decoration:underline}

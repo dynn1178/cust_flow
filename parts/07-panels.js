@@ -573,23 +573,24 @@ function renderTagView(force) {
      '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.t.status === "todo").length + '</span><span class="t">작업 예정</span></div>'].join("");
 
   $("#tagTable").innerHTML =
-    "<thead><tr><th>위치 · 플랫폼 · 상태</th><th>태그명 · 트리거</th><th>이벤트 · 영역 · 채널</th><th>속성 · 테스트샘플</th><th></th></tr></thead><tbody>" +
+    "<thead><tr><th>위치 · 플랫폼 · 상태</th><th>태그명 · 트리거 · 이벤트</th><th>속성 · 테스트샘플</th><th></th></tr></thead><tbody>" +
     (rows.length ? rows.map(({ t, n, b }) =>
       '<tr data-tid="' + t.id + '">' +
         /* 보드·페이지·플랫폼·개발상태를 한 칸에 모아 태그의 "신원"을 보여준다 */
-        '<td><div class="meta stack">' +
+        '<td><div class="meta stack td1cap">' +
           "<span>보드 <b>" + esc(b.name) + "</b></span>" +
           "<span>페이지 <b>" + esc(n.name) + "</b>" + (n.path ? ' <span class="mono" style="font-size:10.5px">(' + esc(n.path) + ")</span>" : "") + "</span>" +
-          '<span class="rowseg">' + platChips(platformsOf(t)) + "</span>" +
-          '<span><span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span></span>" +
+          '<span>플랫폼 <span class="rowseg">' + platChips(platformsOf(t)) + "</span></span>" +
+          '<span>상태 <span class="chip" style="--c:' + TSTATUS_C[t.status] + '">' + TSTATUS[t.status] + "</span></span>" +
         "</div></td>" +
         /* 동작(태그명)+트리거가 이 태그를 대표하는 제목 역할 — 여기를 눌러야만 여정 지도로 이동한다.
-           테스트 샘플 펼치기 등 다른 클릭까지 이동시키지 않기 위해 이동은 이 칸에만 건다. */
-        "<td>" + '<div class="tagname-link" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" title="여정 지도에서 보기">' +
+           테스트 샘플 펼치기 등 다른 클릭까지 이동시키지 않기 위해 이동은 이 칸에만 건다.
+           이벤트·영역·채널은 공간을 아끼려고 같은 칸 안에 줄바꿈(구분선)만 두고 이어 붙인다. */
+        "<td>" + '<div class="tagname-link td2cap" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '" title="여정 지도에서 보기">' +
           '<div style="font-weight:600">' + esc(t.action || "(태그명 없음)") + "</div>" +
           '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
-        "</div></td>" +
-        '<td><div class="meta stack">' +
+        "</div>" +
+        '<div class="meta stack tdsplit td2cap">' +
           "<span>" + (t.eventKo ? '<b style="color:var(--ink)">' + esc(t.eventKo) + "</b> " : "") + '<span class="evt">' + esc(tagEventEn(t)) + "</span></span>" +
           (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
           (t.channels && t.channels.length ? '<span class="rowseg">' + tchanChips(t.channels) + "</span>" : "") +
@@ -598,7 +599,7 @@ function renderTagView(force) {
         "<td>" + (propLines(displayProps(t)) || "—") + sampleChannelsBlock(t) + "</td>" +
         '<td><div class="rowacts edit-only"><button class="btn icon sm" data-trow-edit="' + t.id + '" data-node="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("edit", "xs") + "</button></div></td>" +
       "</tr>").join("")
-      : '<tr><td colspan="5"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
+      : '<tr><td colspan="4"><div class="empty">' + ico("search") + "<div>조건에 맞는 태그가 없습니다</div></div></td></tr>") +
     "</tbody>";
   updateSampleToggleBtn(rows);
 }
