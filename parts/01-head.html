@@ -148,7 +148,7 @@ select.field{cursor:pointer}
 .savechip .dot{--c:var(--ok)}
 .savechip[data-state="dirty"] .dot{--c:var(--warn)}
 .savechip[data-state="off"] .dot{--c:var(--ink-3)}
-.view{display:none; flex:1; min-height:0}
+.view{display:none; flex:1; min-height:0; position:relative}   /* 확장한 패널이 이 상자를 기준으로 세로 전체를 채운다 */
 .view.on{display:flex; flex-direction:column; gap:8px}
 
 /* 보드 드롭다운 · 공용 메뉴 */
@@ -165,9 +165,6 @@ select.field{cursor:pointer}
 
 /* ============ flow canvas ============ */
 .flow{position:relative; border-radius:var(--r-lg); overflow:hidden; flex:none; min-height:130px}
-/* 패널 확장 중 — 지도가 얇아지므로 미니맵은 접어두고 도구 막대만 남긴다 */
-.flow.mini{min-height:0}
-.flow.mini .minimap{display:none}
 .flow-grid{position:absolute; inset:0;
   background-image:radial-gradient(circle at 1px 1px,var(--grid) 1px,transparent 0);
   background-size:22px 22px; pointer-events:none}

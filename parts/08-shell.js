@@ -7,10 +7,24 @@ function applySizes() {
   u.flowH = clamp(u.flowH, 130, Math.max(180, innerHeight - 260));
   u.leftW = clamp(u.leftW, 190, 520);
   u.rightW = clamp(u.rightW, 190, 560);
-  /* 패널을 확장한 동안에는 여정 지도를 최소 높이로 줄여, 아래 패널이 그만큼 위로 넓어지게 한다 */
-  $("#flowPane").style.height = (paneExpandOn() ? Math.min(EXP_FLOW_H, u.flowH) : u.flowH) + "px";
+  $("#flowPane").style.height = u.flowH + "px";
   $("#paneLeft").style.width = u.leftW + "px";
   $("#paneRight").style.width = u.rightW + "px";
+
+  /* 확장한 패널은 화면 옆면을 세로로 통째로 쓴다(CSS에서 position:absolute).
+     나머지는 그대로 두고, 그 패널이 차지한 폭(+경계선 9px)만큼 여정 지도·가로
+     경계선·아래 덱에 여백만 준다 — 무엇도 숨기지 않는다.
+     좁은 화면(860px 이하)에선 영역이 아래위로 쌓이므로 확장 배치를 쓰지 않는다 */
+  const side = innerWidth > 860 ? paneExpand : "";
+  const off = side === "left" ? u.leftW + SPLIT_W : side === "right" ? u.rightW + SPLIT_W : 0;
+  const px = v => (v ? v + "px" : "");
+  [$("#flowPane"), $("#splitH"), $("#deck")].forEach((el, i) => {
+    const prop = i === 2 ? "padding" : "margin";
+    el.style[prop + "Left"] = px(side === "left" ? off : 0);
+    el.style[prop + "Right"] = px(side === "right" ? off : 0);
+  });
+  $("#splitL").style.left = px(side === "left" ? u.leftW : 0);
+  $("#splitR").style.right = px(side === "right" ? u.rightW : 0);
 }
 function initSplitters() {
   const drag = (el, onMove) => {
@@ -34,21 +48,19 @@ function initSplitters() {
   addEventListener("resize", () => { applySizes(); if (!stageZoom) renderStage(); });
 }
 
-/* 영역 확장/축소 — 한쪽 패널이 아래 영역 전체(가로 끝에서 끝)를 혼자 차지하고,
-   위쪽 여정 지도는 최소 높이로 줄어든다. 즉 경계선을 끄는 것과 달리 판 자체가 바뀐다.
-   지도를 아주 숨기지는 않는다 — 확장한 채로도 페이지를 골라 옮겨다녀야 하니까.
-   좌·우 중 하나만 확장할 수 있다(둘 다 전체 폭을 쓸 수는 없으므로).
+/* 영역 확장/축소 — 그 패널이 화면 옆면을 세로로 통째로 차지한다. 여정 지도 옆까지
+   올라가므로 경계선을 끄는 것과 달리 판 자체가 바뀌지만, 지도·스테이지·반대편
+   패널 어느 것도 사라지지 않는다(그만큼 좁아질 뿐).
+   좌·우 중 하나만 확장한다 — 둘 다 세로 한 칸씩 가져가면 가운데가 눌린다.
    개인 화면 설정이라 문서가 아닌 이 브라우저에만 남긴다 */
 const PANE_EXP_KEY = "jta:paneExpand";
-const EXP_FLOW_H = 140;
+const SPLIT_W = 9;               /* .splitter-v 폭 — 확장한 패널과 나머지 사이 간격 */
 let paneExpand = "";
 function paneExpandOn() { return paneExpand === "left" || paneExpand === "right"; }
 function applyPaneExpand() {
   const on = paneExpandOn();
-  if (on) $("#deck").setAttribute("data-expand", paneExpand);
-  else $("#deck").removeAttribute("data-expand");
-  $("#flowPane").classList.toggle("mini", on);
-  $("#splitH").style.display = on ? "none" : "";
+  if (on) $("#view-map").setAttribute("data-expand", paneExpand);
+  else $("#view-map").removeAttribute("data-expand");
   $("#expLeftLabel").textContent = paneExpand === "left" ? "축소" : "확장";
   $("#expRightLabel").textContent = paneExpand === "right" ? "축소" : "확장";
   $("#btnExpLeft").classList.toggle("on", paneExpand === "left");
