@@ -1,6 +1,6 @@
 
 /* ========================================================================
-   저장 위치 — Artifact 공유본 · 서버(Supabase) · JSON 파일
+   저장 위치 — 서버(Supabase) · JSON 파일
    이미지 호스팅(Cloudinary)을 연결하면 화면 이미지·이미지 레이어를
    Cloudinary에 올리고 JSON에는 URL만 남긴다. 이미 등록된 이미지도
    "일괄 URL 변환"으로 나중에 한꺼번에 바꿀 수 있다.
@@ -38,7 +38,7 @@ async function cloudUpload(blob, opts) {
   try {
     res = await fetch("https://api.cloudinary.com/v1_1/" + cfg.cloudName + "/image/upload", { method: "POST", body: fd });
   } catch (err) {
-    throw new Error("Cloudinary에 접속하지 못했습니다. (Artifact 화면 안에서는 외부 업로드가 차단됩니다)");
+    throw new Error("Cloudinary에 접속하지 못했습니다.");
   }
   const j = await res.json().catch(() => null);
   if (!res.ok) throw new Error((j && j.error && j.error.message) || ("업로드 실패 " + res.status));
@@ -86,7 +86,7 @@ function openCloudModal() {
       "Signing Mode를 <b>Unsigned</b>로 만든 프리셋 이름을 적으세요. API Key·Secret은 필요 없습니다 " +
       "(브라우저 코드에 넣으면 노출되므로 쓰지 않습니다).<br>" +
       "업로드 시 <span class=\"mono\">crm/연도-월/보드이름</span> 폴더에 담기고, 페이지 이름이 태그로 붙습니다.<br>" +
-      "이 설정은 이 문서에 같이 저장되므로, <b>공유 저장/서버 저장을 한 번 눌러야</b> 다른 사람이 열었을 때도 그대로 적용됩니다.",
+      "이 설정은 이 문서에 같이 저장되므로, <b>서버 저장을 한 번 눌러야</b> 다른 사람이 열었을 때도 그대로 적용됩니다.",
     fields: [
       { k: "cloudName", label: "Cloud name", mono: true, ph: "pspfcgbn" },
       { k: "preset", label: "Upload preset (Unsigned)", mono: true, ph: "예: jta-unsigned" }
@@ -168,7 +168,6 @@ async function convertAllImagesToUrl() {
 function updateStorageUI() {
   const b = $("#btnShare");
   if (supaOn()) { b.style.display = ""; b.lastChild.textContent = "서버 저장"; }
-  else if (saveAvail) { b.style.display = ""; b.lastChild.textContent = "공유 저장"; }
   else b.style.display = "none";
   $("#btnStorage").classList.toggle("on", supaOn());
 }
@@ -176,7 +175,7 @@ function openStorageModal() {
   const supa = supaOn();
   const where = supa
     ? "<b>서버(Supabase)</b>에 저장 중 — 구글 로그인한 사람만 열람, 서버관리자·운영자만 편집"
-    : (saveAvail ? "이 <b>Artifact 링크</b>에 저장 중 — 링크를 받은 사람이 같은 보드를 봅니다" : "저장 위치가 없습니다 (브라우저에만 임시 보관)");
+    : "저장 위치가 없습니다 (브라우저에만 임시 보관) — 배포한 주소에서 열어야 서버에 저장됩니다";
   const unhosted = unhostedTargets().length;
   const rows =
     '<div class="frow"><span class="lbl">현재 저장 위치</span><div class="meta" style="font-size:12.5px">' + where + "</div></div>" +
@@ -196,7 +195,7 @@ function openStorageModal() {
     '<div class="frow"><span class="lbl">이미지 호스팅 (Cloudinary)</span><div style="display:flex; gap:6px; flex-wrap:wrap">' +
       '<button class="btn sm" data-act="host">' + ico("up", "xs") + (cloudCfg() ? "설정됨 — " + esc(cloudCfg().cloudName) : "Cloudinary 연결") + "</button>" +
       '<button class="btn sm" data-act="urlize">' + ico("loop", "xs") + "일괄 URL 변환</button></div>" +
-      '<p class="hint">화면 이미지·이미지 레이어를 Cloudinary에 올리고 JSON에는 URL만 남깁니다. 연결해 두면 서버 저장 때도 자동으로 적용됩니다. 지금 URL이 아닌 이미지 <b>' + unhosted + "개</b>. Artifact 화면 안에서는 차단되며, 내려받은 파일이나 자체 호스팅에서만 동작합니다.</p></div>";
+      '<p class="hint">화면 이미지·이미지 레이어를 Cloudinary에 올리고 JSON에는 URL만 남깁니다. 연결해 두면 서버 저장 때도 자동으로 적용됩니다. 지금 URL이 아닌 이미지 <b>' + unhosted + "개</b>.</p></div>";
 
   const root = modalHost();
   root.innerHTML =

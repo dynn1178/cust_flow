@@ -3,8 +3,8 @@
    구글 로그인 · 회원 권한 (Supabase)
    - SDK 없이 REST/Auth 엔드포인트만 fetch 로 호출한다 (단일 HTML 유지)
    - 권한은 서버(RLS)에서 강제된다. 아래 UI 숨김은 편의일 뿐 방어선이 아니다.
-   - 배포한 사이트에서만 동작한다. claude.ai Artifact 안에서는 외부 도메인
-     접근이 차단되므로 로그인 버튼이 나타나지 않는다.
+   - 배포한 사이트(Vercel)에서만 동작한다. 로컬 파일로 직접 열면 OAuth
+     리디렉션이 불가능하므로 로그인 버튼이 나타나지 않는다.
    ======================================================================== */
 /* 배포 기본값 — 방문자가 아무것도 설정하지 않아도 바로 구글 로그인이 뜬다.
    anon key 는 공개용 키다(모든 Supabase 웹앱이 브라우저에 노출하는 값).
@@ -32,9 +32,7 @@ function supaCfg() {
   try { saved = JSON.parse(localStorage.getItem(SUPA_KEY) || "null"); } catch (e) {}
   return Object.assign({}, SUPA_DEFAULT, saved || {});
 }
-function inArtifact() { return !!(window.claude && window.claude.use); }   // claude.ai 미리보기
 function supaOn() {
-  if (inArtifact()) return false;                    // 미리보기: 외부 도메인 접속 차단
   if (location.protocol === "file:") return false;   // 로컬 파일: OAuth 리디렉션 불가
   const c = supaCfg();
   return !!(c.url && c.anon);
@@ -316,9 +314,7 @@ function applyRoleUI() {
     label.textContent = "구글로 로그인";
     btn.classList.remove("on");
     $("use", btn).setAttribute("href", "#i-lock");
-    btn.title = inArtifact()
-      ? "이 미리보기 화면에서는 구글 로그인이 차단됩니다 — 배포한 주소에서 로그인하세요"
-      : "구글 로그인을 쓰려면 Supabase 프로젝트를 연결하세요";
+    btn.title = "구글 로그인은 배포한 주소에서만 됩니다 (로컬 파일에서는 불가)";
     return;
   }
   $("use", btn).setAttribute("href", me ? "#i-check" : "#i-lock");
@@ -333,9 +329,6 @@ function applyRoleUI() {
   }
 }
 function openAuthMenu() {
-  if (inArtifact()) {
-    return toast("이 미리보기 화면에서는 구글 로그인이 차단됩니다. 배포한 주소에서 로그인하세요.", "bad");
-  }
   if (!supaOn()) return openServerModal();       // 연결 정보가 비어 있을 때만 설정 화면
   if (!me) return signIn();                      // 설정 화면 없이 바로 구글 로그인
   openMenu(
@@ -356,7 +349,7 @@ function openServerModal() {
     note: "Supabase 프로젝트의 <b>Project URL</b>과 <b>anon public key</b>를 넣으면 구글 로그인·회원 권한·서버 저장이 켜집니다. " +
       "anon key는 공개되어도 되는 값이고, 실제 권한은 서버의 RLS 정책이 판단합니다.<br>" +
       "먼저 <span class=\"mono\">supabase/schema.sql</span>을 SQL Editor에서 한 번 실행하고, Authentication → Providers에서 Google을 켜 주세요. " +
-      "이 설정은 배포된 사이트에서만 동작합니다(Artifact 화면 안에서는 외부 접속이 차단됩니다).",
+      "이 설정은 배포된 사이트(Vercel)에서만 동작합니다.",
     fields: [
       { k: "url", label: "Project URL", mono: true, ph: "https://xxxx.supabase.co" },
       { k: "anon", label: "anon public key", mono: true, ph: "eyJhbGciOi..." },

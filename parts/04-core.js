@@ -195,7 +195,7 @@ const STAGE_FIT = {
 let layerTool = "select";
 let drawColor = SWATCH[0];
 let drawStroke = 3;
-let dirty = false, saveAvail = false;
+let dirty = false;
 let savedRefs = [];              // 마지막 저장 시점에 쓰이던 이미지 파일 목록
 const DRAFT_KEY = "draft:" + location.pathname;
 
@@ -321,51 +321,6 @@ function buildSnapshot() {
     }
   };
 }
-function snapshotBytes(s) {
-  return JSON.stringify(s.data).length + s.uploads.reduce((a, u) => a + u.blob.size, 0);
-}
-
-async function shareSave() {
-  const api = await claudeApi();
-  if (!api) { toast("이 화면에서는 공유 저장을 쓸 수 없습니다. JSON 내보내기를 사용하세요.", "bad"); return; }
-  const btn = $("#btnShare"); btn.disabled = true;
-  setSaveChip("dirty", "저장 중…");
-  const snap = buildSnapshot();
-  try {
-    await hostUploadAll(snap);                  // 이미지 호스팅을 쓰면 URL로 대체
-    const files = { "data/journey.json": JSON.stringify(snap.data) };
-    snap.uploads.forEach(u => { files["data/" + u.ref] = u.blob; });
-    snap.removals.forEach(r => { files["data/" + r] = null; });
-    await api.publish(files);
-    snap.commit();
-    dirty = false;
-    setSaveChip("ok", "공유 저장됨 · " + timeAgo(state.updatedAt));
-    saveDraft();
-    toast("저장했습니다" + (snap.uploads.length ? " · 이미지 " + snap.uploads.length + "개 업로드" : "") + ". 링크를 받은 사람은 같은 내용을 봅니다.", "ok");
-  } catch (err) {
-    const code = err && err.code;
-    if (code === "conflict") {
-      setSaveChip("dirty", "저장 안 됨");
-      toast("다른 사람이 먼저 저장했습니다. 새로고침해 최신본을 받은 뒤 다시 저장하세요.", "bad");
-    } else if (code === "not_writer" || code === "not_granted" || code === "capability_disabled") {
-      saveAvail = false; $("#btnShare").style.display = "none";
-      setSaveChip("off", "읽기 전용");
-      toast("이 뷰는 읽기 전용입니다. JSON 내보내기로 사본을 만들 수 있습니다.", "bad");
-    } else if (code === "too_large") {
-      toast("전체 용량이 한도를 넘었습니다(" + Math.round(snapshotBytes(snap) / 1048576 * 10) / 10 + "MB). 화면 이미지 일부를 삭제하세요.", "bad");
-      setSaveChip("dirty", "저장 안 됨");
-    } else {
-      toast("저장에 실패했습니다: " + (err && err.message ? err.message : code || "알 수 없는 오류"), "bad");
-      setSaveChip("dirty", "저장 안 됨");
-    }
-  } finally { btn.disabled = false; }
-}
-async function claudeApi() {
-  try {
-    if (!window.claude || !window.claude.use) return null;
-    return await window.claude.use("artifact");
-  } catch (e) { return null; }
-}
 function timeAgo(ts) {
   if (!ts) return "방금";
   const d = Math.floor((Date.now() - ts) / 1000);
@@ -376,10 +331,6 @@ function timeAgo(ts) {
 }
 async function saveFile(filename, text, mime) {
   try {
-    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
-    if (dl) { await dl.save({ filename, data: text }); toast(filename + " 저장 완료", "ok"); return; }
-  } catch (e) { /* 아래 폴백 */ }
-  try {                                      // 일반 브라우저(배포본·로컬 파일)에서는 표준 다운로드가 항상 된다
     const blob = new Blob([text], { type: (mime || "application/octet-stream") + ";charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -388,7 +339,7 @@ async function saveFile(filename, text, mime) {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     toast(filename + " 저장 완료", "ok");
     return;
-  } catch (e) { /* Artifact 프리뷰처럼 다운로드 자체가 막힌 화면에서만 여기로 온다 */ }
+  } catch (e) { /* 브라우저가 다운로드를 막은 드문 경우에만 아래 클립보드 폴백으로 온다 */ }
   try { await navigator.clipboard.writeText(text); toast("다운로드가 막혀 있어 클립보드에 복사했습니다.", "ok"); }
   catch (e) { toast("파일을 내보낼 수 없습니다.", "bad"); }
 }
@@ -429,6 +380,8 @@ function fieldRow(f, vals) {
     return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="linklist" data-links="' + f.k + '">' + items +
       '</div><button class="btn sm" data-addlink="' + f.k + '" type="button">' + ico("plus", "xs") + "링크 추가</button></div>";
   }
+  if (f.type === "readonly")
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="ro' + (f.mono ? " mono" : "") + '">' + esc(v || "-") + "</div></div>";
   if (f.type === "check")
     return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
   if (f.type === "action")
@@ -603,8 +556,8 @@ function linkRow(l) {
   "</div>";
 }
 /* http(s) 접두어 없이 입력해도 새 탭에서 열리게 보정한다.
-   window.open()은 Artifact 프리뷰처럼 샌드박스가 걸린 화면에서 조용히 막히는 경우가 있어,
-   실제 <a target="_blank"> 클릭을 흉내 내는 방식을 우선 쓰고 실패하면 window.open으로 폴백한다. */
+   window.open()이 팝업 차단에 막히는 경우가 있어, 실제 <a target="_blank"> 클릭을
+   흉내 내는 방식을 우선 쓰고 실패하면 window.open으로 폴백한다. */
 function openUrl(url) {
   const u = String(url || "").trim();
   if (!u) return;

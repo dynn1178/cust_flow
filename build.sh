@@ -1,16 +1,13 @@
 #!/bin/sh
-# parts/ 조각을 이어 붙여 두 가지 산출물을 만든다.
-#   journey-atlas.html : claude.ai Artifact 배포용 (플랫폼이 doctype/head/body를 감싼다)
-#   index.html         : 웹 서버 배포용 (온전한 HTML 문서 — charset·doctype 포함)
+# parts/ 조각을 이어 붙여 배포 산출물 index.html 을 만든다.
+# 배포는 Vercel 한 곳으로만 한다 (claude.ai Artifact 배포는 쓰지 않는다).
 set -e
 cd "$(dirname "$0")"
 
 HEAD="parts/01-head.html parts/02-css.html"
 BODY="parts/03-markup.html parts/04-core.js parts/05-flow.js parts/06-stage.js \
 parts/07-panels.js parts/09-storage.js parts/10-import.js parts/11-lock.js \
-parts/12-boards.js parts/14-extras.js parts/13-auth.js parts/08-shell.js"
-
-cat $HEAD $BODY > journey-atlas.html
+parts/12-boards.js parts/14-extras.js parts/15-sheets.js parts/16-perf.js parts/13-auth.js parts/08-shell.js"
 
 {
   printf '%s\n' '<!doctype html>'
@@ -30,5 +27,4 @@ cat $HEAD $BODY > journey-atlas.html
 } > index.html
 
 echo "built:"
-echo "  journey-atlas.html  $(wc -c < journey-atlas.html) bytes  (Artifact용)"
-echo "  index.html          $(wc -c < index.html) bytes  (웹 배포용)"
+echo "  index.html  $(wc -c < index.html) bytes  (Vercel 배포용)"

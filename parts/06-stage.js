@@ -97,8 +97,8 @@ function layerMarkup(l, n, idx) {
 
   let pin = "";
   if (l.campId) {
-    const b = bbox(l), found = n.camps.find(x => x.id === l.campId);
-    const col = found ? CHAN[found.chan].c : "var(--camp)";
+    const b = bbox(l), found = campView(n.camps.find(x => x.id === l.campId));
+    const col = found && CHAN[found.chan] ? CHAN[found.chan].c : "var(--camp)";
     pin = '<g class="pin" data-pin="' + l.campId + '" transform="translate(' + b.x + "," + b.y + ')">' +
       '<circle r="11" fill="' + col + '"/><text>' + (idx + 1) + "</text></g>";
   }
@@ -172,9 +172,9 @@ function renderStageFoot(n, L) {
   let html = '<span class="mono" style="font-size:11px">' + d.w + " × " + d.h + "</span>";
   html += '<span class="tool-sep"></span><span>레이어 ' + (n.layers || []).length + "개</span>";
   if (L) {
-    const camp = L.campId ? n.camps.find(c => c.id === L.campId) : null;
+    const camp = L.campId ? campView(n.camps.find(c => c.id === L.campId)) : null;
     html += '<span class="tool-sep"></span><span style="color:var(--ink-2)">선택: ' + LKIND(L) + "</span>";
-    if (camp) html += '<span class="chip" style="--c:' + CHAN[camp.chan].c + '">' + ico("mega", "xs") + esc(camp.name) + "</span>";
+    if (camp) html += '<span class="chip" style="--c:' + (CHAN[camp.chan] || CHAN.push).c + '">' + ico("mega", "xs") + esc(camp.name) + "</span>";
     html += '<div class="spacer"></div>' +
       (L.kind === "text" ? '<button class="btn sm" data-lact="edittext">' + ico("edit", "xs") + "텍스트 수정</button>" : "") +
       '<button class="btn sm" data-lact="front">앞으로</button><button class="btn sm" data-lact="back">뒤로</button>' +

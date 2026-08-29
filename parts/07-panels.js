@@ -2,8 +2,8 @@
 /* ========================================================================
    좌: CRM 캠페인 · 우: 태깅 설정 · 목록 뷰(모든 보드 통합)
    ======================================================================== */
-const viewStale = { tags: true, camps: true };
-function invalidateViews() { viewStale.tags = true; viewStale.camps = true; }
+const viewStale = { tags: true, camps: true, perf: true };
+function invalidateViews() { viewStale.tags = true; viewStale.camps = true; viewStale.perf = true; }
 
 function platChip(p) { return '<span class="chip" style="--c:' + PLAT[p].c + '">' + ico(PLAT[p].ico, "xs") + PLAT[p].name + "</span>"; }
 /* 태그는 이제 플랫폼을 여러 개 체크할 수 있다. 예전 문서(단일 t.platform)도
@@ -231,49 +231,6 @@ function openTagBulkModal(file) {
     });
   });
 }
-function campCsvTemplate() {
-  const head = ["보드", "페이지", "캠페인명", "채널", "대분류", "소분류", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
-  const example = [B().name, (B().nodes[0] || {}).name || "홈", "장바구니 이탈 리마인드", "앱 푸시", "리텐션", "장바구니 이탈",
-    "Cart Updated 후 4시간 미결제", "4시간 지연 발송", "운영중", "BRZ-PUSH-2871", "/cart", "1일 1회 · 야간 발송 제외"];
-  saveFile("campaign-upload-template.csv", "﻿" + [csvLine(head), csvLine(example)].join("\r\n"), "text/csv");
-}
-function openCampBulkModal(file) {
-  readTextFile(file, text => {
-    const rows = parseCsv(text);
-    const data = rows.slice(1);
-    if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
-    const parsed = data.map(r => {
-      const [boardName, pageName, name, chanLabel, cat1, cat2, segment, timing, statusLabel, extId, landing, note] = r;
-      return {
-        boardName: boardName || "", pageName: (pageName || "새 페이지").trim(),
-        camp: {
-          name: name || "이름 없는 캠페인", chan: keyByLabel(CHAN, chanLabel, "push"), cat1: cat1 || "", cat2: cat2 || "",
-          segment: segment || "", timing: timing || "", status: keyByLabel(CSTATUS, statusLabel, "draft"),
-          extId: extId || "", landing: landing || "", note: note || ""
-        }
-      };
-    });
-    let newPages = 0;
-    const seen = new Set();
-    parsed.forEach(p => {
-      const b = resolveBoard(p.boardName), key = b.id + "::" + p.pageName;
-      if (!b.nodes.some(n => n.name === p.pageName) && !seen.has(key)) { newPages++; seen.add(key); }
-    });
-    bulkPreviewModal({
-      title: "캠페인 일괄 업로드", rows: parsed.map(p => esc(p.pageName) + "<em>" + esc((CHAN[p.camp.chan] || CHAN.push).name) + " · " + esc(p.camp.name) + "</em>"),
-      newPages,
-      onRun: () => {
-        parsed.forEach(p => {
-          const b = resolveBoard(p.boardName), node = resolveNode(b, p.pageName, "");
-          node.camps.push(Object.assign({ id: uid("c") }, p.camp));
-        });
-        markDirty(); renderFlow(); renderPanels(); renderCampView(true);
-        toast(parsed.length + "개 캠페인을 등록했습니다" + (newPages ? " · 새 페이지 " + newPages + "개" : ""), "ok");
-      }
-    });
-  });
-}
-
 /* ---------------- 우측: 태깅 ---------------- */
 function renderTagPanel() {
   const n = curNode(), box = $("#tagList");
@@ -346,33 +303,46 @@ function jumpToTag(tagId) {
   });
 }
 
-/* ---------------- 좌측: 캠페인 ---------------- */
+/* ---------------- 좌측: 캠페인 ----------------
+   목록의 원본은 구글 시트다. 문서에는 "이 페이지에 이 캠페인코드를 붙였다"만 남고,
+   이름·채널·상태 같은 표시 내용은 매번 시트에서 채워 넣는다(campView). */
+function campActs(c) {
+  const del = '<button class="btn icon sm" data-camp-del="' + c.id + '" title="이 페이지에서 떼기">' + ico("close", "xs") + "</button>";
+  const edit = c.code && !c.missing
+    ? '<button class="btn icon sm staff-only" data-sheet-edit="' + esc(c.code) + '" title="구글 시트에서 수정">' + ico("edit", "xs") + "</button>"
+    : (c.code ? "" : '<button class="btn icon sm" data-camp-edit="' + c.id + '" title="수정">' + ico("edit", "xs") + "</button>");
+  return '<div class="card-acts edit-only">' + edit + del + "</div>";
+}
 function renderCampPanel() {
   const n = curNode(), box = $("#campList");
   $("#campCount").textContent = n ? n.camps.length : 0;
   if (!n) { box.innerHTML = '<div class="empty">' + ico("mega") + "<div>페이지를 선택하세요</div></div>"; return; }
   const L = (n.layers || []).find(x => x.id === sel.layer);
-  box.innerHTML = (n.camps.length ? n.camps.map(c => {
+  const list = campViews(n);
+  box.innerHTML = (list.length ? list.map(c => {
     const linked = (n.layers || []).filter(l => l.campId === c.id);
     return '<div class="card' + (L && L.campId === c.id ? " pinned" : "") + '" data-camp="' + c.id + '">' +
-      '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div>' + acts("camp", c.id) + "</div>" +
+      '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div>' + campActs(c) + "</div>" +
       '<div class="card-title">' + esc(c.name) + "</div>" +
+      (c.code ? '<div class="kv"><span>' + esc(c.code) + "</span></div>" : "") +
+      (typeof perfBadge === "function" ? perfBadge(c.code) : "") +
       '<div class="meta"><span><span class="dot" style="--c:' + CSTATUS_C[c.status] + '"></span> ' + CSTATUS[c.status] + "</span>" +
-        (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
-        (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
-      (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
+        (c.segment ? "<span>트리거 <b>" + esc(c.segment) + "</b></span>" : "") +
+        (c.timing ? "<span>전환 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
+      (c.landing ? '<div class="kv"><span>' + esc(c.landing) + "</span></div>" : "") +
       campLinkButtons(c) +
       (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
+      (c.missing ? '<div class="hint" style="color:var(--warn)">시트에서 삭제된 캠페인입니다. 떼어 내세요.</div>' : "") +
       (linked.length ? '<div class="linkline">' + ico("pin", "xs") + "화면 레이어 " + linked.length + "곳에 배치됨</div>" : "") +
       (L && canEdit() ? '<button class="btn sm edit-only" data-link="' + c.id + '" style="align-self:flex-start">' +
         ico(L.campId === c.id ? "check" : "pin", "xs") + (L.campId === c.id ? "연결됨 · 해제" : "선택한 레이어에 연결") + "</button>" : "") +
     "</div>";
   }).join("") : '<div class="empty">' + ico("mega") + "<div>이 화면에 붙는 CRM 캠페인이 없습니다" +
-    (canEdit() ? "<br>추가 버튼으로 등록하세요" : "") + "</div></div>");
+    (canEdit() ? "<br><b>붙이기</b>로 구글 시트 목록에서 고르세요" : "") + "</div></div>");
 
   const foot = $("#layerLinkFoot");
   if (L) {
-    const c = L.campId ? n.camps.find(x => x.id === L.campId) : null;
+    const c = list.find(x => x.id === L.campId);
     foot.style.display = "";
     foot.innerHTML = '<div class="frow"><span class="lbl">선택한 레이어</span>' +
       '<div class="meta">' + LKIND(L) + (c ? " → <b>" + esc(c.name) + "</b>" : " → 연결된 캠페인 없음") + "</div></div>";
@@ -477,7 +447,7 @@ function editCamp(id) {
 }
 function initPanels() {
   $("#btnAddTag").addEventListener("click", () => editTag(null));
-  $("#btnAddCamp").addEventListener("click", () => editCamp(null));
+  $("#btnAddCamp").addEventListener("click", () => openCampPicker());
   $("#btnToggleAllTags").addEventListener("click", () => {
     const n = curNode(); if (!n || !n.tags.length) return;
     const allExpanded = n.tags.every(t => expandedTags.has(t.id));
@@ -508,10 +478,14 @@ function initPanels() {
     if (go) return openUrl(go.dataset.gotoUrl);
     if (ed) return editCamp(ed.dataset.campEdit);
     if (dl && canEdit()) {
-      const n = curNode(), c = n.camps.find(x => x.id === dl.dataset.campDel);
-      return confirmDel("캠페인 " + c.name + " 을 삭제할까요?", () => {
-        n.camps = n.camps.filter(x => x.id !== c.id);
-        (n.layers || []).forEach(l => { if (l.campId === c.id) l.campId = null; });
+      /* 시트의 캠페인 자체를 지우는 것이 아니라, 이 페이지에서 떼어 내기만 한다.
+         캠페인 삭제는 앱에서 할 수 없다 — 그만 쓰는 캠페인은 시트에서 상태를 '중단'으로 바꾼다. */
+      const n = curNode(), raw = n.camps.find(x => x.id === dl.dataset.campDel);
+      if (!raw) return;
+      const c = campView(raw);
+      return confirmDel("캠페인 " + c.name + " 을(를) 이 페이지에서 뗄까요?\n캠페인 자체는 구글 시트에 그대로 남습니다.", () => {
+        n.camps = n.camps.filter(x => x.id !== raw.id);
+        (n.layers || []).forEach(l => { if (l.campId === raw.id) l.campId = null; });
         markDirty(); renderFlow(); renderStage(); renderPanels(); renderCampView(true);
       });
     }
@@ -660,7 +634,7 @@ function initTagView() {
 }
 
 /* ---------------- 캠페인 뷰 ---------------- */
-const campFilter = { chan: "all", board: "all", status: "all", cat1: "all", cat2: "all", q: "" };
+const campFilter = { chan: "all", goal: "all", seg: "all", owner: "all", status: "all", place: "all", q: "" };
 /* 구간(스윔레인) 배경은 지금 보고 있는 보드가 아닌 다른 보드일 수도 있어서,
    B()(현재 보드) 전제인 laneRect() 대신 보드를 인자로 받는 버전을 따로 둔다 */
 function laneExtentYFor(b) {
@@ -682,97 +656,104 @@ function laneOfNode(b, n) {
     return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
   }) || null;
 }
-function camCatOptions(all, key, cur) {
-  const names = Array.from(new Set(all.map(x => (x.c[key] || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
-  return '<option value="all">전체</option>' + names.map(v => '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + ">" + esc(v) + "</option>").join("");
+/* 캠페인 탭 — 구글 시트 1.개인화DB 의 목록 그대로를 보여 준다.
+   여정 지도에 붙었는지는 문서에서 캠페인코드로 찾아 표시한다. */
+function campColOptions(key, cur, allLabel) {
+  const names = Array.from(new Set(SHEETS.camps.map(m => String(m[key] || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
+  return '<option value="all">' + esc(allLabel) + "</option>" +
+    names.map(v => '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + ">" + esc(v) + "</option>").join("");
 }
 function renderCampView(force) {
   if (!force && !viewStale.camps) return;
   viewStale.camps = false;
+  const wrap = $("#view-camps");
+  if (!wrap) return;
+  $(".syncbar", wrap).innerHTML = syncBarHtml();
+
+  const chans = Array.from(new Set(SHEETS.camps.map(m => String(m.chan || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
   const seg = $("#campChanFilter");
-  if (!seg.children.length) {
-    seg.innerHTML = '<button class="btn sm on" data-ch="all">전체</button>' +
-      Object.entries(CHAN).map(([k, v]) => '<button class="btn sm" data-ch="' + k + '">' + esc(v.name) + "</button>").join("");
-  }
-  $("#campBoardFilter").innerHTML = boardOptions(campFilter.board);
-  const all = allCamps();
-  if (!all.some(x => (x.c.cat1 || "") === campFilter.cat1)) campFilter.cat1 = "all";
-  if (!all.some(x => (x.c.cat2 || "") === campFilter.cat2)) campFilter.cat2 = "all";
-  $("#campCat1Filter").innerHTML = camCatOptions(all, "cat1", campFilter.cat1);
-  $("#campCat2Filter").innerHTML = camCatOptions(all, "cat2", campFilter.cat2);
-  const rows = all.filter(({ c, n, b }) =>
-    (campFilter.chan === "all" || c.chan === campFilter.chan) &&
-    (campFilter.board === "all" || state.boards[+campFilter.board] === b) &&
-    (campFilter.status === "all" || c.status === campFilter.status) &&
-    (campFilter.cat1 === "all" || (c.cat1 || "") === campFilter.cat1) &&
-    (campFilter.cat2 === "all" || (c.cat2 || "") === campFilter.cat2) &&
-    (!campFilter.q || (c.name + " " + c.segment + " " + c.timing + " " + c.extId + " " + (c.cat1 || "") + " " + (c.cat2 || "") + " " + n.name + " " + b.name).toLowerCase().includes(campFilter.q)));
-  /* 여정 지도 상의 위치(왼쪽→오른쪽, 위쪽→아래쪽)를 따라 캠페인을 여정 순서대로 보여준다 */
-  rows.sort((x, y) => {
-    const bi = state.boards.indexOf(x.b) - state.boards.indexOf(y.b); if (bi) return bi;
-    const qx = nodeRect(x.n), qy = nodeRect(y.n);
-    return (qx.x - qy.x) || (qx.y - qy.y);
-  });
+  seg.innerHTML = '<button class="btn sm' + (campFilter.chan === "all" ? " on" : "") + '" data-ch="all">전체</button>' +
+    chans.map(c => '<button class="btn sm' + (campFilter.chan === c ? " on" : "") + '" data-ch="' + esc(c) + '">' + esc(c) + "</button>").join("");
+  $("#campGoalFilter").innerHTML = campColOptions("goal", campFilter.goal, "모든 목표");
+  $("#campSegFilter").innerHTML = campColOptions("title", campFilter.seg, "모든 캠페인구분");
+  $("#campOwnerFilter").innerHTML = campColOptions("owner", campFilter.owner, "모든 담당자");
+
+  const placed = {};
+  state.boards.forEach(b => b.nodes.forEach(n => (n.camps || []).forEach(c => {
+    if (c.code) (placed[c.code] = placed[c.code] || []).push({ b, n });
+  })));
+
+  const rows = SHEETS.camps.filter(m =>
+    (campFilter.chan === "all" || m.chan === campFilter.chan) &&
+    (campFilter.goal === "all" || m.goal === campFilter.goal) &&
+    (campFilter.seg === "all" || m.title === campFilter.seg) &&
+    (campFilter.owner === "all" || m.owner === campFilter.owner) &&
+    (campFilter.status === "all" || m.status === campFilter.status) &&
+    (campFilter.place === "all" || (campFilter.place === "on" ? !!placed[m.code] : !placed[m.code])) &&
+    (!campFilter.q || (m.code + " " + m.goal + " " + m.title + " " + m.fullName + " " + m.owner + " " + m.trigger).toLowerCase().includes(campFilter.q)));
 
   $("#campStats").innerHTML =
-    ['<div class="stat" style="--c:var(--camp)"><span class="n">' + all.length + '</span><span class="t">전체 캠페인</span></div>',
-     '<div class="stat" style="--c:var(--ok)"><span class="n">' + all.filter(x => x.c.status === "live").length + '</span><span class="t">운영중</span></div>',
-     '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.c.status === "test").length + '</span><span class="t">테스트</span></div>',
-     '<div class="stat" style="--c:var(--accent)"><span class="n">' + new Set(all.map(x => x.n.id)).size + '</span><span class="t">캠페인이 붙은 화면</span></div>'].join("");
+    ['<div class="stat" style="--c:var(--camp)"><span class="n">' + SHEETS.camps.length + '</span><span class="t">시트의 전체 캠페인</span></div>',
+     '<div class="stat" style="--c:var(--ok)"><span class="n">' + SHEETS.camps.filter(m => m.statusCode === "live").length + '</span><span class="t">진행</span></div>',
+     '<div class="stat" style="--c:var(--accent)"><span class="n">' + Object.keys(placed).length + '</span><span class="t">여정지도에 붙임</span></div>',
+     '<div class="stat" style="--c:var(--ink-3)"><span class="n">' + rows.length + '</span><span class="t">지금 조건에 맞는 수</span></div>'].join("");
 
-  $("#campGrid").innerHTML = rows.length ? rows.map(({ c, n, b }) => {
-    const pins = (n.layers || []).filter(l => l.campId === c.id).length;
-    const lane = laneOfNode(b, n);
-    const links = campLinkButtons(c);
-    return '<div class="ccard" style="--c:' + (CHAN[c.chan] || CHAN.push).c + '">' +
+  $("#campGrid").innerHTML = rows.length ? rows.map(m => {
+    const where = placed[m.code] || [];
+    const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
+    const links = campLinkButtons({ links: [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url) });
+    return '<div class="ccard" style="--c:' + (CHAN[m.chanCode] || CHAN.push).c + '">' +
       '<div class="crow">' +
-        '<div class="rowseg">' + (c.cat1 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat1) + "</span>" : "") +
-          (c.cat2 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat2) + "</span>" : "") + "</div>" +
-        '<span class="chip" style="--c:' + CSTATUS_C[c.status] + '">' + CSTATUS[c.status] + "</span>" +
+        '<div class="rowseg">' + (m.goal ? '<span class="chip" style="--c:var(--ink-3)">' + esc(m.goal) + "</span>" : "") +
+          (m.aarrrName ? '<span class="chip" style="--c:var(--ink-3)">' + esc(m.aarrrName) + "</span>" : "") + "</div>" +
+        '<span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span>" +
       "</div>" +
-      '<div class="crow">' + "<h3>" + esc(c.name) + "</h3>" + chanChip(c.chan) + "</div>" +
-      '<div class="crow">' +
-        '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(b.name) + " · " + esc(n.name) + "</span>" +
-        (links || "") +
-      "</div>" +
-      (c.segment || c.timing ? '<div class="meta">' + (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
-        (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" : "") +
-      (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
-      (lane || pins ? '<div class="where">' +
-        (lane ? '<span class="pagechip lanechip" style="--c:' + (lane.color || "var(--accent)") + '" title="여정 지도의 구간">' + ico("lanes", "xs") + " " + esc(lane.name || "구간") + "</span>" : "") +
-        (pins ? '<span class="pagechip">' + ico("pin", "xs") + " 화면 배치 " + pins + "</span>" : "") + "</div>" : "") +
-      (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
+      '<div class="crow"><h3>' + esc(m.label) + "</h3>" + chanChip(m.chanCode) + "</div>" +
+      '<div class="kv"><span>' + esc(m.code) + "</span>" + (m.owner ? "<span>" + esc(m.owner) + "</span>" : "") +
+        (m.progress ? "<span>" + esc(m.progress) + "</span>" : "") + "</div>" +
+      (m.fullName ? '<div class="hint mono">' + esc(m.fullName) + "</div>" : "") +
+      (typeof perfBadge === "function" ? perfBadge(m.code) : "") +
+      (m.trigger || m.index ? '<div class="meta">' + (m.trigger ? "<span>트리거 <b>" + esc(m.trigger) + "</b></span>" : "") +
+        (m.index ? "<span>전환 <b>" + esc(m.index) + "</b></span>" : "") + "</div>" : "") +
+      (ctr.length || cvr.length ? '<div class="meta">' +
+        (ctr.length ? '<span>CTR 기준 <b>' + esc(ctr.join(" · ")) + "</b></span>" : "") +
+        (cvr.length ? '<span>CVR 기준 <b>' + esc(cvr.join(" · ")) + "</b></span>" : "") + "</div>" : "") +
+      (m.path ? '<div class="kv"><span>' + esc(m.path) + "</span></div>" : "") +
+      (links || "") +
+      (where.length ? '<div class="where">' + where.map(({ b, n }) =>
+        '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(n.name) + "</span>").join("") + "</div>"
+        : '<div class="where"><span class="pagechip" style="opacity:.6">여정지도에 아직 안 붙임</span></div>') +
+      (m.memo ? '<div class="hint">' + esc(m.memo) + "</div>" : "") +
+      (canEdit() && isStaff() ? '<button class="btn sm edit-only staff-only" data-sheet-edit="' + esc(m.code) + '" style="align-self:flex-start">' +
+        ico("edit", "xs") + "시트에서 수정</button>" : "") +
     "</div>";
-  }).join("") : '<div class="empty" style="grid-column:1/-1">' + ico("mega") + "<div>조건에 맞는 캠페인이 없습니다</div></div>";
+  }).join("") : '<div class="empty" style="grid-column:1/-1">' + ico("mega") +
+    "<div>" + (SHEETS.camps.length ? "조건에 맞는 캠페인이 없습니다" : "구글 시트에서 캠페인을 아직 불러오지 못했습니다") + "</div></div>";
 }
 function initCampView() {
   $("#campChanFilter").addEventListener("click", e => {
     const b = e.target.closest("[data-ch]"); if (!b) return;
     campFilter.chan = b.dataset.ch; $$("#campChanFilter .btn").forEach(x => x.classList.toggle("on", x === b)); renderCampView(true);
   });
-  $("#campBoardFilter").addEventListener("change", e => { campFilter.board = e.target.value; renderCampView(true); });
+  $("#campGoalFilter").addEventListener("change", e => { campFilter.goal = e.target.value; renderCampView(true); });
+  $("#campSegFilter").addEventListener("change", e => { campFilter.seg = e.target.value; renderCampView(true); });
+  $("#campOwnerFilter").addEventListener("change", e => { campFilter.owner = e.target.value; renderCampView(true); });
   $("#campStatusFilter").addEventListener("change", e => { campFilter.status = e.target.value; renderCampView(true); });
-  $("#campCat1Filter").addEventListener("change", e => { campFilter.cat1 = e.target.value; renderCampView(true); });
-  $("#campCat2Filter").addEventListener("change", e => { campFilter.cat2 = e.target.value; renderCampView(true); });
+  $("#campPlaceFilter").addEventListener("change", e => { campFilter.place = e.target.value; renderCampView(true); });
   $("#campSearch").addEventListener("input", e => { campFilter.q = e.target.value.toLowerCase().trim(); renderCampView(true); });
-  $("#btnCampTemplate").addEventListener("click", campCsvTemplate);
-  $("#btnCampBulk").addEventListener("click", () => {
-    if (!canEdit()) return;
-    const inp = $("#campCsvPick"); inp.value = "";
-    inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) openCampBulkModal(f); };
-    inp.click();
-  });
+  $("#btnNewSheetCamp").addEventListener("click", () => editSheetCamp(null));
   $("#campGrid").addEventListener("click", e => {
     const go = e.target.closest("[data-goto-url]");
     if (go) return openUrl(go.dataset.gotoUrl);
     const g = e.target.closest("[data-goto]");
     if (g && g.dataset.bi != null) jumpTo(+g.dataset.bi, g.dataset.goto);
   });
+  /* 시트 컬럼을 그대로 내보낸다 — 어디에 붙였는지만 한 칸 덧붙인다 */
   $("#btnCampCsv").addEventListener("click", () => {
-    const head = ["보드", "페이지", "캠페인명", "채널", "대분류", "소분류", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
-    const q = s => '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"';
-    const body = allCamps().map(({ c, n, b }) => [b.name, n.name, c.name, (CHAN[c.chan] || CHAN.push).name, c.cat1 || "", c.cat2 || "", c.segment, c.timing, CSTATUS[c.status], c.extId, c.landing, c.note].map(q).join(","));
-    saveFile("crm-campaigns.csv", "﻿" + [head.map(q).join(",")].concat(body).join("\r\n"), "text/csv");
+    const head = SHEET_COLS.map(c => c.label).concat("여정지도 배치");
+    const body = SHEETS.camps.map(m => csvLine(SHEET_COLS.map(c => m[c.key]).concat(
+      placementsOf(m.code).map(({ b, n }) => b.name + " · " + n.name).join(" / "))));
+    saveFile("crm-campaigns.csv", "﻿" + [csvLine(head)].concat(body).join("\r\n"), "text/csv");
   });
 }
 

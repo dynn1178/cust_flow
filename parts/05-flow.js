@@ -209,9 +209,12 @@ function gRow(dotColor, name, meta, mono) {
     '<div class="g-body"><span class="g-name' + (mono ? " mono" : "") + '">' + esc(name) + "</span>" +
     (meta ? '<span class="g-meta">' + meta + "</span>" : "") + "</div></div>";
 }
-function campRow(c) {
+function campRow(raw) {
+  const c = campView(raw);
   const ch = CHAN[c.chan] || CHAN.push;
-  return gRow(ch.c, c.name);
+  /* 캠페인 이름 옆(아래)에 최신월 CTR·CVR 을 함께 보여 준다 */
+  const badge = typeof perfBadge === "function" ? perfBadge(c.code, true) : "";
+  return gRow(ch.c, c.name) + (badge ? '<div class="g-badge">' + badge + "</div>" : "");
 }
 function tagRowsBig(n, plat) {
   const list = n.tags.filter(t => platformsOf(t).indexOf(plat) >= 0);
@@ -222,9 +225,12 @@ function tagRowsBig(n, plat) {
 }
 function campRowsBig(n) {
   if (!n.camps.length) return '<div class="g-empty">등록된 캠페인 없음</div>';
-  return '<div class="node-list">' + n.camps.slice(0, 6).map(c => {
+  return '<div class="node-list">' + n.camps.slice(0, 6).map(raw => {
+    const c = campView(raw);
     const ch = CHAN[c.chan] || CHAN.push;
-    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : ""));
+    const badge = typeof perfBadge === "function" ? perfBadge(c.code, true) : "";
+    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : "")) +
+      (badge ? '<div class="g-badge">' + badge + "</div>" : "");
   }).join("") + (n.camps.length > 6 ? '<div class="g-more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function incompleteRowsBig(n) {
@@ -304,7 +310,9 @@ function renderNodes() {
     el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
-      state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t)).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
+      state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t)).join("|"),
+      /* 시트를 다시 읽으면 캠페인 이름·상태·실적이 바뀌므로 마지막 동기화 시각도 서명에 넣는다 */
+      SHEETS.at, n.camps.map(c => c.code || (c.chan + c.status + c.name)).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
       el.innerHTML = nodeHtml(n);

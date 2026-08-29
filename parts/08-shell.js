@@ -96,12 +96,13 @@ function switchView(v) {
   $$("#viewTabs .btn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   if (v === "tags") renderTagView();
   if (v === "camps") renderCampView();
+  if (v === "perf") renderPerfView();
   if (v === "map") { applySizes(); applyTransform(); if (!stageZoom) renderStage(); }
 }
 
 function initShell() {
   $("#viewTabs").addEventListener("click", e => { const b = e.target.closest("[data-view]"); if (b) switchView(b.dataset.view); });
-  $("#btnShare").addEventListener("click", () => (supaOn() ? serverSave() : shareSave()));
+  $("#btnShare").addEventListener("click", () => serverSave());
   $("#btnTheme").addEventListener("click", () => {
     const cur = document.documentElement.getAttribute("data-theme") || "light";
     const next = cur === "dark" ? "light" : "dark";
@@ -116,7 +117,7 @@ function initShell() {
 
   document.addEventListener("keydown", e => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (canEdit()) (supaOn() ? serverSave() : shareSave()); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (canEdit()) serverSave(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); openQuickSearch(); return; }
     if (typing) return;
     if (e.key === "Escape") {
@@ -260,7 +261,7 @@ function renderAll() {
 }
 
 async function boot() {
-  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initShell(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
+  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initPerfView(); initSheets(); initShell(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
   initMinimap(); wireUndoRedoButtons(); initLaneInteractions();
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */
@@ -275,45 +276,30 @@ async function boot() {
     else if (!ok) { setSaveChip("dirty", "서버에 문서가 없습니다 — 저장하면 만들어집니다"); renderAll(); }
     $("#btnShare").innerHTML = ico("share") + "<span>서버 저장</span>";
     updateStorageUI(); initLock();
+    bootSheets();                                 // 캠페인·성과는 구글 시트에서 받아 온다
     return;
   }
 
-  const api = await claudeApi();
-  saveAvail = !!api;
-
-  let remote = null;                                  // 1) Artifact 공유본
-  if (location.protocol !== "file:" && window.claude) {   // 자체 호스팅에서는 없는 파일이라 요청하지 않는다
-    try {
-      const r = await fetch("data/journey.json", { cache: "no-store" });
-      if (r.ok) remote = normalize(await r.json());
-    } catch (e) { /* 아직 저장 전 */ }
-  }
-  let draft = null;                                   // 2) 저장 안 된 로컬 초안
+  /* 1) 서버가 연결되지 않은 화면(로컬 파일로 직접 연 경우)은 브라우저 임시 보관만 된다 */
+  let draft = null;
   try { draft = await idbGet(DRAFT_KEY); } catch (e) {}
-
-  if (remote) {
-    state = remote;
-    savedRefs = collectRefs();
-    setSaveChip("ok", "공유본 · " + timeAgo(remote.updatedAt));
-  }
   if (draft && draft.data) {
-    const newer = !remote || (draft.base === remote.updatedAt && draft.savedAt > (remote.updatedAt || 0));
-    if (newer) {
-      state = normalize(draft.data);
-      savedRefs = draft.refs || collectRefs();
-      dirty = true; setSaveChip("dirty", "저장 안 된 변경 있음");
-    }
+    state = normalize(draft.data);
+    savedRefs = draft.refs || collectRefs();
+    dirty = true; setSaveChip("dirty", "저장 안 된 변경 있음");
+  } else {
+    setSaveChip("off", "로컬 전용 — 저장하려면 배포한 주소에서 여세요");
   }
-  if (!remote && !draft) setSaveChip("dirty", "샘플 데이터");
 
   const b = B();
   sel.node = b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null;
-  if (!api && !dirty) setSaveChip("off", "로컬 전용");
 
   renderAll();
   updateStorageUI();
   initLock();
-  if (!B().view.fitted) { fitFlow(); B().view.fitted = true; setSaveChip("dirty", saveAvail ? "샘플 데이터 · 저장 전" : "샘플 데이터"); }
+  SHEETS.err = "배포한 주소에서 구글 로그인해야 캠페인 시트를 불러옵니다";
+  renderSyncBars();
+  if (!B().view.fitted) { fitFlow(); B().view.fitted = true; }
 }
 function collectRefs() {
   return state.boards.reduce((a, b) => a.concat(b.nodes.filter(n => n.shot && n.shot.ref).map(n => n.shot.ref)), []);

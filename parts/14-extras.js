@@ -135,7 +135,9 @@ function globalSearchResults(q) {
     if ((n.name + " " + (n.path || "")).toLowerCase().indexOf(q) >= 0) nodes.push({ n, b });
   }));
   const tags = allTags().filter(({ t, n }) => (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + n.name).toLowerCase().indexOf(q) >= 0);
-  const camps = allCamps().filter(({ c, n }) => (c.name + " " + n.name).toLowerCase().indexOf(q) >= 0);
+  /* 여정 지도에 붙어 있는 캠페인은 시트에서 이름을 가져와 검색한다 */
+  const camps = allCamps().map(({ c, n, b }) => ({ c: campView(c), n, b }))
+    .filter(({ c, n }) => c && (c.name + " " + (c.code || "") + " " + n.name).toLowerCase().indexOf(q) >= 0);
   return { nodes: nodes.slice(0, 20), tags: tags.slice(0, 20), camps: camps.slice(0, 20) };
 }
 function qsRow(icoName, title, sub, bi, nodeId) {
@@ -560,10 +562,6 @@ function hexToRgba(hex, a) {
 }
 function safeBoardFilename() { return String(B().name || "board").replace(/[\\/:*?"<>|]/g, "").trim() || "board"; }
 async function downloadBinary(filename, blob) {
-  try {
-    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
-    if (dl) { await dl.save({ filename, data: blob }); toast(filename + " 저장 완료", "ok"); return; }
-  } catch (e) { /* 아래 폴백 */ }
   try {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

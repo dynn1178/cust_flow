@@ -572,6 +572,64 @@ tr:hover .rowacts{opacity:1}
   .splitter-v{display:none}
   .pane.center{min-height:320px}
 }
+
+/* ============ 구글 시트 연동 · 성과 추이 ============ */
+.syncchip{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-3);
+  border:1px solid var(--stroke-2); background:var(--glass-2); border-radius:99px; padding:4px 10px; white-space:nowrap}
+.syncchip.bad{color:var(--bad); border-color:color-mix(in srgb,var(--bad) 35%,transparent)}
+.modal.wide{width:min(880px,100%)}
+.picklist{max-height:52vh; overflow:auto; display:flex; flex-direction:column; gap:4px;
+  border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:6px}
+.pickrow{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--r-sm); cursor:pointer;
+  border:1px solid transparent}
+.pickrow:hover{background:var(--glass-2)}
+.pickrow.on{background:var(--accent-soft); border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+.pickrow input{flex:none; width:15px; height:15px; accent-color:var(--accent)}
+.pickmain{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
+.pickmain b{font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pickmain em{font-style:normal; font-size:11px; color:var(--ink-3)}
+.pickfull{font-size:10.5px; color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.frow .ro{font-size:12px; color:var(--ink-2); background:var(--glass-2); border:1px solid var(--stroke-2);
+  border-radius:var(--r-sm); padding:8px 10px; line-height:1.5; word-break:break-word}
+
+.perfbody{flex:1; min-height:0; display:flex; gap:0}
+.perfside{width:308px; flex:none; border-right:1px solid var(--stroke-2); padding:8px}
+.perfmain{flex:1; min-width:0; padding:12px}
+.perfgroup{font-size:11px; font-weight:600; color:var(--ink-3); padding:10px 8px 4px; letter-spacing:.02em}
+.chartwrap{border:1px solid var(--stroke-2); border-radius:var(--r-md); background:var(--glass-2); padding:8px}
+.perfchart{width:100%; height:auto; display:block}
+.perfchart .gl{stroke:var(--grid); stroke-width:1}
+.perfchart .ax{fill:var(--ink-3); font-size:10px; font-family:var(--f-mono)}
+.perfchart .ax.l{text-anchor:end} .perfchart .ax.r{text-anchor:start} .perfchart .ax.c{text-anchor:middle}
+.perfchart .ax.cap{font-size:10.5px; font-weight:600}
+.perfchart .ln{fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round}
+.legend{display:flex; flex-wrap:wrap; gap:10px; padding:8px 4px 2px}
+.legend .lg{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-2)}
+.legend .lg i{width:10px; height:10px; border-radius:3px; display:inline-block}
+.basiscard{border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:10px 12px; margin-top:12px; background:var(--glass-2)}
+.basiscard h4{margin:0 0 7px; font-size:12.5px; font-weight:600}
+.basiscard .brow{display:flex; gap:8px; align-items:flex-start; font-size:11.5px; color:var(--ink-2); padding:3px 0}
+.basiscard .brow .chip{flex:none}
+.ptable{width:100%; border-collapse:collapse; margin-top:14px; font-size:11.5px}
+.ptable th{position:sticky; top:0; background:var(--glass-3); text-align:left; font-weight:600; color:var(--ink-3);
+  padding:7px 8px; border-bottom:1px solid var(--stroke); white-space:nowrap}
+.ptable td{padding:6px 8px; border-bottom:1px solid var(--stroke-2); vertical-align:top}
+.ptable .r{text-align:right; font-family:var(--f-mono)}
+.ptable .b{font-weight:600}
+.ptable td em{display:block; font-style:normal; font-size:10.5px; color:var(--ink-3)}
+
+.perfbadge{display:inline-flex; gap:4px; align-items:center; flex-wrap:wrap}
+.perfbadge .pb{font-family:var(--f-mono); font-size:10.5px; font-weight:600; border-radius:99px; padding:1px 6px;
+  border:1px solid transparent; white-space:nowrap}
+.perfbadge .pb.ctr{color:#2f6fed; background:rgba(47,111,237,.11); border-color:rgba(47,111,237,.28)}
+.perfbadge .pb.cvr{color:#e0483f; background:rgba(224,72,63,.11); border-color:rgba(224,72,63,.28)}
+.perfbadge .pb i{font-style:normal; margin-left:3px; opacity:.85; font-size:9.5px}
+.perfbadge.sm .pb{font-size:9.5px; padding:0 5px}
+.g-badge{padding:2px 0 4px 20px}
+.card > .perfbadge{margin:-2px 0 2px}
+.ccard > .perfbadge{margin:2px 0}
+.node .perfbadge .pb{font-size:9px; padding:0 4px}
+@media (max-width:860px){ .perfbody{flex-direction:column} .perfside{width:auto; height:220px; border-right:0; border-bottom:1px solid var(--stroke-2)} }
 </style>
 </head>
 <body>
@@ -579,6 +637,7 @@ tr:hover .rowacts{opacity:1}
 <svg style="display:none" aria-hidden="true">
   <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="5" r="2.4"/><path d="M8.4 19h5.1a4 4 0 0 0 0-8h-3a4 4 0 0 1 0-8h5.1"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-5 3 3 4-6"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M4 12h11m0 0-4-4m4 4-4 4"/><path d="M19 5v14"/></symbol>
   <symbol id="i-cursor" viewBox="0 0 24 24"><path d="M5 3l6.5 17 2.3-6.9 6.9-2.3z"/></symbol>
   <symbol id="i-zin" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.6-4.6M10.5 8v5M8 10.5h5"/></symbol>
@@ -641,6 +700,7 @@ tr:hover .rowacts{opacity:1}
       <button class="btn on" data-view="map"><svg class="ico xs"><use href="#i-map"/></svg>여정 지도</button>
       <button class="btn" data-view="tags"><svg class="ico xs"><use href="#i-tag"/></svg>태그 목록</button>
       <button class="btn" data-view="camps"><svg class="ico xs"><use href="#i-mega"/></svg>캠페인</button>
+      <button class="btn" data-view="perf"><svg class="ico xs"><use href="#i-chart"/></svg>성과 추이</button>
     </div>
     <div class="spacer"></div>
     <button class="btn icon" id="btnQuickSearch" title="빠른 검색 (Ctrl+F)"><svg class="ico"><use href="#i-search"/></svg></button>
@@ -708,7 +768,7 @@ tr:hover .rowacts{opacity:1}
           <span class="count" id="campCount">0</span>
           <div class="spacer"></div>
           <button class="btn sm" id="btnExpLeft" title="이 영역을 아래 전체(가로 끝에서 끝)로 넓히고 여정 지도는 줄입니다"><svg class="ico xs"><use href="#i-fit"/></svg><span id="expLeftLabel">확장</span></button>
-          <button class="btn sm edit-only" id="btnAddCamp"><svg class="ico xs"><use href="#i-plus"/></svg>추가</button>
+          <button class="btn sm edit-only" id="btnAddCamp" title="구글 시트의 캠페인 목록에서 골라 이 페이지에 붙입니다"><svg class="ico xs"><use href="#i-plus"/></svg>붙이기</button>
         </div>
         <div class="pane-body" id="campList"></div>
         <div class="pane-foot" id="layerLinkFoot" style="display:none"></div>
@@ -805,21 +865,49 @@ tr:hover .rowacts{opacity:1}
     <div class="listwrap glass">
       <div class="toolrow">
         <div class="seg" id="campChanFilter"></div>
-        <select class="field" id="campBoardFilter"></select>
+        <select class="field" id="campGoalFilter" title="목표(대분류)"></select>
+        <select class="field" id="campSegFilter" title="캠페인구분"></select>
+        <select class="field" id="campOwnerFilter" title="담당자"></select>
         <select class="field" id="campStatusFilter">
-          <option value="all">모든 상태</option><option value="live">운영중</option>
-          <option value="draft">기획중</option><option value="test">테스트</option><option value="ended">종료</option>
+          <option value="all">모든 상태</option><option value="진행">진행</option><option value="중단">중단</option>
         </select>
-        <select class="field" id="campCat1Filter"></select>
-        <select class="field" id="campCat2Filter"></select>
-        <input class="field" id="campSearch" placeholder="캠페인명 · 세그먼트 검색" style="flex:1; min-width:150px">
+        <select class="field" id="campPlaceFilter">
+          <option value="all">배치 무관</option><option value="on">여정지도에 붙은 것</option><option value="off">아직 안 붙인 것</option>
+        </select>
+        <input class="field" id="campSearch" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:170px">
         <div class="spacer"></div>
-        <button class="btn edit-only staff-only" id="btnCampBulk" title="CSV 파일로 캠페인 일괄 등록"><svg class="ico"><use href="#i-up"/></svg>일괄 업로드</button>
-        <button class="btn staff-only" id="btnCampTemplate" title="업로드용 샘플 CSV 내려받기"><svg class="ico"><use href="#i-down"/></svg>샘플 양식</button>
+        <span class="syncbar"></span>
+        <button class="btn edit-only staff-only" id="btnNewSheetCamp" title="구글 시트에 새 캠페인을 등록합니다"><svg class="ico"><use href="#i-plus"/></svg>새 캠페인</button>
+        <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>
         <button class="btn staff-only" id="btnCampCsv"><svg class="ico"><use href="#i-down"/></svg>CSV</button>
       </div>
       <div class="statgrid" id="campStats"></div>
       <div class="scroller"><div class="grid-cards" id="campGrid"></div></div>
+    </div>
+  </section>
+
+  <!-- ============== PERFORMANCE VIEW ============== -->
+  <section class="view" id="view-perf">
+    <div class="listwrap glass">
+      <div class="toolrow">
+        <select class="field" id="perfGoal" title="목표(대분류)"></select>
+        <select class="field" id="perfSeg" title="캠페인구분"></select>
+        <select class="field" id="perfChan" title="채널"></select>
+        <select class="field" id="perfOwner" title="담당자"></select>
+        <input class="field" id="perfSearch" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:170px">
+        <div class="spacer"></div>
+        <span class="syncbar"></span>
+        <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>
+      </div>
+      <div class="statgrid" id="perfStats"></div>
+      <div class="perfbody">
+        <div class="perfside scroller" id="perfList"></div>
+        <div class="perfmain scroller">
+          <div id="perfChart"></div>
+          <div id="perfBasis"></div>
+          <div id="perfTable"></div>
+        </div>
+      </div>
     </div>
   </section>
 </div>
@@ -833,7 +921,6 @@ tr:hover .rowacts{opacity:1}
 <input type="file" id="dirPick" webkitdirectory directory style="display:none">
 <input type="file" id="jsonPick" accept="application/json,.json" style="display:none">
 <input type="file" id="tagCsvPick" accept=".csv,text/csv" style="display:none">
-<input type="file" id="campCsvPick" accept=".csv,text/csv" style="display:none">
 <script>
 "use strict";
 /* ========================================================================
@@ -1031,7 +1118,7 @@ const STAGE_FIT = {
 let layerTool = "select";
 let drawColor = SWATCH[0];
 let drawStroke = 3;
-let dirty = false, saveAvail = false;
+let dirty = false;
 let savedRefs = [];              // 마지막 저장 시점에 쓰이던 이미지 파일 목록
 const DRAFT_KEY = "draft:" + location.pathname;
 
@@ -1157,51 +1244,6 @@ function buildSnapshot() {
     }
   };
 }
-function snapshotBytes(s) {
-  return JSON.stringify(s.data).length + s.uploads.reduce((a, u) => a + u.blob.size, 0);
-}
-
-async function shareSave() {
-  const api = await claudeApi();
-  if (!api) { toast("이 화면에서는 공유 저장을 쓸 수 없습니다. JSON 내보내기를 사용하세요.", "bad"); return; }
-  const btn = $("#btnShare"); btn.disabled = true;
-  setSaveChip("dirty", "저장 중…");
-  const snap = buildSnapshot();
-  try {
-    await hostUploadAll(snap);                  // 이미지 호스팅을 쓰면 URL로 대체
-    const files = { "data/journey.json": JSON.stringify(snap.data) };
-    snap.uploads.forEach(u => { files["data/" + u.ref] = u.blob; });
-    snap.removals.forEach(r => { files["data/" + r] = null; });
-    await api.publish(files);
-    snap.commit();
-    dirty = false;
-    setSaveChip("ok", "공유 저장됨 · " + timeAgo(state.updatedAt));
-    saveDraft();
-    toast("저장했습니다" + (snap.uploads.length ? " · 이미지 " + snap.uploads.length + "개 업로드" : "") + ". 링크를 받은 사람은 같은 내용을 봅니다.", "ok");
-  } catch (err) {
-    const code = err && err.code;
-    if (code === "conflict") {
-      setSaveChip("dirty", "저장 안 됨");
-      toast("다른 사람이 먼저 저장했습니다. 새로고침해 최신본을 받은 뒤 다시 저장하세요.", "bad");
-    } else if (code === "not_writer" || code === "not_granted" || code === "capability_disabled") {
-      saveAvail = false; $("#btnShare").style.display = "none";
-      setSaveChip("off", "읽기 전용");
-      toast("이 뷰는 읽기 전용입니다. JSON 내보내기로 사본을 만들 수 있습니다.", "bad");
-    } else if (code === "too_large") {
-      toast("전체 용량이 한도를 넘었습니다(" + Math.round(snapshotBytes(snap) / 1048576 * 10) / 10 + "MB). 화면 이미지 일부를 삭제하세요.", "bad");
-      setSaveChip("dirty", "저장 안 됨");
-    } else {
-      toast("저장에 실패했습니다: " + (err && err.message ? err.message : code || "알 수 없는 오류"), "bad");
-      setSaveChip("dirty", "저장 안 됨");
-    }
-  } finally { btn.disabled = false; }
-}
-async function claudeApi() {
-  try {
-    if (!window.claude || !window.claude.use) return null;
-    return await window.claude.use("artifact");
-  } catch (e) { return null; }
-}
 function timeAgo(ts) {
   if (!ts) return "방금";
   const d = Math.floor((Date.now() - ts) / 1000);
@@ -1212,10 +1254,6 @@ function timeAgo(ts) {
 }
 async function saveFile(filename, text, mime) {
   try {
-    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
-    if (dl) { await dl.save({ filename, data: text }); toast(filename + " 저장 완료", "ok"); return; }
-  } catch (e) { /* 아래 폴백 */ }
-  try {                                      // 일반 브라우저(배포본·로컬 파일)에서는 표준 다운로드가 항상 된다
     const blob = new Blob([text], { type: (mime || "application/octet-stream") + ";charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1224,7 +1262,7 @@ async function saveFile(filename, text, mime) {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     toast(filename + " 저장 완료", "ok");
     return;
-  } catch (e) { /* Artifact 프리뷰처럼 다운로드 자체가 막힌 화면에서만 여기로 온다 */ }
+  } catch (e) { /* 브라우저가 다운로드를 막은 드문 경우에만 아래 클립보드 폴백으로 온다 */ }
   try { await navigator.clipboard.writeText(text); toast("다운로드가 막혀 있어 클립보드에 복사했습니다.", "ok"); }
   catch (e) { toast("파일을 내보낼 수 없습니다.", "bad"); }
 }
@@ -1265,6 +1303,8 @@ function fieldRow(f, vals) {
     return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="linklist" data-links="' + f.k + '">' + items +
       '</div><button class="btn sm" data-addlink="' + f.k + '" type="button">' + ico("plus", "xs") + "링크 추가</button></div>";
   }
+  if (f.type === "readonly")
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="ro' + (f.mono ? " mono" : "") + '">' + esc(v || "-") + "</div></div>";
   if (f.type === "check")
     return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
   if (f.type === "action")
@@ -1439,8 +1479,8 @@ function linkRow(l) {
   "</div>";
 }
 /* http(s) 접두어 없이 입력해도 새 탭에서 열리게 보정한다.
-   window.open()은 Artifact 프리뷰처럼 샌드박스가 걸린 화면에서 조용히 막히는 경우가 있어,
-   실제 <a target="_blank"> 클릭을 흉내 내는 방식을 우선 쓰고 실패하면 window.open으로 폴백한다. */
+   window.open()이 팝업 차단에 막히는 경우가 있어, 실제 <a target="_blank"> 클릭을
+   흉내 내는 방식을 우선 쓰고 실패하면 window.open으로 폴백한다. */
 function openUrl(url) {
   const u = String(url || "").trim();
   if (!u) return;
@@ -1695,9 +1735,12 @@ function gRow(dotColor, name, meta, mono) {
     '<div class="g-body"><span class="g-name' + (mono ? " mono" : "") + '">' + esc(name) + "</span>" +
     (meta ? '<span class="g-meta">' + meta + "</span>" : "") + "</div></div>";
 }
-function campRow(c) {
+function campRow(raw) {
+  const c = campView(raw);
   const ch = CHAN[c.chan] || CHAN.push;
-  return gRow(ch.c, c.name);
+  /* 캠페인 이름 옆(아래)에 최신월 CTR·CVR 을 함께 보여 준다 */
+  const badge = typeof perfBadge === "function" ? perfBadge(c.code, true) : "";
+  return gRow(ch.c, c.name) + (badge ? '<div class="g-badge">' + badge + "</div>" : "");
 }
 function tagRowsBig(n, plat) {
   const list = n.tags.filter(t => platformsOf(t).indexOf(plat) >= 0);
@@ -1708,9 +1751,12 @@ function tagRowsBig(n, plat) {
 }
 function campRowsBig(n) {
   if (!n.camps.length) return '<div class="g-empty">등록된 캠페인 없음</div>';
-  return '<div class="node-list">' + n.camps.slice(0, 6).map(c => {
+  return '<div class="node-list">' + n.camps.slice(0, 6).map(raw => {
+    const c = campView(raw);
     const ch = CHAN[c.chan] || CHAN.push;
-    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : ""));
+    const badge = typeof perfBadge === "function" ? perfBadge(c.code, true) : "";
+    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : "")) +
+      (badge ? '<div class="g-badge">' + badge + "</div>" : "");
   }).join("") + (n.camps.length > 6 ? '<div class="g-more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function incompleteRowsBig(n) {
@@ -1790,7 +1836,9 @@ function renderNodes() {
     el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
-      state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t)).join("|"), n.camps.map(c => c.chan + c.status + c.name).join("|"),
+      state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t)).join("|"),
+      /* 시트를 다시 읽으면 캠페인 이름·상태·실적이 바뀌므로 마지막 동기화 시각도 서명에 넣는다 */
+      SHEETS.at, n.camps.map(c => c.code || (c.chan + c.status + c.name)).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
       el.innerHTML = nodeHtml(n);
@@ -2382,8 +2430,8 @@ function layerMarkup(l, n, idx) {
 
   let pin = "";
   if (l.campId) {
-    const b = bbox(l), found = n.camps.find(x => x.id === l.campId);
-    const col = found ? CHAN[found.chan].c : "var(--camp)";
+    const b = bbox(l), found = campView(n.camps.find(x => x.id === l.campId));
+    const col = found && CHAN[found.chan] ? CHAN[found.chan].c : "var(--camp)";
     pin = '<g class="pin" data-pin="' + l.campId + '" transform="translate(' + b.x + "," + b.y + ')">' +
       '<circle r="11" fill="' + col + '"/><text>' + (idx + 1) + "</text></g>";
   }
@@ -2457,9 +2505,9 @@ function renderStageFoot(n, L) {
   let html = '<span class="mono" style="font-size:11px">' + d.w + " × " + d.h + "</span>";
   html += '<span class="tool-sep"></span><span>레이어 ' + (n.layers || []).length + "개</span>";
   if (L) {
-    const camp = L.campId ? n.camps.find(c => c.id === L.campId) : null;
+    const camp = L.campId ? campView(n.camps.find(c => c.id === L.campId)) : null;
     html += '<span class="tool-sep"></span><span style="color:var(--ink-2)">선택: ' + LKIND(L) + "</span>";
-    if (camp) html += '<span class="chip" style="--c:' + CHAN[camp.chan].c + '">' + ico("mega", "xs") + esc(camp.name) + "</span>";
+    if (camp) html += '<span class="chip" style="--c:' + (CHAN[camp.chan] || CHAN.push).c + '">' + ico("mega", "xs") + esc(camp.name) + "</span>";
     html += '<div class="spacer"></div>' +
       (L.kind === "text" ? '<button class="btn sm" data-lact="edittext">' + ico("edit", "xs") + "텍스트 수정</button>" : "") +
       '<button class="btn sm" data-lact="front">앞으로</button><button class="btn sm" data-lact="back">뒤로</button>' +
@@ -2762,8 +2810,8 @@ function selectNode(id) {
 /* ========================================================================
    좌: CRM 캠페인 · 우: 태깅 설정 · 목록 뷰(모든 보드 통합)
    ======================================================================== */
-const viewStale = { tags: true, camps: true };
-function invalidateViews() { viewStale.tags = true; viewStale.camps = true; }
+const viewStale = { tags: true, camps: true, perf: true };
+function invalidateViews() { viewStale.tags = true; viewStale.camps = true; viewStale.perf = true; }
 
 function platChip(p) { return '<span class="chip" style="--c:' + PLAT[p].c + '">' + ico(PLAT[p].ico, "xs") + PLAT[p].name + "</span>"; }
 /* 태그는 이제 플랫폼을 여러 개 체크할 수 있다. 예전 문서(단일 t.platform)도
@@ -2991,49 +3039,6 @@ function openTagBulkModal(file) {
     });
   });
 }
-function campCsvTemplate() {
-  const head = ["보드", "페이지", "캠페인명", "채널", "대분류", "소분류", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
-  const example = [B().name, (B().nodes[0] || {}).name || "홈", "장바구니 이탈 리마인드", "앱 푸시", "리텐션", "장바구니 이탈",
-    "Cart Updated 후 4시간 미결제", "4시간 지연 발송", "운영중", "BRZ-PUSH-2871", "/cart", "1일 1회 · 야간 발송 제외"];
-  saveFile("campaign-upload-template.csv", "﻿" + [csvLine(head), csvLine(example)].join("\r\n"), "text/csv");
-}
-function openCampBulkModal(file) {
-  readTextFile(file, text => {
-    const rows = parseCsv(text);
-    const data = rows.slice(1);
-    if (!data.length) return toast("CSV에서 데이터 행을 찾지 못했습니다", "bad");
-    const parsed = data.map(r => {
-      const [boardName, pageName, name, chanLabel, cat1, cat2, segment, timing, statusLabel, extId, landing, note] = r;
-      return {
-        boardName: boardName || "", pageName: (pageName || "새 페이지").trim(),
-        camp: {
-          name: name || "이름 없는 캠페인", chan: keyByLabel(CHAN, chanLabel, "push"), cat1: cat1 || "", cat2: cat2 || "",
-          segment: segment || "", timing: timing || "", status: keyByLabel(CSTATUS, statusLabel, "draft"),
-          extId: extId || "", landing: landing || "", note: note || ""
-        }
-      };
-    });
-    let newPages = 0;
-    const seen = new Set();
-    parsed.forEach(p => {
-      const b = resolveBoard(p.boardName), key = b.id + "::" + p.pageName;
-      if (!b.nodes.some(n => n.name === p.pageName) && !seen.has(key)) { newPages++; seen.add(key); }
-    });
-    bulkPreviewModal({
-      title: "캠페인 일괄 업로드", rows: parsed.map(p => esc(p.pageName) + "<em>" + esc((CHAN[p.camp.chan] || CHAN.push).name) + " · " + esc(p.camp.name) + "</em>"),
-      newPages,
-      onRun: () => {
-        parsed.forEach(p => {
-          const b = resolveBoard(p.boardName), node = resolveNode(b, p.pageName, "");
-          node.camps.push(Object.assign({ id: uid("c") }, p.camp));
-        });
-        markDirty(); renderFlow(); renderPanels(); renderCampView(true);
-        toast(parsed.length + "개 캠페인을 등록했습니다" + (newPages ? " · 새 페이지 " + newPages + "개" : ""), "ok");
-      }
-    });
-  });
-}
-
 /* ---------------- 우측: 태깅 ---------------- */
 function renderTagPanel() {
   const n = curNode(), box = $("#tagList");
@@ -3106,33 +3111,46 @@ function jumpToTag(tagId) {
   });
 }
 
-/* ---------------- 좌측: 캠페인 ---------------- */
+/* ---------------- 좌측: 캠페인 ----------------
+   목록의 원본은 구글 시트다. 문서에는 "이 페이지에 이 캠페인코드를 붙였다"만 남고,
+   이름·채널·상태 같은 표시 내용은 매번 시트에서 채워 넣는다(campView). */
+function campActs(c) {
+  const del = '<button class="btn icon sm" data-camp-del="' + c.id + '" title="이 페이지에서 떼기">' + ico("close", "xs") + "</button>";
+  const edit = c.code && !c.missing
+    ? '<button class="btn icon sm staff-only" data-sheet-edit="' + esc(c.code) + '" title="구글 시트에서 수정">' + ico("edit", "xs") + "</button>"
+    : (c.code ? "" : '<button class="btn icon sm" data-camp-edit="' + c.id + '" title="수정">' + ico("edit", "xs") + "</button>");
+  return '<div class="card-acts edit-only">' + edit + del + "</div>";
+}
 function renderCampPanel() {
   const n = curNode(), box = $("#campList");
   $("#campCount").textContent = n ? n.camps.length : 0;
   if (!n) { box.innerHTML = '<div class="empty">' + ico("mega") + "<div>페이지를 선택하세요</div></div>"; return; }
   const L = (n.layers || []).find(x => x.id === sel.layer);
-  box.innerHTML = (n.camps.length ? n.camps.map(c => {
+  const list = campViews(n);
+  box.innerHTML = (list.length ? list.map(c => {
     const linked = (n.layers || []).filter(l => l.campId === c.id);
     return '<div class="card' + (L && L.campId === c.id ? " pinned" : "") + '" data-camp="' + c.id + '">' +
-      '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div>' + acts("camp", c.id) + "</div>" +
+      '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div>' + campActs(c) + "</div>" +
       '<div class="card-title">' + esc(c.name) + "</div>" +
+      (c.code ? '<div class="kv"><span>' + esc(c.code) + "</span></div>" : "") +
+      (typeof perfBadge === "function" ? perfBadge(c.code) : "") +
       '<div class="meta"><span><span class="dot" style="--c:' + CSTATUS_C[c.status] + '"></span> ' + CSTATUS[c.status] + "</span>" +
-        (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
-        (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
-      (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
+        (c.segment ? "<span>트리거 <b>" + esc(c.segment) + "</b></span>" : "") +
+        (c.timing ? "<span>전환 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +
+      (c.landing ? '<div class="kv"><span>' + esc(c.landing) + "</span></div>" : "") +
       campLinkButtons(c) +
       (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
+      (c.missing ? '<div class="hint" style="color:var(--warn)">시트에서 삭제된 캠페인입니다. 떼어 내세요.</div>' : "") +
       (linked.length ? '<div class="linkline">' + ico("pin", "xs") + "화면 레이어 " + linked.length + "곳에 배치됨</div>" : "") +
       (L && canEdit() ? '<button class="btn sm edit-only" data-link="' + c.id + '" style="align-self:flex-start">' +
         ico(L.campId === c.id ? "check" : "pin", "xs") + (L.campId === c.id ? "연결됨 · 해제" : "선택한 레이어에 연결") + "</button>" : "") +
     "</div>";
   }).join("") : '<div class="empty">' + ico("mega") + "<div>이 화면에 붙는 CRM 캠페인이 없습니다" +
-    (canEdit() ? "<br>추가 버튼으로 등록하세요" : "") + "</div></div>");
+    (canEdit() ? "<br><b>붙이기</b>로 구글 시트 목록에서 고르세요" : "") + "</div></div>");
 
   const foot = $("#layerLinkFoot");
   if (L) {
-    const c = L.campId ? n.camps.find(x => x.id === L.campId) : null;
+    const c = list.find(x => x.id === L.campId);
     foot.style.display = "";
     foot.innerHTML = '<div class="frow"><span class="lbl">선택한 레이어</span>' +
       '<div class="meta">' + LKIND(L) + (c ? " → <b>" + esc(c.name) + "</b>" : " → 연결된 캠페인 없음") + "</div></div>";
@@ -3237,7 +3255,7 @@ function editCamp(id) {
 }
 function initPanels() {
   $("#btnAddTag").addEventListener("click", () => editTag(null));
-  $("#btnAddCamp").addEventListener("click", () => editCamp(null));
+  $("#btnAddCamp").addEventListener("click", () => openCampPicker());
   $("#btnToggleAllTags").addEventListener("click", () => {
     const n = curNode(); if (!n || !n.tags.length) return;
     const allExpanded = n.tags.every(t => expandedTags.has(t.id));
@@ -3268,10 +3286,14 @@ function initPanels() {
     if (go) return openUrl(go.dataset.gotoUrl);
     if (ed) return editCamp(ed.dataset.campEdit);
     if (dl && canEdit()) {
-      const n = curNode(), c = n.camps.find(x => x.id === dl.dataset.campDel);
-      return confirmDel("캠페인 " + c.name + " 을 삭제할까요?", () => {
-        n.camps = n.camps.filter(x => x.id !== c.id);
-        (n.layers || []).forEach(l => { if (l.campId === c.id) l.campId = null; });
+      /* 시트의 캠페인 자체를 지우는 것이 아니라, 이 페이지에서 떼어 내기만 한다.
+         캠페인 삭제는 앱에서 할 수 없다 — 그만 쓰는 캠페인은 시트에서 상태를 '중단'으로 바꾼다. */
+      const n = curNode(), raw = n.camps.find(x => x.id === dl.dataset.campDel);
+      if (!raw) return;
+      const c = campView(raw);
+      return confirmDel("캠페인 " + c.name + " 을(를) 이 페이지에서 뗄까요?\n캠페인 자체는 구글 시트에 그대로 남습니다.", () => {
+        n.camps = n.camps.filter(x => x.id !== raw.id);
+        (n.layers || []).forEach(l => { if (l.campId === raw.id) l.campId = null; });
         markDirty(); renderFlow(); renderStage(); renderPanels(); renderCampView(true);
       });
     }
@@ -3420,7 +3442,7 @@ function initTagView() {
 }
 
 /* ---------------- 캠페인 뷰 ---------------- */
-const campFilter = { chan: "all", board: "all", status: "all", cat1: "all", cat2: "all", q: "" };
+const campFilter = { chan: "all", goal: "all", seg: "all", owner: "all", status: "all", place: "all", q: "" };
 /* 구간(스윔레인) 배경은 지금 보고 있는 보드가 아닌 다른 보드일 수도 있어서,
    B()(현재 보드) 전제인 laneRect() 대신 보드를 인자로 받는 버전을 따로 둔다 */
 function laneExtentYFor(b) {
@@ -3442,103 +3464,110 @@ function laneOfNode(b, n) {
     return cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h;
   }) || null;
 }
-function camCatOptions(all, key, cur) {
-  const names = Array.from(new Set(all.map(x => (x.c[key] || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
-  return '<option value="all">전체</option>' + names.map(v => '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + ">" + esc(v) + "</option>").join("");
+/* 캠페인 탭 — 구글 시트 1.개인화DB 의 목록 그대로를 보여 준다.
+   여정 지도에 붙었는지는 문서에서 캠페인코드로 찾아 표시한다. */
+function campColOptions(key, cur, allLabel) {
+  const names = Array.from(new Set(SHEETS.camps.map(m => String(m[key] || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
+  return '<option value="all">' + esc(allLabel) + "</option>" +
+    names.map(v => '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + ">" + esc(v) + "</option>").join("");
 }
 function renderCampView(force) {
   if (!force && !viewStale.camps) return;
   viewStale.camps = false;
+  const wrap = $("#view-camps");
+  if (!wrap) return;
+  $(".syncbar", wrap).innerHTML = syncBarHtml();
+
+  const chans = Array.from(new Set(SHEETS.camps.map(m => String(m.chan || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
   const seg = $("#campChanFilter");
-  if (!seg.children.length) {
-    seg.innerHTML = '<button class="btn sm on" data-ch="all">전체</button>' +
-      Object.entries(CHAN).map(([k, v]) => '<button class="btn sm" data-ch="' + k + '">' + esc(v.name) + "</button>").join("");
-  }
-  $("#campBoardFilter").innerHTML = boardOptions(campFilter.board);
-  const all = allCamps();
-  if (!all.some(x => (x.c.cat1 || "") === campFilter.cat1)) campFilter.cat1 = "all";
-  if (!all.some(x => (x.c.cat2 || "") === campFilter.cat2)) campFilter.cat2 = "all";
-  $("#campCat1Filter").innerHTML = camCatOptions(all, "cat1", campFilter.cat1);
-  $("#campCat2Filter").innerHTML = camCatOptions(all, "cat2", campFilter.cat2);
-  const rows = all.filter(({ c, n, b }) =>
-    (campFilter.chan === "all" || c.chan === campFilter.chan) &&
-    (campFilter.board === "all" || state.boards[+campFilter.board] === b) &&
-    (campFilter.status === "all" || c.status === campFilter.status) &&
-    (campFilter.cat1 === "all" || (c.cat1 || "") === campFilter.cat1) &&
-    (campFilter.cat2 === "all" || (c.cat2 || "") === campFilter.cat2) &&
-    (!campFilter.q || (c.name + " " + c.segment + " " + c.timing + " " + c.extId + " " + (c.cat1 || "") + " " + (c.cat2 || "") + " " + n.name + " " + b.name).toLowerCase().includes(campFilter.q)));
-  /* 여정 지도 상의 위치(왼쪽→오른쪽, 위쪽→아래쪽)를 따라 캠페인을 여정 순서대로 보여준다 */
-  rows.sort((x, y) => {
-    const bi = state.boards.indexOf(x.b) - state.boards.indexOf(y.b); if (bi) return bi;
-    const qx = nodeRect(x.n), qy = nodeRect(y.n);
-    return (qx.x - qy.x) || (qx.y - qy.y);
-  });
+  seg.innerHTML = '<button class="btn sm' + (campFilter.chan === "all" ? " on" : "") + '" data-ch="all">전체</button>' +
+    chans.map(c => '<button class="btn sm' + (campFilter.chan === c ? " on" : "") + '" data-ch="' + esc(c) + '">' + esc(c) + "</button>").join("");
+  $("#campGoalFilter").innerHTML = campColOptions("goal", campFilter.goal, "모든 목표");
+  $("#campSegFilter").innerHTML = campColOptions("title", campFilter.seg, "모든 캠페인구분");
+  $("#campOwnerFilter").innerHTML = campColOptions("owner", campFilter.owner, "모든 담당자");
+
+  const placed = {};
+  state.boards.forEach(b => b.nodes.forEach(n => (n.camps || []).forEach(c => {
+    if (c.code) (placed[c.code] = placed[c.code] || []).push({ b, n });
+  })));
+
+  const rows = SHEETS.camps.filter(m =>
+    (campFilter.chan === "all" || m.chan === campFilter.chan) &&
+    (campFilter.goal === "all" || m.goal === campFilter.goal) &&
+    (campFilter.seg === "all" || m.title === campFilter.seg) &&
+    (campFilter.owner === "all" || m.owner === campFilter.owner) &&
+    (campFilter.status === "all" || m.status === campFilter.status) &&
+    (campFilter.place === "all" || (campFilter.place === "on" ? !!placed[m.code] : !placed[m.code])) &&
+    (!campFilter.q || (m.code + " " + m.goal + " " + m.title + " " + m.fullName + " " + m.owner + " " + m.trigger).toLowerCase().includes(campFilter.q)));
 
   $("#campStats").innerHTML =
-    ['<div class="stat" style="--c:var(--camp)"><span class="n">' + all.length + '</span><span class="t">전체 캠페인</span></div>',
-     '<div class="stat" style="--c:var(--ok)"><span class="n">' + all.filter(x => x.c.status === "live").length + '</span><span class="t">운영중</span></div>',
-     '<div class="stat" style="--c:var(--warn)"><span class="n">' + all.filter(x => x.c.status === "test").length + '</span><span class="t">테스트</span></div>',
-     '<div class="stat" style="--c:var(--accent)"><span class="n">' + new Set(all.map(x => x.n.id)).size + '</span><span class="t">캠페인이 붙은 화면</span></div>'].join("");
+    ['<div class="stat" style="--c:var(--camp)"><span class="n">' + SHEETS.camps.length + '</span><span class="t">시트의 전체 캠페인</span></div>',
+     '<div class="stat" style="--c:var(--ok)"><span class="n">' + SHEETS.camps.filter(m => m.statusCode === "live").length + '</span><span class="t">진행</span></div>',
+     '<div class="stat" style="--c:var(--accent)"><span class="n">' + Object.keys(placed).length + '</span><span class="t">여정지도에 붙임</span></div>',
+     '<div class="stat" style="--c:var(--ink-3)"><span class="n">' + rows.length + '</span><span class="t">지금 조건에 맞는 수</span></div>'].join("");
 
-  $("#campGrid").innerHTML = rows.length ? rows.map(({ c, n, b }) => {
-    const pins = (n.layers || []).filter(l => l.campId === c.id).length;
-    const lane = laneOfNode(b, n);
-    const links = campLinkButtons(c);
-    return '<div class="ccard" style="--c:' + (CHAN[c.chan] || CHAN.push).c + '">' +
+  $("#campGrid").innerHTML = rows.length ? rows.map(m => {
+    const where = placed[m.code] || [];
+    const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
+    const links = campLinkButtons({ links: [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url) });
+    return '<div class="ccard" style="--c:' + (CHAN[m.chanCode] || CHAN.push).c + '">' +
       '<div class="crow">' +
-        '<div class="rowseg">' + (c.cat1 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat1) + "</span>" : "") +
-          (c.cat2 ? '<span class="chip" style="--c:var(--ink-3)">' + esc(c.cat2) + "</span>" : "") + "</div>" +
-        '<span class="chip" style="--c:' + CSTATUS_C[c.status] + '">' + CSTATUS[c.status] + "</span>" +
+        '<div class="rowseg">' + (m.goal ? '<span class="chip" style="--c:var(--ink-3)">' + esc(m.goal) + "</span>" : "") +
+          (m.aarrrName ? '<span class="chip" style="--c:var(--ink-3)">' + esc(m.aarrrName) + "</span>" : "") + "</div>" +
+        '<span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span>" +
       "</div>" +
-      '<div class="crow">' + "<h3>" + esc(c.name) + "</h3>" + chanChip(c.chan) + "</div>" +
-      '<div class="crow">' +
-        '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(b.name) + " · " + esc(n.name) + "</span>" +
-        (links || "") +
-      "</div>" +
-      (c.segment || c.timing ? '<div class="meta">' + (c.segment ? "<span>세그먼트 <b>" + esc(c.segment) + "</b></span>" : "") +
-        (c.timing ? "<span>타이밍 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" : "") +
-      (c.extId || c.landing ? '<div class="kv">' + (c.extId ? "<span>" + esc(c.extId) + "</span>" : "") + (c.landing ? "<span>" + esc(c.landing) + "</span>" : "") + "</div>" : "") +
-      (lane || pins ? '<div class="where">' +
-        (lane ? '<span class="pagechip lanechip" style="--c:' + (lane.color || "var(--accent)") + '" title="여정 지도의 구간">' + ico("lanes", "xs") + " " + esc(lane.name || "구간") + "</span>" : "") +
-        (pins ? '<span class="pagechip">' + ico("pin", "xs") + " 화면 배치 " + pins + "</span>" : "") + "</div>" : "") +
-      (c.note ? '<div class="hint">' + esc(c.note) + "</div>" : "") +
+      '<div class="crow"><h3>' + esc(m.label) + "</h3>" + chanChip(m.chanCode) + "</div>" +
+      '<div class="kv"><span>' + esc(m.code) + "</span>" + (m.owner ? "<span>" + esc(m.owner) + "</span>" : "") +
+        (m.progress ? "<span>" + esc(m.progress) + "</span>" : "") + "</div>" +
+      (m.fullName ? '<div class="hint mono">' + esc(m.fullName) + "</div>" : "") +
+      (typeof perfBadge === "function" ? perfBadge(m.code) : "") +
+      (m.trigger || m.index ? '<div class="meta">' + (m.trigger ? "<span>트리거 <b>" + esc(m.trigger) + "</b></span>" : "") +
+        (m.index ? "<span>전환 <b>" + esc(m.index) + "</b></span>" : "") + "</div>" : "") +
+      (ctr.length || cvr.length ? '<div class="meta">' +
+        (ctr.length ? '<span>CTR 기준 <b>' + esc(ctr.join(" · ")) + "</b></span>" : "") +
+        (cvr.length ? '<span>CVR 기준 <b>' + esc(cvr.join(" · ")) + "</b></span>" : "") + "</div>" : "") +
+      (m.path ? '<div class="kv"><span>' + esc(m.path) + "</span></div>" : "") +
+      (links || "") +
+      (where.length ? '<div class="where">' + where.map(({ b, n }) =>
+        '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(n.name) + "</span>").join("") + "</div>"
+        : '<div class="where"><span class="pagechip" style="opacity:.6">여정지도에 아직 안 붙임</span></div>') +
+      (m.memo ? '<div class="hint">' + esc(m.memo) + "</div>" : "") +
+      (canEdit() && isStaff() ? '<button class="btn sm edit-only staff-only" data-sheet-edit="' + esc(m.code) + '" style="align-self:flex-start">' +
+        ico("edit", "xs") + "시트에서 수정</button>" : "") +
     "</div>";
-  }).join("") : '<div class="empty" style="grid-column:1/-1">' + ico("mega") + "<div>조건에 맞는 캠페인이 없습니다</div></div>";
+  }).join("") : '<div class="empty" style="grid-column:1/-1">' + ico("mega") +
+    "<div>" + (SHEETS.camps.length ? "조건에 맞는 캠페인이 없습니다" : "구글 시트에서 캠페인을 아직 불러오지 못했습니다") + "</div></div>";
 }
 function initCampView() {
   $("#campChanFilter").addEventListener("click", e => {
     const b = e.target.closest("[data-ch]"); if (!b) return;
     campFilter.chan = b.dataset.ch; $$("#campChanFilter .btn").forEach(x => x.classList.toggle("on", x === b)); renderCampView(true);
   });
-  $("#campBoardFilter").addEventListener("change", e => { campFilter.board = e.target.value; renderCampView(true); });
+  $("#campGoalFilter").addEventListener("change", e => { campFilter.goal = e.target.value; renderCampView(true); });
+  $("#campSegFilter").addEventListener("change", e => { campFilter.seg = e.target.value; renderCampView(true); });
+  $("#campOwnerFilter").addEventListener("change", e => { campFilter.owner = e.target.value; renderCampView(true); });
   $("#campStatusFilter").addEventListener("change", e => { campFilter.status = e.target.value; renderCampView(true); });
-  $("#campCat1Filter").addEventListener("change", e => { campFilter.cat1 = e.target.value; renderCampView(true); });
-  $("#campCat2Filter").addEventListener("change", e => { campFilter.cat2 = e.target.value; renderCampView(true); });
+  $("#campPlaceFilter").addEventListener("change", e => { campFilter.place = e.target.value; renderCampView(true); });
   $("#campSearch").addEventListener("input", e => { campFilter.q = e.target.value.toLowerCase().trim(); renderCampView(true); });
-  $("#btnCampTemplate").addEventListener("click", campCsvTemplate);
-  $("#btnCampBulk").addEventListener("click", () => {
-    if (!canEdit()) return;
-    const inp = $("#campCsvPick"); inp.value = "";
-    inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) openCampBulkModal(f); };
-    inp.click();
-  });
+  $("#btnNewSheetCamp").addEventListener("click", () => editSheetCamp(null));
   $("#campGrid").addEventListener("click", e => {
     const go = e.target.closest("[data-goto-url]");
     if (go) return openUrl(go.dataset.gotoUrl);
     const g = e.target.closest("[data-goto]");
     if (g && g.dataset.bi != null) jumpTo(+g.dataset.bi, g.dataset.goto);
   });
+  /* 시트 컬럼을 그대로 내보낸다 — 어디에 붙였는지만 한 칸 덧붙인다 */
   $("#btnCampCsv").addEventListener("click", () => {
-    const head = ["보드", "페이지", "캠페인명", "채널", "대분류", "소분류", "세그먼트", "타이밍", "상태", "캠페인ID", "랜딩", "메모"];
-    const q = s => '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"';
-    const body = allCamps().map(({ c, n, b }) => [b.name, n.name, c.name, (CHAN[c.chan] || CHAN.push).name, c.cat1 || "", c.cat2 || "", c.segment, c.timing, CSTATUS[c.status], c.extId, c.landing, c.note].map(q).join(","));
-    saveFile("crm-campaigns.csv", "﻿" + [head.map(q).join(",")].concat(body).join("\r\n"), "text/csv");
+    const head = SHEET_COLS.map(c => c.label).concat("여정지도 배치");
+    const body = SHEETS.camps.map(m => csvLine(SHEET_COLS.map(c => m[c.key]).concat(
+      placementsOf(m.code).map(({ b, n }) => b.name + " · " + n.name).join(" / "))));
+    saveFile("crm-campaigns.csv", "﻿" + [csvLine(head)].concat(body).join("\r\n"), "text/csv");
   });
 }
 
 
 /* ========================================================================
-   저장 위치 — Artifact 공유본 · 서버(Supabase) · JSON 파일
+   저장 위치 — 서버(Supabase) · JSON 파일
    이미지 호스팅(Cloudinary)을 연결하면 화면 이미지·이미지 레이어를
    Cloudinary에 올리고 JSON에는 URL만 남긴다. 이미 등록된 이미지도
    "일괄 URL 변환"으로 나중에 한꺼번에 바꿀 수 있다.
@@ -3576,7 +3605,7 @@ async function cloudUpload(blob, opts) {
   try {
     res = await fetch("https://api.cloudinary.com/v1_1/" + cfg.cloudName + "/image/upload", { method: "POST", body: fd });
   } catch (err) {
-    throw new Error("Cloudinary에 접속하지 못했습니다. (Artifact 화면 안에서는 외부 업로드가 차단됩니다)");
+    throw new Error("Cloudinary에 접속하지 못했습니다.");
   }
   const j = await res.json().catch(() => null);
   if (!res.ok) throw new Error((j && j.error && j.error.message) || ("업로드 실패 " + res.status));
@@ -3624,7 +3653,7 @@ function openCloudModal() {
       "Signing Mode를 <b>Unsigned</b>로 만든 프리셋 이름을 적으세요. API Key·Secret은 필요 없습니다 " +
       "(브라우저 코드에 넣으면 노출되므로 쓰지 않습니다).<br>" +
       "업로드 시 <span class=\"mono\">crm/연도-월/보드이름</span> 폴더에 담기고, 페이지 이름이 태그로 붙습니다.<br>" +
-      "이 설정은 이 문서에 같이 저장되므로, <b>공유 저장/서버 저장을 한 번 눌러야</b> 다른 사람이 열었을 때도 그대로 적용됩니다.",
+      "이 설정은 이 문서에 같이 저장되므로, <b>서버 저장을 한 번 눌러야</b> 다른 사람이 열었을 때도 그대로 적용됩니다.",
     fields: [
       { k: "cloudName", label: "Cloud name", mono: true, ph: "pspfcgbn" },
       { k: "preset", label: "Upload preset (Unsigned)", mono: true, ph: "예: jta-unsigned" }
@@ -3706,7 +3735,6 @@ async function convertAllImagesToUrl() {
 function updateStorageUI() {
   const b = $("#btnShare");
   if (supaOn()) { b.style.display = ""; b.lastChild.textContent = "서버 저장"; }
-  else if (saveAvail) { b.style.display = ""; b.lastChild.textContent = "공유 저장"; }
   else b.style.display = "none";
   $("#btnStorage").classList.toggle("on", supaOn());
 }
@@ -3714,7 +3742,7 @@ function openStorageModal() {
   const supa = supaOn();
   const where = supa
     ? "<b>서버(Supabase)</b>에 저장 중 — 구글 로그인한 사람만 열람, 서버관리자·운영자만 편집"
-    : (saveAvail ? "이 <b>Artifact 링크</b>에 저장 중 — 링크를 받은 사람이 같은 보드를 봅니다" : "저장 위치가 없습니다 (브라우저에만 임시 보관)");
+    : "저장 위치가 없습니다 (브라우저에만 임시 보관) — 배포한 주소에서 열어야 서버에 저장됩니다";
   const unhosted = unhostedTargets().length;
   const rows =
     '<div class="frow"><span class="lbl">현재 저장 위치</span><div class="meta" style="font-size:12.5px">' + where + "</div></div>" +
@@ -3734,7 +3762,7 @@ function openStorageModal() {
     '<div class="frow"><span class="lbl">이미지 호스팅 (Cloudinary)</span><div style="display:flex; gap:6px; flex-wrap:wrap">' +
       '<button class="btn sm" data-act="host">' + ico("up", "xs") + (cloudCfg() ? "설정됨 — " + esc(cloudCfg().cloudName) : "Cloudinary 연결") + "</button>" +
       '<button class="btn sm" data-act="urlize">' + ico("loop", "xs") + "일괄 URL 변환</button></div>" +
-      '<p class="hint">화면 이미지·이미지 레이어를 Cloudinary에 올리고 JSON에는 URL만 남깁니다. 연결해 두면 서버 저장 때도 자동으로 적용됩니다. 지금 URL이 아닌 이미지 <b>' + unhosted + "개</b>. Artifact 화면 안에서는 차단되며, 내려받은 파일이나 자체 호스팅에서만 동작합니다.</p></div>";
+      '<p class="hint">화면 이미지·이미지 레이어를 Cloudinary에 올리고 JSON에는 URL만 남깁니다. 연결해 두면 서버 저장 때도 자동으로 적용됩니다. 지금 URL이 아닌 이미지 <b>' + unhosted + "개</b>.</p></div>";
 
   const root = modalHost();
   root.innerHTML =
@@ -4312,7 +4340,9 @@ function globalSearchResults(q) {
     if ((n.name + " " + (n.path || "")).toLowerCase().indexOf(q) >= 0) nodes.push({ n, b });
   }));
   const tags = allTags().filter(({ t, n }) => (tagEventEn(t) + " " + (t.eventKo || "") + " " + tagArea(t) + " " + n.name).toLowerCase().indexOf(q) >= 0);
-  const camps = allCamps().filter(({ c, n }) => (c.name + " " + n.name).toLowerCase().indexOf(q) >= 0);
+  /* 여정 지도에 붙어 있는 캠페인은 시트에서 이름을 가져와 검색한다 */
+  const camps = allCamps().map(({ c, n, b }) => ({ c: campView(c), n, b }))
+    .filter(({ c, n }) => c && (c.name + " " + (c.code || "") + " " + n.name).toLowerCase().indexOf(q) >= 0);
   return { nodes: nodes.slice(0, 20), tags: tags.slice(0, 20), camps: camps.slice(0, 20) };
 }
 function qsRow(icoName, title, sub, bi, nodeId) {
@@ -4738,10 +4768,6 @@ function hexToRgba(hex, a) {
 function safeBoardFilename() { return String(B().name || "board").replace(/[\\/:*?"<>|]/g, "").trim() || "board"; }
 async function downloadBinary(filename, blob) {
   try {
-    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
-    if (dl) { await dl.save({ filename, data: blob }); toast(filename + " 저장 완료", "ok"); return; }
-  } catch (e) { /* 아래 폴백 */ }
-  try {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = filename; a.style.display = "none";
@@ -4808,11 +4834,789 @@ async function exportBoardPdf() {
 }
 
 /* ========================================================================
+   구글 시트 연동 — 캠페인 마스터(1.개인화DB) · 성과 이력(3.개인화RAW)
+
+   시트가 원본이고 이 앱은 화면이다. 캠페인 목록을 앱 안에 따로 적재하지 않고,
+   접속할 때 /api/sheets 를 통해 읽어 온다. 여정 지도 문서에 저장되는 것은
+   "이 페이지에 이 캠페인코드를 붙였다"는 연결 정보뿐이다.
+   그래서 시트에서 사라진 캠페인은 앱에서도 저절로 사라진다.
+
+   읽기 = 로그인한 회원 누구나 · 쓰기(추가·수정) = 운영자 이상 · 삭제는 없다.
+   ======================================================================== */
+
+/* ---------------- 컬럼 스펙 ----------------
+   1.개인화DB 의 A~AE. 이 배열이 시트 ↔ 앱 사이의 유일한 기준점이다.
+   edit:false 인 열은 로직·수치라서 앱에서 고칠 수 없다(가져오기만 한다). */
+const SHEET_COLS = [
+  { a: "A",  key: "mkt",        label: "마케팅구분",     edit: true },
+  { a: "B",  key: "aarrrCode",  label: "AARRR구분코드",  edit: true },
+  { a: "C",  key: "aarrrName",  label: "AARRR구분명",    edit: true },
+  { a: "D",  key: "goal",       label: "목표",           edit: true },
+  { a: "E",  key: "code",       label: "캠페인코드",     edit: true },
+  { a: "F",  key: "title",      label: "캠페인구분",     edit: true },   // 화면 표시명
+  { a: "G",  key: "fullName",   label: "캠페인명",       edit: true },   // 실제 세부 이름
+  { a: "H",  key: "progress",   label: "진행도",         edit: true },
+  { a: "I",  key: "chan",       label: "채널",           edit: true },
+  { a: "J",  key: "trigger",    label: "트리거",         edit: true },
+  { a: "K",  key: "index",      label: "Index",          edit: true },
+  { a: "L",  key: "path",       label: "경로",           edit: true },
+  { a: "M",  key: "status",     label: "상태",           edit: true },
+  { a: "N",  key: "event",      label: "이벤트",         edit: true },
+  { a: "O",  key: "apidb",      label: "API/DB",         edit: true },
+  { a: "P",  key: "owner",      label: "담당자",         edit: true },
+  { a: "Q",  key: "memo",       label: "메모",           edit: true },
+  { a: "R",  key: "ctrBasis",   label: "CTR기준",        edit: false },
+  { a: "S",  key: "cvrBasis",   label: "CVR기준",        edit: false },
+  { a: "T",  key: "link1",      label: "링크1",          edit: true },
+  { a: "U",  key: "link2",      label: "링크2",          edit: true },
+  { a: "V",  key: "measure",    label: "성과측정",       edit: true },
+  { a: "W",  key: "measureNote",label: "비고",           edit: true },
+  { a: "X",  key: "sent",       label: "전달",           edit: false, num: true },
+  { a: "Y",  key: "recv",       label: "수신",           edit: false, num: true },
+  { a: "Z",  key: "recvU",      label: "수신(고유)",     edit: false, num: true },
+  { a: "AA", key: "open",       label: "오픈",           edit: false, num: true },
+  { a: "AB", key: "conv",       label: "예약/반응",      edit: false, num: true },
+  { a: "AC", key: "ctr",        label: "CTR",            edit: false, num: true, rate: true },
+  { a: "AD", key: "cvr",        label: "CVR",            edit: false, num: true, rate: true },
+  { a: "AE", key: "revenue",    label: "매출",           edit: false, num: true }
+];
+const COL_BY_KEY = SHEET_COLS.reduce((m, c, i) => (m[c.key] = i, m), {});
+/* 3.개인화RAW 의 A~P */
+const RAW_COLS = ["date", "code", "goal", "title", "fullName", "chan", "owner",
+  "sent", "recv", "recvU", "open", "conv", "ctr", "cvr", "revenue", "note"];
+
+/* 시트의 채널 표기를 앱의 채널 코드(아이콘·색)로 옮긴다 */
+const CHAN_MATCH = [
+  ["앱푸시", "push"], ["웹푸시", "push"], ["푸시", "push"], ["push", "push"],
+  ["인앱", "inapp"], ["팝업", "inapp"],
+  ["알림톡", "kakao"], ["카카오", "kakao"], ["친구톡", "kakao"],
+  ["이메일", "email"], ["메일", "email"], ["email", "email"],
+  ["문자", "sms"], ["sms", "sms"], ["lms", "sms"], ["mms", "sms"],
+  ["배너", "banner"], ["띠", "banner"]
+];
+function chanKey(s) {
+  const t = String(s || "").toLowerCase();
+  for (const [needle, key] of CHAN_MATCH) if (t.indexOf(needle) >= 0) return key;
+  return "inapp";
+}
+/* 시트의 상태(진행·중단)를 앱의 상태 코드로 */
+function statusKey(s) {
+  const t = String(s || "").trim();
+  if (t.indexOf("중단") >= 0 || t.indexOf("종료") >= 0) return "ended";
+  if (t.indexOf("테스트") >= 0) return "test";
+  if (!t) return "draft";
+  return "live";
+}
+/* 화면 표시명 — 캠페인구분은 채널만 다른 같은 이름이 여럿이라 채널을 뒤에 붙인다 */
+function campLabel(m) {
+  if (!m) return "";
+  const base = (m.title || m.fullName || m.code || "이름 없음").trim();
+  const ch = String(m.chan || "").trim();
+  return ch ? base + " [" + ch + "]" : base;
+}
+
+/* ---------------- 시트에서 읽어 둔 것 ---------------- */
+const SHEETS = {
+  camps: [],        // 캠페인 마스터 레코드
+  byCode: {},
+  perf: [],         // 성과 이력 레코드
+  at: 0,            // 마지막으로 읽은 시각
+  err: null,
+  loading: false,
+  loaded: false
+};
+const SHEET_CACHE = "sheets:v1";
+
+const num = v => {
+  if (typeof v === "number") return v;
+  const n = parseFloat(String(v == null ? "" : v).replace(/[,\s%₩]/g, ""));
+  return isFinite(n) ? n : null;
+};
+const colIndex = letters => {                     // "AB" → 27
+  let n = 0;
+  for (const ch of String(letters)) n = n * 26 + (ch.charCodeAt(0) - 64);
+  return n - 1;
+};
+
+/* 수식을 컬럼명 문장으로 바꾼다 — "=AB2/Y2" → "예약/반응 ÷ 수신".
+   다른 시트를 가리키는 참조( '3.개인화RAW'!AB2 )는 건드리지 않는다. */
+function formulaToBasis(f) {
+  if (typeof f !== "string" || f.charAt(0) !== "=") return "";
+  return f.slice(1)
+    .replace(/(!?)\$?([A-Z]{1,2})\$?\d+/g, (m, bang, col) => {
+      if (bang) return m;
+      const c = SHEET_COLS[colIndex(col)];
+      return c ? c.label : m;
+    })
+    .replace(/\//g, " ÷ ").replace(/\*/g, " × ")
+    .replace(/\s{2,}/g, " ").trim();
+}
+/* 실적 기준 — 시트에 적어 둔 기준 문구와, 수식에서 역산한 산식을 함께 보여준다 */
+function basisOf(m, kind) {
+  const written = kind === "ctr" ? m.ctrBasis : m.cvrBasis;
+  const derived = kind === "ctr" ? m.ctrFormula : m.cvrFormula;
+  const out = [];
+  if (written) out.push(String(written).trim());
+  if (derived && derived !== written) out.push(derived);
+  return out;
+}
+
+/* ---------------- 정규화 ---------------- */
+function normCampRows(payload) {
+  const rows = (payload && payload.rows) || [], forms = (payload && payload.formulas) || [];
+  const out = [];
+  rows.forEach((r, i) => {
+    if (!r || !String(r[COL_BY_KEY.code] || "").trim()) return;      // 캠페인코드 없는 줄은 건너뛴다
+    const m = { _row: i + 2, _raw: r.slice() };
+    SHEET_COLS.forEach((c, ci) => {
+      const v = r[ci];
+      m[c.key] = c.num ? num(v) : (v == null ? "" : String(v).trim());
+    });
+    const f = forms[i] || [];
+    m.ctrFormula = formulaToBasis(f[COL_BY_KEY.ctr]);
+    m.cvrFormula = formulaToBasis(f[COL_BY_KEY.cvr]);
+    m.chanCode = chanKey(m.chan);
+    m.statusCode = statusKey(m.status);
+    m.label = campLabel(m);
+    out.push(m);
+  });
+  return out;
+}
+/* 날짜 → "2026-07". 시트에서 문자열로 오든 일련번호로 오든 받아 준다 */
+function ym(v) {
+  if (v == null || v === "") return "";
+  if (typeof v === "number") {
+    const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
+    return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0");
+  }
+  const s = String(v).trim();
+  const m = /^(\d{4})[-./년\s]*(\d{1,2})/.exec(s);
+  return m ? m[1] + "-" + String(m[2]).padStart(2, "0") : "";
+}
+function normPerfRows(payload) {
+  const rows = (payload && payload.rows) || [];
+  const out = [];
+  rows.forEach(r => {
+    if (!r) return;
+    const code = String(r[1] || "").trim();
+    const month = ym(r[0]);
+    if (!code || !month) return;
+    const o = { month: month };
+    RAW_COLS.forEach((k, i) => {
+      const v = r[i];
+      o[k] = i >= 7 && i <= 14 ? num(v) : (v == null ? "" : String(v).trim());
+    });
+    o.code = code;
+    o.chanCode = chanKey(o.chan);
+    /* CTR·CVR 은 시트에서 계산된 값을 그대로 쓴다. 0~1 로 오면 %로 맞춘다. */
+    o.ctrPct = ratePct(o.ctr);
+    o.cvrPct = ratePct(o.cvr);
+    out.push(o);
+  });
+  out.sort((a, b) => a.month.localeCompare(b.month));
+  return out;
+}
+function ratePct(v) {
+  const n = num(v);
+  if (n == null) return null;
+  return Math.abs(n) <= 1 ? n * 100 : n;          // 0.056 → 5.6 · 5.6 → 5.6
+}
+
+/* ---------------- 불러오기 ---------------- */
+async function sheetApi(path, opts) {
+  const token = await ensureToken();
+  if (!token) throw new Error("로그인이 필요합니다");
+  const o = Object.assign({ headers: {} }, opts || {});
+  o.headers = Object.assign({ Authorization: "Bearer " + token }, o.headers);
+  const r = await fetch("/api/sheets" + path, o);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ("시트를 읽지 못했습니다 (" + r.status + ")"));
+  return j;
+}
+
+function applySheetPayload(j, at) {
+  if (j.campaigns) SHEETS.camps = normCampRows(j.campaigns);
+  if (j.perf) SHEETS.perf = normPerfRows(j.perf);
+  SHEETS.byCode = SHEETS.camps.reduce((m, c) => (m[c.code] = c, m), {});
+  SHEETS.at = at || Date.now();
+  SHEETS.loaded = true;
+}
+
+/* 접속할 때 한 번 읽고, 그 뒤에는 새로고침 버튼으로만 다시 읽는다.
+   먼저 브라우저에 남은 마지막 응답으로 화면을 그려 두고 뒤에서 갱신한다. */
+async function loadSheets(opt) {
+  const o = opt || {};
+  if (SHEETS.loading) return;
+  if (!supaOn() || !me) { SHEETS.err = "로그인하면 캠페인 시트를 불러옵니다"; renderSyncBars(); return; }
+  SHEETS.loading = true; SHEETS.err = null;
+  renderSyncBars();
+  try {
+    const j = await sheetApi("?action=all" + (o.fresh ? "&fresh=1" : ""));
+    applySheetPayload(j, Date.now());
+    try { await idbSet(SHEET_CACHE, { campaigns: j.campaigns, perf: j.perf, at: SHEETS.at }); } catch (e) {}
+    if (o.toast) toast("캠페인 " + SHEETS.camps.length + "건 · 성과 " + SHEETS.perf.length + "행을 시트에서 불러왔습니다", "ok");
+  } catch (e) {
+    SHEETS.err = (e && e.message) || "시트를 읽지 못했습니다";
+    if (o.toast) toast(SHEETS.err, "bad");
+  } finally {
+    SHEETS.loading = false;
+    renderSyncBars();
+    invalidateViews();
+    renderFlow(); renderPanels();
+    renderCampView(true);
+    if (typeof renderPerfView === "function") renderPerfView(true);
+  }
+}
+/* 지난번 접속에서 받아 둔 내용 — 시트가 느리거나 막혀 있어도 화면은 비지 않는다 */
+async function loadSheetCache() {
+  let c = null;
+  try { c = await idbGet(SHEET_CACHE); } catch (e) {}
+  if (!c || !c.campaigns) return false;
+  applySheetPayload(c, c.at);
+  return true;
+}
+
+function syncAgo() {
+  if (!SHEETS.at) return "아직 불러오지 않음";
+  return timeAgo(SHEETS.at) + " 기준";
+}
+function syncBarHtml() {
+  if (SHEETS.loading) return '<span class="syncchip">' + ico("loop", "xs") + "시트를 읽는 중…</span>";
+  if (SHEETS.err) return '<span class="syncchip bad">' + ico("alert", "xs") + esc(SHEETS.err) +
+    (SHEETS.at ? " · " + esc(syncAgo()) + " 자료로 표시 중" : "") + "</span>";
+  return '<span class="syncchip">' + ico("check", "xs") + "캠페인 " + SHEETS.camps.length + "건 · " + esc(syncAgo()) + "</span>";
+}
+function renderSyncBars() {
+  $$(".syncbar").forEach(el => { el.innerHTML = syncBarHtml(); });
+  $$("[data-sheet-refresh]").forEach(b => { b.disabled = !!SHEETS.loading; });
+}
+
+/* ---------------- 마스터 조회 ---------------- */
+const campByCode = code => SHEETS.byCode[String(code || "").trim()] || null;
+
+/* 노드에 붙어 있는 항목 하나를 화면에 그릴 형태로 편다.
+   시트 연동 항목은 {id, code} 만 문서에 저장되고, 나머지는 여기서 시트로부터 채운다.
+   예전 방식으로 직접 등록해 둔 캠페인은 그대로 통과시킨다(옛 문서 호환). */
+function campView(c) {
+  if (!c) return null;
+  if (!c.code) return c;
+  const m = campByCode(c.code);
+  if (!m) {
+    return {
+      id: c.id, code: c.code, missing: true, name: c.code + " · 시트에서 삭제됨",
+      chan: "inapp", status: "ended", segment: "", timing: "", extId: c.code,
+      landing: "", note: "", links: []
+    };
+  }
+  return {
+    id: c.id, code: c.code, missing: false, master: m,
+    name: m.label,
+    chan: m.chanCode, chanText: m.chan,
+    status: m.statusCode,
+    segment: m.trigger, timing: m.index,
+    extId: m.code, landing: m.path, note: m.memo,
+    links: [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url)
+  };
+}
+const campViews = n => (n && n.camps ? n.camps.map(campView).filter(Boolean) : []);
+/* 어느 페이지에 붙어 있는지 — 캠페인코드로 전체 보드를 훑는다 */
+function placementsOf(code) {
+  const out = [];
+  state.boards.forEach(b => b.nodes.forEach(n => {
+    if ((n.camps || []).some(c => c.code === code)) out.push({ b, n });
+  }));
+  return out;
+}
+
+/* ---------------- 여정 지도에 붙이기 ---------------- */
+let pickFilter = { q: "", goal: "all", chan: "all", owner: "all" };
+
+function optionsOf(list, key, cur, allLabel) {
+  const names = Array.from(new Set(list.map(x => String(x[key] || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
+  return '<option value="all">' + esc(allLabel) + "</option>" +
+    names.map(v => '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + ">" + esc(v) + "</option>").join("");
+}
+function pickRows(n) {
+  const has = (n.camps || []).map(c => c.code).filter(Boolean);
+  const q = pickFilter.q;
+  return SHEETS.camps.filter(m =>
+    (pickFilter.goal === "all" || m.goal === pickFilter.goal) &&
+    (pickFilter.chan === "all" || m.chan === pickFilter.chan) &&
+    (pickFilter.owner === "all" || m.owner === pickFilter.owner) &&
+    (!q || (m.code + " " + m.goal + " " + m.title + " " + m.fullName + " " + m.owner).toLowerCase().indexOf(q) >= 0)
+  ).map(m => ({ m, on: has.indexOf(m.code) >= 0 }));
+}
+function pickListHtml(n) {
+  const rows = pickRows(n);
+  if (!rows.length) return '<div class="empty">' + ico("mega") + "<div>조건에 맞는 캠페인이 없습니다</div></div>";
+  return rows.map(({ m, on }) =>
+    '<label class="pickrow' + (on ? " on" : "") + '">' +
+      '<input type="checkbox" data-pick="' + esc(m.code) + '"' + (on ? " checked" : "") + ">" +
+      '<span class="pickmain"><b>' + esc(m.label) + "</b>" +
+        '<em>' + esc(m.code) + (m.goal ? " · " + esc(m.goal) : "") + (m.owner ? " · " + esc(m.owner) : "") + "</em>" +
+        (m.fullName ? '<span class="pickfull mono">' + esc(m.fullName) + "</span>" : "") + "</span>" +
+      '<span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span>" +
+    "</label>").join("");
+}
+function openCampPicker() {
+  const n = curNode();
+  if (!n || !canEdit()) return;
+  if (!SHEETS.loaded) return toast("캠페인 시트를 아직 불러오지 못했습니다. 캠페인 탭에서 새로고침해 보세요.", "bad");
+
+  const root = modalHost();
+  const draw = () => { $("#pickList", root).innerHTML = pickListHtml(n); };
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass wide" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("mega") + "<h3>캠페인 붙이기 · " + esc(n.name) + '</h3><button class="btn icon sm" data-x>' + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' +
+        '<div class="toolrow">' +
+          '<input class="field" id="pickQ" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:180px" value="' + esc(pickFilter.q) + '">' +
+          '<select class="field" id="pickGoal">' + optionsOf(SHEETS.camps, "goal", pickFilter.goal, "모든 목표") + "</select>" +
+          '<select class="field" id="pickChan">' + optionsOf(SHEETS.camps, "chan", pickFilter.chan, "모든 채널") + "</select>" +
+          '<select class="field" id="pickOwner">' + optionsOf(SHEETS.camps, "owner", pickFilter.owner, "모든 담당자") + "</select>" +
+        "</div>" +
+        '<div class="picklist" id="pickList"></div>' +
+        '<p class="hint">체크한 캠페인이 이 페이지에 붙습니다. 목록은 구글 시트 <b>1.개인화DB</b> 에 있는 것만 나옵니다 — ' +
+          '여기 없는 캠페인은 <b>새 캠페인 등록</b>으로 시트에 먼저 추가하세요.</p>' +
+      "</div>" +
+      '<div class="modal-foot">' +
+        (isStaff() ? '<button class="btn" data-new>' + ico("plus", "xs") + "새 캠페인 등록</button>" : "") +
+        '<div class="spacer"></div><button class="btn primary" data-x>닫기</button></div>' +
+    "</div></div>";
+  draw();
+
+  root.addEventListener("input", e => {
+    if (e.target.id === "pickQ") { pickFilter.q = e.target.value.toLowerCase().trim(); draw(); }
+  });
+  root.addEventListener("change", e => {
+    if (e.target.id === "pickGoal") { pickFilter.goal = e.target.value; return draw(); }
+    if (e.target.id === "pickChan") { pickFilter.chan = e.target.value; return draw(); }
+    if (e.target.id === "pickOwner") { pickFilter.owner = e.target.value; return draw(); }
+    const cb = e.target.closest("[data-pick]");
+    if (!cb) return;
+    const code = cb.dataset.pick;
+    if (cb.checked) {
+      if (!n.camps.some(c => c.code === code)) n.camps.push({ id: uid("c"), code: code });
+    } else {
+      const gone = n.camps.filter(c => c.code === code).map(c => c.id);
+      n.camps = n.camps.filter(c => c.code !== code);
+      (n.layers || []).forEach(l => { if (gone.indexOf(l.campId) >= 0) l.campId = null; });
+    }
+    cb.closest(".pickrow").classList.toggle("on", cb.checked);
+    markDirty(); renderFlow(); renderStage(); renderPanels(); renderCampView(true);
+  });
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
+    if (e.target.closest("[data-new]")) { closeModal(); editSheetCamp(null); }
+  });
+}
+
+/* ---------------- 시트에 캠페인 추가 · 수정 ---------------- */
+function sheetFormFields() {
+  return [
+    { k: "code", label: "캠페인코드", mono: true, ph: "A1-002" },
+    { k: "title", label: "캠페인구분 (화면 표시명)", ph: "회원가입 유도" },
+    { k: "fullName", label: "캠페인명 (세부 이름)", ph: "IN_P_CRM_가입_트리거기반_공통_앱_회원가입유도_260701~260731" },
+    { k: "chan", label: "채널", ph: "인앱 · 앱푸시 · 인앱/웹" },
+    { k: "goal", label: "목표", ph: "회원가입 증대" },
+    { k: "mkt", label: "마케팅구분", ph: "개인화" },
+    { k: "aarrrCode", label: "AARRR구분코드", mono: true, ph: "A1" },
+    { k: "aarrrName", label: "AARRR구분명", ph: "획득 (인지)" },
+    { k: "status", label: "상태", type: "select", opts: { "진행": "진행", "중단": "중단" } },
+    { k: "progress", label: "진행도", ph: "완료" },
+    { k: "owner", label: "담당자", ph: "홍길동" },
+    { type: "group", label: "실행 조건", open: true, fields: [
+      { k: "trigger", label: "트리거", ph: "메인 페이지 로딩 시 & 로그인 = N" },
+      { k: "index", label: "Index", ph: "7일 이내 회원가입 = Y" },
+      { k: "path", label: "경로", mono: true, ph: "/product/main.yb" },
+      { k: "event", label: "이벤트", ph: "" },
+      { k: "apidb", label: "API/DB", ph: "" }
+    ] },
+    { type: "group", label: "링크 · 성과측정", fields: [
+      { k: "link1", label: "링크1", mono: true, ph: "https://dashboard-05.braze.com/..." },
+      { k: "link2", label: "링크2", mono: true, ph: "" },
+      { k: "measure", label: "성과측정 여부", type: "select", opts: { "Y": "Y (측정함)", "N": "N (측정 안 함)", "": "미지정" } },
+      { k: "measureNote", label: "비고 (성과측정 참고 메모)", type: "textarea" }
+    ] },
+    { k: "memo", label: "메모", type: "textarea" }
+  ];
+}
+/* 앱에서 고칠 수 없는 열은 값만 보여 준다 */
+function lockedFields(m) {
+  if (!m) return [];
+  return [{ type: "group", label: "실적 기준 · 수치 (시트에서만 수정)", open: true, fields: [
+    { k: "_ctrBasis", label: "CTR 기준", type: "readonly" },
+    { k: "_cvrBasis", label: "CVR 기준", type: "readonly" },
+    { k: "_nums", label: "시트 집계", type: "readonly" }
+  ] }];
+}
+function editSheetCamp(code) {
+  if (!isStaff()) return toast("캠페인 등록·수정은 운영자 이상만 할 수 있습니다", "bad");
+  const m = code ? campByCode(code) : null;
+  if (code && !m) return toast("시트에서 이 캠페인을 찾지 못했습니다. 새로고침해 보세요.", "bad");
+
+  const values = {};
+  SHEET_COLS.forEach(c => { values[c.key] = m ? (m[c.key] == null ? "" : m[c.key]) : ""; });
+  if (!m) values.status = "진행";
+  if (m) {
+    const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
+    values._ctrBasis = ctr.length ? ctr.join("  ·  ") : "시트에 기준이 적혀 있지 않습니다";
+    values._cvrBasis = cvr.length ? cvr.join("  ·  ") : "시트에 기준이 적혀 있지 않습니다";
+    values._nums = SHEET_COLS.filter(c => c.num).map(c => {
+      const v = m[c.key];
+      return c.label + " " + (v == null ? "-" : c.rate ? (Math.abs(v) <= 1 ? v * 100 : v).toFixed(1) + "%" : v.toLocaleString("ko-KR"));
+    }).join("  ·  ");
+  }
+
+  openForm({
+    title: m ? "캠페인 수정 · " + m.code : "새 캠페인 등록",
+    icon: "mega",
+    okText: m ? "시트에 저장" : "시트에 등록",
+    note: "구글 시트 <b>1.개인화DB</b> 에 그대로 반영됩니다. " +
+      "<b>CTR기준·CVR기준과 전달~매출(X~AE)은 로직·수치라 앱에서 고칠 수 없습니다</b> — 시트에서 직접 수정하세요. " +
+      "앱에서는 삭제할 수 없습니다. 그만 쓰는 캠페인은 상태를 <b>중단</b>으로 바꾸세요." +
+      (m ? "" : "<br>새로 등록하면 실적 열의 수식은 바로 윗줄에서 복사됩니다. CTR기준·CVR기준은 시트에서 채워 주세요."),
+    fields: sheetFormFields().concat(lockedFields(m)),
+    values,
+    onSave: async v => {
+      const newCode = String(v.code || "").trim();
+      if (!newCode) return toast("캠페인코드는 반드시 필요합니다", "bad");
+      if (!m && campByCode(newCode)) return toast("이미 있는 캠페인코드입니다: " + newCode, "bad");
+      if (m && newCode !== m.code) return toast("캠페인코드는 바꿀 수 없습니다. 시트에서 직접 고쳐 주세요.", "bad");
+      const row = [];
+      SHEET_COLS.forEach((c, i) => { row[i] = c.edit ? (v[c.key] == null ? "" : String(v[c.key])) : ""; });
+      toast(m ? "시트에 저장하는 중…" : "시트에 등록하는 중…");
+      try {
+        await sheetApi("", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "upsert", code: m ? m.code : newCode, values: row })
+        });
+        await loadSheets({ fresh: true });
+        toast(m ? "시트에 저장했습니다" : "시트에 등록했습니다 · " + newCode, "ok");
+      } catch (e) {
+        toast("시트에 쓰지 못했습니다: " + ((e && e.message) || "알 수 없는 오류"), "bad");
+      }
+    }
+  });
+}
+
+/* ---------------- 초기화 ---------------- */
+function initSheets() {
+  document.addEventListener("click", e => {
+    const r = e.target.closest("[data-sheet-refresh]");
+    if (r) { if (!isStaff()) return toast("새로고침은 운영자 이상만 할 수 있습니다", "bad"); loadSheets({ fresh: true, toast: true }); }
+    const ed = e.target.closest("[data-sheet-edit]");
+    if (ed) editSheetCamp(ed.dataset.sheetEdit);
+  });
+}
+/* 접속 직후 — 캐시로 먼저 그리고 시트를 다시 읽는다 */
+async function bootSheets() {
+  const had = await loadSheetCache();
+  if (had) { renderSyncBars(); invalidateViews(); renderFlow(); renderPanels(); }
+  await loadSheets({});
+}
+
+/* ========================================================================
+   성과 추이 — 구글 시트 3.개인화RAW 를 월 단위로 집계해 보여 준다.
+
+   가로축은 월, 세로축은 성과. CTR 은 곡선(왼쪽 축), CVR 은 세로 막대(오른쪽 축)로
+   같은 차트에 겹쳐 그린다 — CVR 이 CTR 보다 훨씬 작아 축을 나누지 않으면 바닥에 붙는다.
+   ======================================================================== */
+const PERF_C = ["#2f6fed", "#e0483f", "#12a97a", "#8b5cf6", "#e08a1e", "#0ea5b7"];
+const perfFilter = { q: "", goal: "all", chan: "all", owner: "all", seg: "all" };
+let perfPicked = [];                     // 차트에 그릴 캠페인코드 (최대 6개)
+
+const pct1 = v => (v == null ? "-" : v.toFixed(1) + "%");
+const kNum = v => (v == null ? "-" : Math.round(v).toLocaleString("ko-KR"));
+
+/* ---------------- 집계 ---------------- */
+/* 같은 캠페인·같은 달에 여러 줄이 있으면 횟수는 더하고, 비율은 수신 수로 가중평균한다 */
+function perfByCampMonth() {
+  const map = {};
+  SHEETS.perf.forEach(r => {
+    const k = r.code + "|" + r.month;
+    const b = map[k] || (map[k] = {
+      code: r.code, month: r.month, goal: r.goal, title: r.title, fullName: r.fullName,
+      chan: r.chan, chanCode: r.chanCode, owner: r.owner,
+      sent: 0, recv: 0, recvU: 0, open: 0, conv: 0, revenue: 0, _w: 0, _ctr: 0, _cvr: 0
+    });
+    ["sent", "recv", "recvU", "open", "conv", "revenue"].forEach(k2 => { b[k2] += r[k2] || 0; });
+    const w = r.recv || r.sent || 1;
+    b._w += w;
+    if (r.ctrPct != null) b._ctr += r.ctrPct * w;
+    if (r.cvrPct != null) b._cvr += r.cvrPct * w;
+  });
+  return Object.values(map).map(b => {
+    b.ctr = b._w ? b._ctr / b._w : null;
+    b.cvr = b._w ? b._cvr / b._w : null;
+    return b;
+  });
+}
+let perfCache = null;
+function perfRows() {
+  if (!perfCache || perfCache.at !== SHEETS.at) perfCache = { at: SHEETS.at, rows: perfByCampMonth() };
+  return perfCache.rows;
+}
+const perfMonths = () => Array.from(new Set(perfRows().map(r => r.month))).sort();
+
+/* 캠페인 하나의 월별 이력 (오래된 달 → 최근 달) */
+function perfHistory(code) {
+  return perfRows().filter(r => r.code === code).sort((a, b) => a.month.localeCompare(b.month));
+}
+/* 가장 최근 달과 그 직전 달 — 여정 지도 배지에 쓴다 */
+function perfLatest(code) {
+  const h = perfHistory(code);
+  if (!h.length) return null;
+  const cur = h[h.length - 1], prev = h[h.length - 2] || null;
+  return {
+    month: cur.month, ctr: cur.ctr, cvr: cur.cvr,
+    dCtr: prev && cur.ctr != null && prev.ctr != null ? cur.ctr - prev.ctr : null,
+    dCvr: prev && cur.cvr != null && prev.cvr != null ? cur.cvr - prev.cvr : null
+  };
+}
+/* 캠페인 이름 옆에 붙는 전월 실적 배지 — CTR 파랑 · CVR 빨강 */
+function perfBadge(code, small) {
+  const p = code ? perfLatest(code) : null;
+  if (!p) return "";
+  const arrow = d => (d == null || Math.abs(d) < 0.05 ? "" : '<i class="' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
+  return '<span class="perfbadge' + (small ? " sm" : "") + '" title="' + esc(p.month) + ' 기준 · 직전 달 대비 증감">' +
+    '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
+    '<span class="pb cvr">CVR ' + pct1(p.cvr) + arrow(p.dCvr) + "</span>" +
+  "</span>";
+}
+
+/* ---------------- 차트 ---------------- */
+/* 점들을 부드러운 곡선으로 잇는다 (Catmull-Rom → 3차 베지어) */
+function smoothPath(pts) {
+  if (!pts.length) return "";
+  if (pts.length < 3) return "M" + pts.map(p => p[0] + " " + p[1]).join(" L");
+  let d = "M" + pts[0][0] + " " + pts[0][1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += " C" + c1x + " " + c1y + " " + c2x + " " + c2y + " " + p2[0] + " " + p2[1];
+  }
+  return d;
+}
+function niceMax(v) {
+  if (!v || v <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  const s = v / mag;
+  return (s <= 1 ? 1 : s <= 2 ? 2 : s <= 2.5 ? 2.5 : s <= 5 ? 5 : 10) * mag;
+}
+function perfChartSvg(series, months) {
+  const W = 940, H = 340, L = 54, R = 54, T = 18, Bm = 46;
+  const iw = W - L - R, ih = H - T - Bm;
+  if (!months.length || !series.length)
+    return '<div class="empty">' + ico("mega") + "<div>왼쪽 목록에서 캠페인을 선택하면 추이가 그려집니다</div></div>";
+
+  const ctrMax = niceMax(Math.max.apply(null, series.reduce((a, s) => a.concat(s.ctr.filter(v => v != null)), [0])));
+  const cvrMax = niceMax(Math.max.apply(null, series.reduce((a, s) => a.concat(s.cvr.filter(v => v != null)), [0])));
+  const step = iw / months.length;
+  const cx = i => L + step * (i + 0.5);
+  const yCtr = v => T + ih - (v / ctrMax) * ih;
+  const yCvr = v => T + ih - (v / cvrMax) * ih;
+
+  const grid = [0, 0.25, 0.5, 0.75, 1].map(f => {
+    const y = T + ih - f * ih;
+    return '<line class="gl" x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '"/>' +
+      '<text class="ax l" x="' + (L - 8) + '" y="' + (y + 4) + '">' + (ctrMax * f).toFixed(ctrMax < 5 ? 1 : 0) + "%</text>" +
+      '<text class="ax r" x="' + (W - R + 8) + '" y="' + (y + 4) + '">' + (cvrMax * f).toFixed(cvrMax < 5 ? 1 : 0) + "%</text>";
+  }).join("");
+
+  const xlab = months.map((m, i) =>
+    '<text class="ax c" x="' + cx(i) + '" y="' + (T + ih + 20) + '">' + esc(m.slice(2)) + "</text>").join("");
+
+  /* CVR — 달마다 시리즈 수만큼 나란히 세운 막대 */
+  const bw = Math.max(4, Math.min(20, (step * 0.56) / series.length));
+  const bars = series.map((s, si) => s.cvr.map((v, i) => {
+    if (v == null) return "";
+    const x = cx(i) - (series.length * bw) / 2 + si * bw;
+    const y = yCvr(v), h = Math.max(1, T + ih - y);
+    return '<rect class="bar" x="' + x + '" y="' + y + '" width="' + (bw - 1.5) + '" height="' + h + '" fill="' + s.color + '" opacity=".34">' +
+      "<title>" + esc(s.label) + " · " + esc(months[i]) + " CVR " + pct1(v) + "</title></rect>";
+  }).join("")).join("");
+
+  /* CTR — 부드러운 곡선 */
+  const lines = series.map(s => {
+    const pts = s.ctr.map((v, i) => (v == null ? null : [cx(i), yCtr(v)])).filter(Boolean);
+    if (!pts.length) return "";
+    return '<path class="ln" d="' + smoothPath(pts) + '" stroke="' + s.color + '"/>' +
+      pts.map((p, i) => '<circle class="dot" cx="' + p[0] + '" cy="' + p[1] + '" r="3.4" fill="' + s.color + '"><title>' +
+        esc(s.label) + " · CTR " + pct1(s.ctr.filter(v => v != null)[i]) + "</title></circle>").join("");
+  }).join("");
+
+  const legend = series.map(s =>
+    '<span class="lg"><i style="background:' + s.color + '"></i>' + esc(s.label) + "</span>").join("");
+
+  return '<div class="chartwrap"><svg class="perfchart" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet">' +
+      grid + xlab + bars + lines +
+      '<text class="ax cap l" x="' + L + '" y="' + (T - 4) + '">CTR (곡선)</text>' +
+      '<text class="ax cap r" x="' + (W - R) + '" y="' + (T - 4) + '">CVR (막대)</text>' +
+    "</svg>" +
+    '<div class="legend">' + legend + "</div></div>";
+}
+
+/* ---------------- 뷰 ---------------- */
+let perfIndexCache = null;
+function perfCampIndex() {
+  if (perfIndexCache && perfIndexCache.at === SHEETS.at) return perfIndexCache.list;
+  const rows = perfRows();
+  const byCode = {};
+  rows.forEach(r => {
+    const m = campByCode(r.code);
+    const b = byCode[r.code] || (byCode[r.code] = {
+      code: r.code,
+      label: m ? m.label : (r.title ? r.title + (r.chan ? " [" + r.chan + "]" : "") : r.code),
+      fullName: m ? m.fullName : r.fullName,
+      goal: (m && m.goal) || r.goal || "미분류",
+      seg: (m && m.title) || r.title || "",
+      chan: (m && m.chan) || r.chan || "",
+      owner: (m && m.owner) || r.owner || "",
+      months: 0, inSheet: !!m
+    });
+    b.months++;
+  });
+  const list = Object.values(byCode).sort((a, b) =>
+    (a.goal || "").localeCompare(b.goal || "", "ko") || a.code.localeCompare(b.code));
+  perfIndexCache = { at: SHEETS.at, list };
+  return list;
+}
+function perfCampList() {
+  const q = perfFilter.q;
+  return perfCampIndex().filter(b =>
+    (perfFilter.goal === "all" || b.goal === perfFilter.goal) &&
+    (perfFilter.chan === "all" || b.chan === perfFilter.chan) &&
+    (perfFilter.owner === "all" || b.owner === perfFilter.owner) &&
+    (perfFilter.seg === "all" || b.seg === perfFilter.seg) &&
+    (!q || (b.code + " " + b.goal + " " + b.label + " " + b.fullName + " " + b.owner).toLowerCase().indexOf(q) >= 0)
+  );
+}
+function perfSeriesFor(codes, months) {
+  return codes.map((code, i) => {
+    const h = perfHistory(code);
+    const at = m => h.find(x => x.month === m) || null;
+    const m0 = campByCode(code);
+    return {
+      code,
+      label: m0 ? m0.label : ((h[0] && h[0].title) || code),
+      color: PERF_C[i % PERF_C.length],
+      ctr: months.map(m => { const r = at(m); return r ? r.ctr : null; }),
+      cvr: months.map(m => { const r = at(m); return r ? r.cvr : null; })
+    };
+  });
+}
+function renderPerfView(force) {
+  if (!force && !viewStale.perf) return;
+  viewStale.perf = false;
+  const wrap = $("#view-perf");
+  if (!wrap) return;
+  $(".syncbar", wrap).innerHTML = syncBarHtml();
+
+  const all = perfRows();
+  const list = perfCampList();
+  const codes = list.map(b => b.code);
+  perfPicked = perfPicked.filter(c => codes.indexOf(c) >= 0);
+  if (!perfPicked.length && codes.length) perfPicked = codes.slice(0, 1);
+
+  const opts = (key, cur, label) => {
+    const names = Array.from(new Set(perfCampIndex().map(x => String(x[key] || "").trim()).filter(Boolean)));
+    return '<option value="all">' + esc(label) + "</option>" +
+      names.sort((a, b) => a.localeCompare(b, "ko")).map(v => '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + ">" + esc(v) + "</option>").join("");
+  };
+  $("#perfGoal").innerHTML = opts("goal", perfFilter.goal, "모든 목표 (대분류)");
+  $("#perfChan").innerHTML = opts("chan", perfFilter.chan, "모든 채널");
+  $("#perfOwner").innerHTML = opts("owner", perfFilter.owner, "모든 담당자");
+  $("#perfSeg").innerHTML = opts("seg", perfFilter.seg, "모든 캠페인구분");
+
+  const months = perfMonths();
+  const last = months[months.length - 1];
+  const lastRows = all.filter(r => r.month === last);
+  const wAvg = key => {
+    let w = 0, s = 0;
+    lastRows.forEach(r => { const q = r.recv || r.sent || 0; if (r[key] != null && q) { w += q; s += r[key] * q; } });
+    return w ? s / w : null;
+  };
+  $("#perfStats").innerHTML = [
+    '<div class="stat" style="--c:var(--accent)"><span class="n">' + (months.length ? esc(months[0]) + " ~ " + esc(last) : "-") + '</span><span class="t">집계 기간</span></div>',
+    '<div class="stat" style="--c:var(--camp)"><span class="n">' + codes.length + '</span><span class="t">캠페인</span></div>',
+    '<div class="stat" style="--c:#2f6fed"><span class="n">' + pct1(wAvg("ctr")) + '</span><span class="t">' + esc(last || "-") + ' 평균 CTR</span></div>',
+    '<div class="stat" style="--c:#e0483f"><span class="n">' + pct1(wAvg("cvr")) + '</span><span class="t">' + esc(last || "-") + ' 평균 CVR</span></div>'
+  ].join("");
+
+  /* 목표(대분류)로 묶은 캠페인 목록 — 체크한 것이 차트에 그려진다 */
+  let html = "", goal = null;
+  list.forEach(b => {
+    if (b.goal !== goal) { goal = b.goal; html += '<div class="perfgroup">' + esc(goal) + "</div>"; }
+    const on = perfPicked.indexOf(b.code) >= 0;
+    html += '<label class="pickrow' + (on ? " on" : "") + '">' +
+      '<input type="checkbox" data-perf-pick="' + esc(b.code) + '"' + (on ? " checked" : "") + ">" +
+      '<span class="pickmain"><b>' + esc(b.label) + "</b>" +
+        "<em>" + esc(b.code) + " · " + b.months + "개월" + (b.owner ? " · " + esc(b.owner) : "") +
+        (b.inSheet ? "" : " · <span style=\"color:var(--warn)\">마스터에 없음</span>") + "</em></span>" +
+      perfBadge(b.code, true) + "</label>";
+  });
+  $("#perfList").innerHTML = html || '<div class="empty">' + ico("mega") + "<div>조건에 맞는 캠페인이 없습니다</div></div>";
+  $("#perfChart").innerHTML = perfChartSvg(perfSeriesFor(perfPicked, months), months);
+
+  /* 선택한 캠페인의 월별 수치 표 */
+  const picked = perfPicked.map(c => ({ code: c, h: perfHistory(c) }));
+  $("#perfTable").innerHTML = picked.length
+    ? '<table class="ptable"><thead><tr><th>캠페인</th><th>월</th><th class="r">전달</th><th class="r">수신</th>' +
+      '<th class="r">오픈</th><th class="r">예약/반응</th><th class="r">CTR</th><th class="r">CVR</th><th class="r">매출</th></tr></thead><tbody>' +
+      picked.map(({ code, h }) => {
+        const m0 = campByCode(code);
+        return h.slice().reverse().map((r, i) =>
+          "<tr>" + (i === 0 ? '<td rowspan="' + h.length + '">' + esc(m0 ? m0.label : code) + '<em class="mono">' + esc(code) + "</em></td>" : "") +
+            "<td>" + esc(r.month) + '</td><td class="r">' + kNum(r.sent) + '</td><td class="r">' + kNum(r.recv) +
+            '</td><td class="r">' + kNum(r.open) + '</td><td class="r">' + kNum(r.conv) +
+            '</td><td class="r b" style="color:#2f6fed">' + pct1(r.ctr) + '</td><td class="r b" style="color:#e0483f">' + pct1(r.cvr) +
+            '</td><td class="r">' + kNum(r.revenue) + "</td></tr>").join("");
+      }).join("") + "</tbody></table>"
+    : "";
+
+  /* 실적 기준 — 이 캠페인의 CTR·CVR 이 무엇을 무엇으로 나눈 값인지 */
+  $("#perfBasis").innerHTML = perfPicked.map(code => {
+    const m = campByCode(code);
+    if (!m) return "";
+    const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
+    if (!ctr.length && !cvr.length) return "";
+    return '<div class="basiscard"><h4>' + esc(m.label) + "</h4>" +
+      (ctr.length ? '<div class="brow"><span class="chip" style="--c:#2f6fed">CTR 기준</span><span>' + esc(ctr.join("  ·  ")) + "</span></div>" : "") +
+      (cvr.length ? '<div class="brow"><span class="chip" style="--c:#e0483f">CVR 기준</span><span>' + esc(cvr.join("  ·  ")) + "</span></div>" : "") +
+      "</div>";
+  }).join("");
+}
+function initPerfView() {
+  const wrap = $("#view-perf");
+  if (!wrap) return;
+  ["perfGoal", "perfChan", "perfOwner", "perfSeg"].forEach(id => {
+    $("#" + id).addEventListener("change", e => {
+      perfFilter[id.replace("perf", "").toLowerCase()] = e.target.value;
+      renderPerfView(true);
+    });
+  });
+  $("#perfSearch").addEventListener("input", e => { perfFilter.q = e.target.value.toLowerCase().trim(); renderPerfView(true); });
+  $("#perfList").addEventListener("change", e => {
+    const cb = e.target.closest("[data-perf-pick]");
+    if (!cb) return;
+    const code = cb.dataset.perfPick;
+    if (cb.checked) {
+      if (perfPicked.length >= 6) { cb.checked = false; return toast("한 번에 6개까지 겹쳐 볼 수 있습니다", "bad"); }
+      if (perfPicked.indexOf(code) < 0) perfPicked.push(code);
+    } else perfPicked = perfPicked.filter(c => c !== code);
+    renderPerfView(true);
+  });
+}
+
+/* ========================================================================
    구글 로그인 · 회원 권한 (Supabase)
    - SDK 없이 REST/Auth 엔드포인트만 fetch 로 호출한다 (단일 HTML 유지)
    - 권한은 서버(RLS)에서 강제된다. 아래 UI 숨김은 편의일 뿐 방어선이 아니다.
-   - 배포한 사이트에서만 동작한다. claude.ai Artifact 안에서는 외부 도메인
-     접근이 차단되므로 로그인 버튼이 나타나지 않는다.
+   - 배포한 사이트(Vercel)에서만 동작한다. 로컬 파일로 직접 열면 OAuth
+     리디렉션이 불가능하므로 로그인 버튼이 나타나지 않는다.
    ======================================================================== */
 /* 배포 기본값 — 방문자가 아무것도 설정하지 않아도 바로 구글 로그인이 뜬다.
    anon key 는 공개용 키다(모든 Supabase 웹앱이 브라우저에 노출하는 값).
@@ -4840,9 +5644,7 @@ function supaCfg() {
   try { saved = JSON.parse(localStorage.getItem(SUPA_KEY) || "null"); } catch (e) {}
   return Object.assign({}, SUPA_DEFAULT, saved || {});
 }
-function inArtifact() { return !!(window.claude && window.claude.use); }   // claude.ai 미리보기
 function supaOn() {
-  if (inArtifact()) return false;                    // 미리보기: 외부 도메인 접속 차단
   if (location.protocol === "file:") return false;   // 로컬 파일: OAuth 리디렉션 불가
   const c = supaCfg();
   return !!(c.url && c.anon);
@@ -5124,9 +5926,7 @@ function applyRoleUI() {
     label.textContent = "구글로 로그인";
     btn.classList.remove("on");
     $("use", btn).setAttribute("href", "#i-lock");
-    btn.title = inArtifact()
-      ? "이 미리보기 화면에서는 구글 로그인이 차단됩니다 — 배포한 주소에서 로그인하세요"
-      : "구글 로그인을 쓰려면 Supabase 프로젝트를 연결하세요";
+    btn.title = "구글 로그인은 배포한 주소에서만 됩니다 (로컬 파일에서는 불가)";
     return;
   }
   $("use", btn).setAttribute("href", me ? "#i-check" : "#i-lock");
@@ -5141,9 +5941,6 @@ function applyRoleUI() {
   }
 }
 function openAuthMenu() {
-  if (inArtifact()) {
-    return toast("이 미리보기 화면에서는 구글 로그인이 차단됩니다. 배포한 주소에서 로그인하세요.", "bad");
-  }
   if (!supaOn()) return openServerModal();       // 연결 정보가 비어 있을 때만 설정 화면
   if (!me) return signIn();                      // 설정 화면 없이 바로 구글 로그인
   openMenu(
@@ -5164,7 +5961,7 @@ function openServerModal() {
     note: "Supabase 프로젝트의 <b>Project URL</b>과 <b>anon public key</b>를 넣으면 구글 로그인·회원 권한·서버 저장이 켜집니다. " +
       "anon key는 공개되어도 되는 값이고, 실제 권한은 서버의 RLS 정책이 판단합니다.<br>" +
       "먼저 <span class=\"mono\">supabase/schema.sql</span>을 SQL Editor에서 한 번 실행하고, Authentication → Providers에서 Google을 켜 주세요. " +
-      "이 설정은 배포된 사이트에서만 동작합니다(Artifact 화면 안에서는 외부 접속이 차단됩니다).",
+      "이 설정은 배포된 사이트(Vercel)에서만 동작합니다.",
     fields: [
       { k: "url", label: "Project URL", mono: true, ph: "https://xxxx.supabase.co" },
       { k: "anon", label: "anon public key", mono: true, ph: "eyJhbGciOi..." },
@@ -5282,12 +6079,13 @@ function switchView(v) {
   $$("#viewTabs .btn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   if (v === "tags") renderTagView();
   if (v === "camps") renderCampView();
+  if (v === "perf") renderPerfView();
   if (v === "map") { applySizes(); applyTransform(); if (!stageZoom) renderStage(); }
 }
 
 function initShell() {
   $("#viewTabs").addEventListener("click", e => { const b = e.target.closest("[data-view]"); if (b) switchView(b.dataset.view); });
-  $("#btnShare").addEventListener("click", () => (supaOn() ? serverSave() : shareSave()));
+  $("#btnShare").addEventListener("click", () => serverSave());
   $("#btnTheme").addEventListener("click", () => {
     const cur = document.documentElement.getAttribute("data-theme") || "light";
     const next = cur === "dark" ? "light" : "dark";
@@ -5302,7 +6100,7 @@ function initShell() {
 
   document.addEventListener("keydown", e => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (canEdit()) (supaOn() ? serverSave() : shareSave()); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (canEdit()) serverSave(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); openQuickSearch(); return; }
     if (typing) return;
     if (e.key === "Escape") {
@@ -5446,7 +6244,7 @@ function renderAll() {
 }
 
 async function boot() {
-  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initShell(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
+  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initPerfView(); initSheets(); initShell(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
   initMinimap(); wireUndoRedoButtons(); initLaneInteractions();
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */
@@ -5461,45 +6259,30 @@ async function boot() {
     else if (!ok) { setSaveChip("dirty", "서버에 문서가 없습니다 — 저장하면 만들어집니다"); renderAll(); }
     $("#btnShare").innerHTML = ico("share") + "<span>서버 저장</span>";
     updateStorageUI(); initLock();
+    bootSheets();                                 // 캠페인·성과는 구글 시트에서 받아 온다
     return;
   }
 
-  const api = await claudeApi();
-  saveAvail = !!api;
-
-  let remote = null;                                  // 1) Artifact 공유본
-  if (location.protocol !== "file:" && window.claude) {   // 자체 호스팅에서는 없는 파일이라 요청하지 않는다
-    try {
-      const r = await fetch("data/journey.json", { cache: "no-store" });
-      if (r.ok) remote = normalize(await r.json());
-    } catch (e) { /* 아직 저장 전 */ }
-  }
-  let draft = null;                                   // 2) 저장 안 된 로컬 초안
+  /* 1) 서버가 연결되지 않은 화면(로컬 파일로 직접 연 경우)은 브라우저 임시 보관만 된다 */
+  let draft = null;
   try { draft = await idbGet(DRAFT_KEY); } catch (e) {}
-
-  if (remote) {
-    state = remote;
-    savedRefs = collectRefs();
-    setSaveChip("ok", "공유본 · " + timeAgo(remote.updatedAt));
-  }
   if (draft && draft.data) {
-    const newer = !remote || (draft.base === remote.updatedAt && draft.savedAt > (remote.updatedAt || 0));
-    if (newer) {
-      state = normalize(draft.data);
-      savedRefs = draft.refs || collectRefs();
-      dirty = true; setSaveChip("dirty", "저장 안 된 변경 있음");
-    }
+    state = normalize(draft.data);
+    savedRefs = draft.refs || collectRefs();
+    dirty = true; setSaveChip("dirty", "저장 안 된 변경 있음");
+  } else {
+    setSaveChip("off", "로컬 전용 — 저장하려면 배포한 주소에서 여세요");
   }
-  if (!remote && !draft) setSaveChip("dirty", "샘플 데이터");
 
   const b = B();
   sel.node = b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null;
-  if (!api && !dirty) setSaveChip("off", "로컬 전용");
 
   renderAll();
   updateStorageUI();
   initLock();
-  if (!B().view.fitted) { fitFlow(); B().view.fitted = true; setSaveChip("dirty", saveAvail ? "샘플 데이터 · 저장 전" : "샘플 데이터"); }
+  SHEETS.err = "배포한 주소에서 구글 로그인해야 캠페인 시트를 불러옵니다";
+  renderSyncBars();
+  if (!B().view.fitted) { fitFlow(); B().view.fitted = true; }
 }
 function collectRefs() {
   return state.boards.reduce((a, b) => a.concat(b.nodes.filter(n => n.shot && n.shot.ref).map(n => n.shot.ref)), []);

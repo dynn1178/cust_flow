@@ -2,6 +2,7 @@
 <svg style="display:none" aria-hidden="true">
   <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="5" r="2.4"/><path d="M8.4 19h5.1a4 4 0 0 0 0-8h-3a4 4 0 0 1 0-8h5.1"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 19V5"/><path d="M4 19h16"/><path d="M7 15l4-5 3 3 4-6"/></symbol>
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M4 12h11m0 0-4-4m4 4-4 4"/><path d="M19 5v14"/></symbol>
   <symbol id="i-cursor" viewBox="0 0 24 24"><path d="M5 3l6.5 17 2.3-6.9 6.9-2.3z"/></symbol>
   <symbol id="i-zin" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.6-4.6M10.5 8v5M8 10.5h5"/></symbol>
@@ -64,6 +65,7 @@
       <button class="btn on" data-view="map"><svg class="ico xs"><use href="#i-map"/></svg>여정 지도</button>
       <button class="btn" data-view="tags"><svg class="ico xs"><use href="#i-tag"/></svg>태그 목록</button>
       <button class="btn" data-view="camps"><svg class="ico xs"><use href="#i-mega"/></svg>캠페인</button>
+      <button class="btn" data-view="perf"><svg class="ico xs"><use href="#i-chart"/></svg>성과 추이</button>
     </div>
     <div class="spacer"></div>
     <button class="btn icon" id="btnQuickSearch" title="빠른 검색 (Ctrl+F)"><svg class="ico"><use href="#i-search"/></svg></button>
@@ -131,7 +133,7 @@
           <span class="count" id="campCount">0</span>
           <div class="spacer"></div>
           <button class="btn sm" id="btnExpLeft" title="이 영역을 아래 전체(가로 끝에서 끝)로 넓히고 여정 지도는 줄입니다"><svg class="ico xs"><use href="#i-fit"/></svg><span id="expLeftLabel">확장</span></button>
-          <button class="btn sm edit-only" id="btnAddCamp"><svg class="ico xs"><use href="#i-plus"/></svg>추가</button>
+          <button class="btn sm edit-only" id="btnAddCamp" title="구글 시트의 캠페인 목록에서 골라 이 페이지에 붙입니다"><svg class="ico xs"><use href="#i-plus"/></svg>붙이기</button>
         </div>
         <div class="pane-body" id="campList"></div>
         <div class="pane-foot" id="layerLinkFoot" style="display:none"></div>
@@ -228,21 +230,49 @@
     <div class="listwrap glass">
       <div class="toolrow">
         <div class="seg" id="campChanFilter"></div>
-        <select class="field" id="campBoardFilter"></select>
+        <select class="field" id="campGoalFilter" title="목표(대분류)"></select>
+        <select class="field" id="campSegFilter" title="캠페인구분"></select>
+        <select class="field" id="campOwnerFilter" title="담당자"></select>
         <select class="field" id="campStatusFilter">
-          <option value="all">모든 상태</option><option value="live">운영중</option>
-          <option value="draft">기획중</option><option value="test">테스트</option><option value="ended">종료</option>
+          <option value="all">모든 상태</option><option value="진행">진행</option><option value="중단">중단</option>
         </select>
-        <select class="field" id="campCat1Filter"></select>
-        <select class="field" id="campCat2Filter"></select>
-        <input class="field" id="campSearch" placeholder="캠페인명 · 세그먼트 검색" style="flex:1; min-width:150px">
+        <select class="field" id="campPlaceFilter">
+          <option value="all">배치 무관</option><option value="on">여정지도에 붙은 것</option><option value="off">아직 안 붙인 것</option>
+        </select>
+        <input class="field" id="campSearch" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:170px">
         <div class="spacer"></div>
-        <button class="btn edit-only staff-only" id="btnCampBulk" title="CSV 파일로 캠페인 일괄 등록"><svg class="ico"><use href="#i-up"/></svg>일괄 업로드</button>
-        <button class="btn staff-only" id="btnCampTemplate" title="업로드용 샘플 CSV 내려받기"><svg class="ico"><use href="#i-down"/></svg>샘플 양식</button>
+        <span class="syncbar"></span>
+        <button class="btn edit-only staff-only" id="btnNewSheetCamp" title="구글 시트에 새 캠페인을 등록합니다"><svg class="ico"><use href="#i-plus"/></svg>새 캠페인</button>
+        <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>
         <button class="btn staff-only" id="btnCampCsv"><svg class="ico"><use href="#i-down"/></svg>CSV</button>
       </div>
       <div class="statgrid" id="campStats"></div>
       <div class="scroller"><div class="grid-cards" id="campGrid"></div></div>
+    </div>
+  </section>
+
+  <!-- ============== PERFORMANCE VIEW ============== -->
+  <section class="view" id="view-perf">
+    <div class="listwrap glass">
+      <div class="toolrow">
+        <select class="field" id="perfGoal" title="목표(대분류)"></select>
+        <select class="field" id="perfSeg" title="캠페인구분"></select>
+        <select class="field" id="perfChan" title="채널"></select>
+        <select class="field" id="perfOwner" title="담당자"></select>
+        <input class="field" id="perfSearch" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:170px">
+        <div class="spacer"></div>
+        <span class="syncbar"></span>
+        <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>
+      </div>
+      <div class="statgrid" id="perfStats"></div>
+      <div class="perfbody">
+        <div class="perfside scroller" id="perfList"></div>
+        <div class="perfmain scroller">
+          <div id="perfChart"></div>
+          <div id="perfBasis"></div>
+          <div id="perfTable"></div>
+        </div>
+      </div>
     </div>
   </section>
 </div>
@@ -256,4 +286,3 @@
 <input type="file" id="dirPick" webkitdirectory directory style="display:none">
 <input type="file" id="jsonPick" accept="application/json,.json" style="display:none">
 <input type="file" id="tagCsvPick" accept=".csv,text/csv" style="display:none">
-<input type="file" id="campCsvPick" accept=".csv,text/csv" style="display:none">
