@@ -118,9 +118,33 @@ const isStaff = me => me && (me.role === "server_admin" || me.role === "operator
 async function readCampaigns() {
   const range = a1(DB_TAB, "A1:" + DB_LAST_COL);
   const q = "/values/" + encodeURIComponent(range) + "?dateTimeRenderOption=FORMATTED_STRING&valueRenderOption=";
-  const [vals, forms] = await Promise.all([gapi(q + "UNFORMATTED_VALUE"), gapi(q + "FORMULA")]);
+  const [vals, forms, links] = await Promise.all([
+    gapi(q + "UNFORMATTED_VALUE"), gapi(q + "FORMULA"), readLinks()
+  ]);
   const v = vals.values || [], f = forms.values || [];
-  return { header: v[0] || [], rows: v.slice(1), formulas: f.slice(1) };
+  return { header: v[0] || [], rows: v.slice(1), formulas: f.slice(1), links: links };
+}
+/* 링크1·링크2(T·U)는 셀에 "ALL" 같은 글자만 보이고 주소는 따로 붙어 있는 경우가 많다.
+   values API 는 보이는 글자만 주므로, 링크 주소는 셀 메타데이터에서 따로 읽어 온다.
+   - Ctrl+K 로 건 링크      → hyperlink
+   - 글자 일부에만 건 링크  → textFormatRuns[].format.link.uri
+   - =HYPERLINK() 수식      → 프런트에서 수식으로부터 뽑는다 */
+async function readLinks() {
+  try {
+    const j = await gapi("?includeGridData=true" +
+      "&ranges=" + encodeURIComponent(a1(DB_TAB, "T:U")) +
+      "&fields=" + encodeURIComponent("sheets.data.rowData.values(hyperlink,textFormatRuns.format.link.uri)"));
+    const rowData = (((j.sheets || [])[0] || {}).data || [])[0];
+    const rows = (rowData && rowData.rowData) || [];
+    return rows.slice(1).map(r => (r.values || []).map(c => {
+      if (!c) return "";
+      if (c.hyperlink) return c.hyperlink;
+      const run = (c.textFormatRuns || []).find(t => t.format && t.format.link && t.format.link.uri);
+      return run ? run.format.link.uri : "";
+    }));
+  } catch (e) {
+    return [];                                 // 링크를 못 읽어도 나머지는 그대로 보여 준다
+  }
 }
 async function readPerf() {
   const range = a1(RAW_TAB, "A1:" + RAW_LAST_COL);

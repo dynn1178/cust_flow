@@ -204,17 +204,16 @@ function drawEdgeHandles() {
 /* ---------------- 노드 ----------------
    보기 모드마다 카드 아래쪽 목록의 형태만 바뀐다 — 점 색으로 채널/상태를
    나타내고, 이름 아래 작은 메타 줄(선택)을 붙이는 공통 패턴(g-row)을 쓴다. */
-function gRow(dotColor, name, meta, mono) {
+function gRow(dotColor, name, meta, mono, extra) {
   return '<div class="g-row' + (meta ? "" : " simple") + '"><span class="g-dot" style="background:' + dotColor + '"></span>' +
     '<div class="g-body"><span class="g-name' + (mono ? " mono" : "") + '">' + esc(name) + "</span>" +
-    (meta ? '<span class="g-meta">' + meta + "</span>" : "") + "</div></div>";
+    (meta ? '<span class="g-meta">' + meta + "</span>" : "") + (extra || "") + "</div></div>";
 }
 function campRow(raw) {
   const c = campView(raw);
   const ch = CHAN[c.chan] || CHAN.push;
-  /* 캠페인 이름 옆(아래)에 최신월 CTR·CVR 을 함께 보여 준다 */
-  const badge = typeof perfBadge === "function" ? perfBadge(c.code, true) : "";
-  return gRow(ch.c, c.name) + (badge ? '<div class="g-badge">' + badge + "</div>" : "");
+  /* 실적은 이름 바로 아래 한 줄로 — g-body 안에 넣어야 확대/축소 때 이름과 같은 비율로 커진다 */
+  return gRow(ch.c, c.name, "", false, perfBadge(c.code, "line"));
 }
 function tagRowsBig(n, plat) {
   const list = n.tags.filter(t => platformsOf(t).indexOf(plat) >= 0);
@@ -228,9 +227,7 @@ function campRowsBig(n) {
   return '<div class="node-list">' + n.camps.slice(0, 6).map(raw => {
     const c = campView(raw);
     const ch = CHAN[c.chan] || CHAN.push;
-    const badge = typeof perfBadge === "function" ? perfBadge(c.code, true) : "";
-    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : "")) +
-      (badge ? '<div class="g-badge">' + badge + "</div>" : "");
+    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status], false, perfBadge(c.code, "line"));
   }).join("") + (n.camps.length > 6 ? '<div class="g-more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function incompleteRowsBig(n) {

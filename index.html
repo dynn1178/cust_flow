@@ -286,6 +286,13 @@ select.field{cursor:pointer}
 .g-name.mono{font-family:var(--f-mono)}
 .g-row.simple .g-name{font-weight:500; color:var(--ink-2)}
 .g-meta{font-size:.84em; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+/* 여정 지도 노드의 실적 한 줄 — 캠페인 이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
+.perfline{display:flex; align-items:center; gap:4px; font-family:var(--f-mono); font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px}
+.perfline .mon{color:var(--ink-3); font-weight:500; font-size:.82em}
+.perfline .ctr{color:#2f6fed} .perfline .cvr{color:#e0483f}
+.perfline .sep{color:var(--ink-3); opacity:.6}
+.perfline i{font-style:normal; font-size:.72em; opacity:.85; margin-left:1px}
 .g-more{font-size:max(12px,min(15.5px,calc(12px / max(var(--zoom,1),.65)))); color:var(--ink-3); padding-left:12px}
 .g-empty{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--ink-3); text-align:center; padding-top:2px}
 .g-miss{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--warn); display:flex; align-items:center; gap:6px}
@@ -608,18 +615,19 @@ tr:hover .rowacts{opacity:1}
 #campTable td:last-child,#campTable th:last-child{border-right:0; width:40px}
 #campTable .nm{font-weight:600; font-size:12.5px; letter-spacing:-.01em}
 #campTable .sub{display:block; font-size:10.5px; color:var(--ink-3); margin-top:2px; overflow-wrap:anywhere}
-#campTable .basis{font-size:10.5px; color:var(--ink-2); line-height:1.5; max-width:230px}
-#campTable .basis b{display:inline-block; min-width:30px; color:var(--ink-3); font-weight:600}
 #campTable .capname{max-width:210px}
 #campTable .capfull{max-width:260px}
 #campTable .wherecell{display:flex; flex-wrap:wrap; gap:3px; max-width:180px}
 
 .perfbody{flex:1; min-height:0; display:flex; gap:0}
 .perfside{width:308px; flex:none; border-right:1px solid var(--stroke-2); padding:8px}
-.perfmain{flex:1; min-width:0; padding:12px}
+/* 그래프는 위에 고정하고, 실적 기준·표만 아래에서 스크롤한다 */
+.perfmain{flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; padding:12px; gap:12px}
+#perfChart{flex:none}
+.perfscroll{flex:1; min-height:0; overflow:auto; overscroll-behavior:contain}
 .perfgroup{font-size:11px; font-weight:600; color:var(--ink-3); padding:10px 8px 4px; letter-spacing:.02em}
 .chartwrap{position:relative; border:1px solid var(--stroke-2); border-radius:var(--r-md); background:var(--glass-2); padding:6px}
-.perfchart{width:100%; max-width:760px; height:auto; display:block; margin:0 auto}
+.perfchart{width:100%; height:auto; display:block}
 .perfchart .hit{fill:transparent; cursor:crosshair}
 .perfchart .vline{stroke:var(--ink-3); stroke-width:1; stroke-dasharray:3 3; opacity:.5}
 .perfchart .vlab{fill:var(--ink-2); font-size:8px; font-family:var(--f-mono); text-anchor:middle}
@@ -636,8 +644,18 @@ tr:hover .rowacts{opacity:1}
 .legend{display:flex; flex-wrap:wrap; gap:10px; padding:6px 4px 2px; justify-content:center}
 .legend .lg{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ink-2)}
 .legend .lg i{width:10px; height:10px; border-radius:3px; display:inline-block}
-.basiscard{border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:10px 12px; margin-top:12px; background:var(--glass-2)}
+/* 실적 기준 — 라벨은 색 있는 세로 띠, 시트 문구는 굵게, 수식 역산은 아래 흐리게 */
+.basis2{display:flex; flex-direction:column; gap:5px; max-width:280px}
+.brow2{display:flex; gap:7px; align-items:flex-start; line-height:1.45}
+.brow2 .bk{flex:none; font-family:var(--f-mono); font-size:9.5px; font-weight:700; letter-spacing:.04em;
+  color:var(--c); border-left:2.5px solid var(--c); padding:1px 0 1px 5px; min-width:30px}
+.brow2 .bv{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px}
+.brow2 .bmain{font-size:11.5px; color:var(--ink); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+.brow2 .bsub{font-size:10.5px; color:var(--ink-3); font-family:var(--f-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.brow2.none .bv{font-size:11px; color:var(--ink-3); font-style:italic}
+.basiscard{border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:10px 12px; margin-bottom:12px; background:var(--glass-2)}
 .basiscard h4{margin:0 0 7px; font-size:12.5px; font-weight:600}
+.basiscard .basis2{max-width:none}
 .basiscard .brow{display:flex; gap:8px; align-items:flex-start; font-size:11.5px; color:var(--ink-2); padding:3px 0}
 .basiscard .brow .chip{flex:none}
 .ptable{width:100%; border-collapse:collapse; margin-top:14px; font-size:11.5px}
@@ -656,13 +674,8 @@ tr:hover .rowacts{opacity:1}
 .perfbadge .pb.mon{color:var(--ink-3); background:var(--glass-2); border-color:var(--stroke-2); font-weight:500}
 .perfbadge .pb i{font-style:normal; margin-left:3px; opacity:.85; font-size:9.5px}
 .perfbadge.sm .pb{font-size:11px; padding:1px 6px}
-.g-badge{padding:3px 0 5px 20px}
 .card > .perfbadge{margin:-2px 0 2px}
 .ccard > .perfbadge{margin:2px 0}
-/* 노드 카드는 폭이 좁으므로 CTR·CVR 을 두 줄로 쌓고 글자는 오히려 키운다 */
-.node .perfbadge{display:flex; flex-direction:column; align-items:flex-start; gap:3px}
-/* 노드 카드에서는 "월" 만 한 줄, 그 아래 CTR·CVR 이 각각 한 줄씩 온다 */
-.node .perfbadge .pb.mon{font-size:10px; padding:0 6px}
 .node .perfbadge .pb{font-size:11px; padding:1px 7px; line-height:1.5}
 @media (max-width:860px){ .perfbody{flex-direction:column} .perfside{width:auto; height:220px; border-right:0; border-bottom:1px solid var(--stroke-2)} }
 </style>
@@ -900,11 +913,15 @@ tr:hover .rowacts{opacity:1}
     <div class="listwrap glass">
       <div class="toolrow">
         <div class="seg" id="campChanFilter"></div>
+        <select class="field" id="campAarrrFilter" title="AARRR 구분명"></select>
         <select class="field" id="campGoalFilter" title="목표(대분류)"></select>
         <select class="field" id="campSegFilter" title="캠페인구분"></select>
         <select class="field" id="campOwnerFilter" title="담당자"></select>
-        <select class="field" id="campStatusFilter">
-          <option value="all">모든 상태</option><option value="진행">진행</option><option value="중단">중단</option>
+        <select class="field" id="campStatusFilter" title="운영상태 — 시트 M열">
+          <option value="all">운영상태 전체</option><option value="진행">진행</option><option value="중단">중단</option>
+        </select>
+        <select class="field" id="campMeasureFilter" title="성과측정 여부 — 시트 V열">
+          <option value="all">성과측정 전체</option><option value="Y">성과측정 Y</option><option value="N">성과측정 N</option>
         </select>
         <select class="field" id="campPlaceFilter">
           <option value="all">배치 무관</option><option value="on">여정지도에 붙은 것</option><option value="off">아직 안 붙인 것</option>
@@ -943,10 +960,12 @@ tr:hover .rowacts{opacity:1}
       <div class="statgrid" id="perfStats"></div>
       <div class="perfbody">
         <div class="perfside scroller" id="perfList"></div>
-        <div class="perfmain scroller">
+        <div class="perfmain">
           <div id="perfChart"></div>
-          <div id="perfBasis"></div>
-          <div id="perfTable"></div>
+          <div class="perfscroll">
+            <div id="perfBasis"></div>
+            <div id="perfTable"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1772,17 +1791,16 @@ function drawEdgeHandles() {
 /* ---------------- 노드 ----------------
    보기 모드마다 카드 아래쪽 목록의 형태만 바뀐다 — 점 색으로 채널/상태를
    나타내고, 이름 아래 작은 메타 줄(선택)을 붙이는 공통 패턴(g-row)을 쓴다. */
-function gRow(dotColor, name, meta, mono) {
+function gRow(dotColor, name, meta, mono, extra) {
   return '<div class="g-row' + (meta ? "" : " simple") + '"><span class="g-dot" style="background:' + dotColor + '"></span>' +
     '<div class="g-body"><span class="g-name' + (mono ? " mono" : "") + '">' + esc(name) + "</span>" +
-    (meta ? '<span class="g-meta">' + meta + "</span>" : "") + "</div></div>";
+    (meta ? '<span class="g-meta">' + meta + "</span>" : "") + (extra || "") + "</div></div>";
 }
 function campRow(raw) {
   const c = campView(raw);
   const ch = CHAN[c.chan] || CHAN.push;
-  /* 캠페인 이름 옆(아래)에 최신월 CTR·CVR 을 함께 보여 준다 */
-  const badge = typeof perfBadge === "function" ? perfBadge(c.code, true) : "";
-  return gRow(ch.c, c.name) + (badge ? '<div class="g-badge">' + badge + "</div>" : "");
+  /* 실적은 이름 바로 아래 한 줄로 — g-body 안에 넣어야 확대/축소 때 이름과 같은 비율로 커진다 */
+  return gRow(ch.c, c.name, "", false, perfBadge(c.code, "line"));
 }
 function tagRowsBig(n, plat) {
   const list = n.tags.filter(t => platformsOf(t).indexOf(plat) >= 0);
@@ -1796,9 +1814,7 @@ function campRowsBig(n) {
   return '<div class="node-list">' + n.camps.slice(0, 6).map(raw => {
     const c = campView(raw);
     const ch = CHAN[c.chan] || CHAN.push;
-    const badge = typeof perfBadge === "function" ? perfBadge(c.code, true) : "";
-    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status] + (c.timing ? " · " + esc(c.timing) : "")) +
-      (badge ? '<div class="g-badge">' + badge + "</div>" : "");
+    return gRow(CSTATUS_C[c.status], c.name, ch.name + " · " + CSTATUS[c.status], false, perfBadge(c.code, "line"));
   }).join("") + (n.camps.length > 6 ? '<div class="g-more">+' + (n.camps.length - 6) + "개 더</div>" : "") + "</div>";
 }
 function incompleteRowsBig(n) {
@@ -3484,7 +3500,9 @@ function initTagView() {
 }
 
 /* ---------------- 캠페인 뷰 ---------------- */
-const campFilter = { chan: "all", goal: "all", seg: "all", owner: "all", status: "all", place: "all", q: "" };
+/* 운영상태는 기본으로 "진행"만 본다 — 중단된 캠페인까지 섞이면 목록이 지저분해진다 */
+const campFilter = { chan: "all", aarrr: "all", goal: "all", seg: "all", owner: "all",
+  status: "진행", measure: "all", place: "all", q: "" };
 /* 구간(스윔레인) 배경은 지금 보고 있는 보드가 아닌 다른 보드일 수도 있어서,
    B()(현재 보드) 전제인 laneRect() 대신 보드를 인자로 받는 버전을 따로 둔다 */
 function laneExtentYFor(b) {
@@ -3524,9 +3542,13 @@ function renderCampView(force) {
   const seg = $("#campChanFilter");
   seg.innerHTML = '<button class="btn sm' + (campFilter.chan === "all" ? " on" : "") + '" data-ch="all">전체</button>' +
     chans.map(c => '<button class="btn sm' + (campFilter.chan === c ? " on" : "") + '" data-ch="' + esc(c) + '">' + esc(c) + "</button>").join("");
+  $("#campAarrrFilter").innerHTML = campColOptions("aarrrName", campFilter.aarrr, "모든 AARRR 구분");
   $("#campGoalFilter").innerHTML = campColOptions("goal", campFilter.goal, "모든 목표");
   $("#campSegFilter").innerHTML = campColOptions("title", campFilter.seg, "모든 캠페인구분");
   $("#campOwnerFilter").innerHTML = campColOptions("owner", campFilter.owner, "모든 담당자");
+
+  $("#campStatusFilter").value = campFilter.status;
+  $("#campMeasureFilter").value = campFilter.measure;
 
   const placed = {};
   state.boards.forEach(b => b.nodes.forEach(n => (n.camps || []).forEach(c => {
@@ -3538,7 +3560,9 @@ function renderCampView(force) {
     (campFilter.goal === "all" || m.goal === campFilter.goal) &&
     (campFilter.seg === "all" || m.title === campFilter.seg) &&
     (campFilter.owner === "all" || m.owner === campFilter.owner) &&
+    (campFilter.aarrr === "all" || m.aarrrName === campFilter.aarrr) &&
     (campFilter.status === "all" || m.status === campFilter.status) &&
+    (campFilter.measure === "all" || String(m.measure || "").toUpperCase() === campFilter.measure) &&
     (campFilter.place === "all" || (campFilter.place === "on" ? !!placed[m.code] : !placed[m.code])) &&
     (!campFilter.q || (m.code + " " + m.goal + " " + m.title + " " + m.fullName + " " + m.owner + " " + m.trigger).toLowerCase().includes(campFilter.q)));
 
@@ -3549,33 +3573,39 @@ function renderCampView(force) {
      '<div class="stat" style="--c:var(--ink-3)"><span class="n">' + rows.length + '</span><span class="t">지금 조건에 맞는 수</span></div>'].join("");
 
   /* 카드가 아니라 표로 — 칼럼끼리 세로로 맞아야 여러 캠페인을 한눈에 견준다 */
-  const head = ["캠페인코드", "캠페인구분", "채널", "목표", "상태", "담당자", "캠페인명", "실적 기준", "최신월 성과", "여정지도", "링크", ""];
+  /* '상태'(M열)와 '진행도'(H열)는 뜻이 다르다 — 헤더에서 구분해 준다 */
+  const head = [
+    ["캠페인코드", "시트 E열"], ["캠페인구분", "화면 표시명 · 시트 F열"], ["채널", "시트 I열"],
+    ["AARRR · 목표", "시트 C열 · D열"], ["운영상태", "시트 M열 — 이 캠페인을 지금 돌리고 있는지 (진행 / 중단)"],
+    ["작업 진행도", "시트 H열 — 세팅 작업이 어디까지 됐는지 (완료 등)"], ["담당자", "시트 P열"],
+    ["캠페인명", "시트 G열 — 실제 세부 이름"], ["실적 기준", "시트 R열 · S열 + 실적 수식에서 자동으로 풀어 쓴 산식"],
+    ["최신월 성과", "3.개인화RAW 의 가장 최근 달"], ["여정지도", ""], ["링크", "시트 T열 · U열"], ["", ""]];
   const body = rows.map(m => {
     const where = placed[m.code] || [];
-    const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
-    const links = [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url);
+    const links = m.linkList || [];
+    const noLink = [m.link1, m.link2].filter(Boolean).length - links.length;
     return "<tr>" +
       '<td class="nowrap mono">' + esc(m.code) + "</td>" +
       '<td class="capname"><span class="nm">' + esc(m.title || "-") + "</span>" +
         (m.aarrrName ? '<span class="sub">' + esc(m.aarrrName) + "</span>" : "") + "</td>" +
       '<td class="nowrap">' + chanChip(m.chanCode) + "</td>" +
-      "<td>" + esc(m.goal || "-") + "</td>" +
-      '<td class="nowrap"><span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span>" +
-        (m.progress ? '<span class="sub">' + esc(m.progress) + "</span>" : "") + "</td>" +
+      "<td>" + esc(m.goal || "-") + (m.aarrrName ? '<span class="sub">' + esc(m.aarrrName) + "</span>" : "") + "</td>" +
+      '<td class="nowrap"><span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span></td>" +
+      '<td class="nowrap">' + (m.progress ? esc(m.progress) : '<span style="color:var(--ink-3)">-</span>') +
+        (String(m.measure || "").toUpperCase() === "Y" ? '<span class="sub">성과측정 Y</span>' : "") + "</td>" +
       '<td class="nowrap">' + esc(m.owner || "-") + "</td>" +
       '<td class="capfull"><span class="mono" style="font-size:11px">' + esc(m.fullName || "-") + "</span>" +
         (m.path ? '<span class="sub">' + esc(m.path) + "</span>" : "") + "</td>" +
-      '<td><div class="basis">' +
-        (ctr.length ? "<div><b>CTR</b> " + esc(ctr.join(" · ")) + "</div>" : "") +
-        (cvr.length ? "<div><b>CVR</b> " + esc(cvr.join(" · ")) + "</div>" : "") +
-        (!ctr.length && !cvr.length ? '<span style="color:var(--ink-3)">기준 미기입</span>' : "") + "</div></td>" +
+      "<td>" + basisHtml(m) + "</td>" +
       "<td>" + (perfBadge(m.code) || '<span style="color:var(--ink-3)">-</span>') + "</td>" +
       '<td><div class="wherecell">' + (where.length
         ? where.map(({ b, n }) => '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' +
             ico("map", "xs") + " " + esc(n.name) + "</span>").join("")
         : '<span style="color:var(--ink-3)">미배치</span>') + "</div></td>" +
-      '<td><div class="rowseg">' + links.map((l, i) =>
-        '<button class="btn icon sm" data-goto-url="' + esc(l.url) + '" type="button" title="' + esc(l.url) + '">' + ico("link", "xs") + "</button>").join("") + "</div></td>" +
+      '<td><div class="rowseg">' + links.map(l =>
+        '<button class="btn sm" data-goto-url="' + esc(l.url) + '" type="button" title="' + esc(l.url) + '">' +
+          ico("link", "xs") + esc(l.label.length > 8 ? l.label.slice(0, 8) + "…" : l.label) + "</button>").join("") +
+        (noLink > 0 ? '<span class="chip" style="--c:var(--ink-3)" title="셀에 글자만 있고 주소가 걸려 있지 않습니다">주소 없음</span>' : "") + "</div></td>" +
       '<td>' + (canEdit() && isStaff()
         ? '<div class="rowacts"><button class="btn icon sm" data-sheet-edit="' + esc(m.code) + '" title="수정">' + ico("edit", "xs") + "</button></div>"
         : "") + "</td>" +
@@ -3583,7 +3613,7 @@ function renderCampView(force) {
   }).join("");
 
   $("#campTable").innerHTML = rows.length
-    ? "<thead><tr>" + head.map(h => "<th>" + esc(h) + "</th>").join("") + "</tr></thead><tbody>" + body + "</tbody>"
+    ? "<thead><tr>" + head.map(h => '<th' + (h[1] ? ' title="' + esc(h[1]) + '"' : "") + ">" + esc(h[0]) + "</th>").join("") + "</tr></thead><tbody>" + body + "</tbody>"
     : '<tbody><tr><td><div class="empty">' + ico("mega") +
       "<div>" + (SHEETS.camps.length ? "조건에 맞는 캠페인이 없습니다" : "구글 시트에서 캠페인을 아직 불러오지 못했습니다") + "</div></div></td></tr></tbody>";
 }
@@ -3592,6 +3622,8 @@ function initCampView() {
     const b = e.target.closest("[data-ch]"); if (!b) return;
     campFilter.chan = b.dataset.ch; $$("#campChanFilter .btn").forEach(x => x.classList.toggle("on", x === b)); renderCampView(true);
   });
+  $("#campAarrrFilter").addEventListener("change", e => { campFilter.aarrr = e.target.value; renderCampView(true); });
+  $("#campMeasureFilter").addEventListener("change", e => { campFilter.measure = e.target.value; renderCampView(true); });
   $("#campGoalFilter").addEventListener("change", e => { campFilter.goal = e.target.value; renderCampView(true); });
   $("#campSegFilter").addEventListener("change", e => { campFilter.seg = e.target.value; renderCampView(true); });
   $("#campOwnerFilter").addEventListener("change", e => { campFilter.owner = e.target.value; renderCampView(true); });
@@ -3607,8 +3639,9 @@ function initCampView() {
   });
   /* 시트 컬럼을 그대로 내보낸다 — 어디에 붙였는지만 한 칸 덧붙인다 */
   $("#btnCampCsv").addEventListener("click", () => {
-    const head = SHEET_COLS.map(c => c.label).concat("여정지도 배치");
-    const body = SHEETS.camps.map(m => csvLine(SHEET_COLS.map(c => m[c.key]).concat(
+    const cols = SHEET_COLS.filter(c => !c.num);      // 전달~매출 같은 수치는 빼고 정보 칸만 내보낸다
+    const head = cols.map(c => c.label).concat("링크1 주소", "링크2 주소", "여정지도 배치");
+    const body = SHEETS.camps.map(m => csvLine(cols.map(c => m[c.key]).concat(m.link1Url || "", m.link2Url || "",
       placementsOf(m.code).map(({ b, n }) => b.name + " · " + n.name).join(" / "))));
     saveFile("crm-campaigns.csv", "﻿" + [csvLine(head)].concat(body).join("\r\n"), "text/csv");
   });
@@ -5000,6 +5033,15 @@ function formulaToBasis(f) {
     .replace(/\//g, " ÷ ").replace(/\*/g, " × ")
     .replace(/\s{2,}/g, " ").trim();
 }
+/* 셀에 걸린 링크 주소를 찾는다.
+   시트에는 글자가 "ALL" 이고 주소는 따로 붙어 있는 경우가 많아 세 군데를 차례로 본다. */
+function linkUrlOf(meta, formula, text) {
+  if (meta) return meta;
+  const m = /^=\s*HYPERLINK\s*\(\s*"([^"]+)"/i.exec(String(formula || ""));
+  if (m) return m[1];
+  const t = String(text || "").trim();
+  return /^(https?:\/\/|www\.)/i.test(t) ? t : "";
+}
 /* 실적 기준 — 시트에 적어 둔 기준 문구와, 수식에서 역산한 산식을 함께 보여준다 */
 function basisOf(m, kind) {
   const written = kind === "ctr" ? m.ctrBasis : m.cvrBasis;
@@ -5010,9 +5052,26 @@ function basisOf(m, kind) {
   return out;
 }
 
+/* 실적 기준 블록 — 시트에 적어 둔 기준 문구를 크게, 수식에서 역산한 산식을 그 아래 흐리게.
+   둘 다 없으면 "미기입"으로 남겨 어느 캠페인이 정의가 비었는지 바로 보이게 한다. */
+function basisHtml(m) {
+  const row = (kind, label, color) => {
+    const written = String((kind === "ctr" ? m.ctrBasis : m.cvrBasis) || "").trim();
+    const derived = (kind === "ctr" ? m.ctrFormula : m.cvrFormula) || "";
+    if (!written && !derived) return '<div class="brow2 none"><span class="bk" style="--c:' + color + '">' + label +
+      '</span><span class="bv">미기입</span></div>';
+    return '<div class="brow2"><span class="bk" style="--c:' + color + '">' + label + "</span>" +
+      '<span class="bv">' + (written ? '<span class="bmain" title="' + esc(written) + '">' + esc(written) + "</span>" : "") +
+        (derived && derived !== written ? '<span class="bsub" title="시트 수식에서 자동으로 풀어 쓴 산식">' + esc(derived) + "</span>" : "") +
+      "</span></div>";
+  };
+  return '<div class="basis2">' + row("ctr", "CTR", "#2f6fed") + row("cvr", "CVR", "#e0483f") + "</div>";
+}
+
 /* ---------------- 정규화 ---------------- */
 function normCampRows(payload) {
-  const rows = (payload && payload.rows) || [], forms = (payload && payload.formulas) || [];
+  const rows = (payload && payload.rows) || [], forms = (payload && payload.formulas) || [],
+        links = (payload && payload.links) || [];
   const out = [];
   rows.forEach((r, i) => {
     if (!r || !String(r[COL_BY_KEY.code] || "").trim()) return;      // 캠페인코드 없는 줄은 건너뛴다
@@ -5021,9 +5080,13 @@ function normCampRows(payload) {
       const v = r[ci];
       m[c.key] = c.num ? num(v) : (v == null ? "" : String(v).trim());
     });
-    const f = forms[i] || [];
+    const f = forms[i] || [], lk = links[i] || [];
     m.ctrFormula = formulaToBasis(f[COL_BY_KEY.ctr]);
     m.cvrFormula = formulaToBasis(f[COL_BY_KEY.cvr]);
+    m.link1Url = linkUrlOf(lk[0], f[COL_BY_KEY.link1], m.link1);
+    m.link2Url = linkUrlOf(lk[1], f[COL_BY_KEY.link2], m.link2);
+    m.linkList = [{ label: m.link1 || "링크1", url: m.link1Url }, { label: m.link2 || "링크2", url: m.link2Url }]
+      .filter(l => l.url);
     m.chanCode = chanKey(m.chan);
     m.statusCode = statusKey(m.status);
     m.label = campLabel(m);
@@ -5163,8 +5226,8 @@ function campView(c) {
     chan: m.chanCode, chanText: m.chan,
     status: m.statusCode,
     segment: m.trigger, timing: m.index,
-    extId: m.code, landing: m.path, note: m.memo,
-    links: [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url)
+    extId: m.code, landing: m.path, note: "",     /* 메모는 카드에 띄우지 않는다 — 길고 내부 기록용이다 */
+    links: m.linkList || []
   };
 }
 const campViews = n => (n && n.camps ? n.camps.map(campView).filter(Boolean) : []);
@@ -5426,13 +5489,21 @@ function perfLatest(code) {
     dCvr: prev && cur.cvr != null && prev.cvr != null ? cur.cvr - prev.cvr : null
   };
 }
-/* 캠페인 이름 옆에 붙는 최신월 실적 배지 — CTR 파랑 · CVR 빨강 */
-function perfBadge(code, small) {
+/* 캠페인 이름 옆에 붙는 최신월 실적 배지 — CTR 파랑 · CVR 빨강.
+   mode "line" 은 여정 지도 노드 카드용으로, 라벨 없이 한 줄로 줄여 캠페인 이름과 같은 크기로 나온다.
+   달마다 마지막 데이터가 있는 달이 다르므로 어느 달 실적인지 앞에 적는다. */
+function perfBadge(code, mode) {
   const p = code ? perfLatest(code) : null;
   if (!p) return "";
   const arrow = d => (d == null || Math.abs(d) < 0.05 ? "" : '<i class="' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
-  /* 어느 달 실적인지 배지 안에 같이 적는다 — 캠페인마다 마지막 달이 다르다 */
-  return '<span class="perfbadge' + (small ? " sm" : "") + '" title="' + esc(p.month) + ' 실적 · 직전 달 대비 증감">' +
+  const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR · 직전 달 대비 증감";
+  if (mode === "line") {
+    return '<span class="perfline" title="' + esc(tip) + '">' +
+      '<span class="mon">' + esc(p.month) + "</span>" +
+      '<span class="ctr">' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
+      '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + arrow(p.dCvr) + "</span></span>";
+  }
+  return '<span class="perfbadge' + (mode === "sm" ? " sm" : "") + '" title="' + esc(tip) + '">' +
     '<span class="pb mon">' + esc(p.month) + "</span>" +
     '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
     '<span class="pb cvr">CVR ' + pct1(p.cvr) + arrow(p.dCvr) + "</span>" +
@@ -5473,7 +5544,7 @@ function trimMonths(series, months) {
   for (let i = a; i <= b; i++) if (has(i)) out.push(i);
   return out;
 }
-const GEO = { W: 680, H: 252, L: 42, R: 42, T: 26, B: 34 };
+const GEO = { W: 880, H: 322, L: 46, R: 46, T: 28, B: 38 };
 let chartCtx = null;                       // 마우스 오버 값 표시가 참조할 마지막 렌더 정보
 
 function perfChartSvg(series, months) {
@@ -5499,8 +5570,13 @@ function perfChartSvg(series, months) {
       '<text class="ax l" x="' + (L - 6) + '" y="' + (y + 3) + '">' + (ctrMax * f).toFixed(dec(ctrMax)) + "%</text>" +
       '<text class="ax r" x="' + (W - R + 6) + '" y="' + (y + 3) + '">' + (cvrMax * f).toFixed(dec(cvrMax)) + "%</text>";
   }).join("");
+  /* 달이 많으면 글자가 서로 겹치므로 몇 칸씩 건너뛴다.
+     맨 마지막 달은 반드시 남기고 거기서부터 거꾸로 세어 나간다. */
+  const every = Math.max(1, Math.ceil(30 / step));
   const xlab = months.map((m, i) =>
-    '<text class="ax c" x="' + cx(i) + '" y="' + (T + ih + 15) + '">' + esc(m.slice(2)) + "</text>").join("");
+    ((months.length - 1 - i) % every === 0
+      ? '<text class="ax c" x="' + cx(i) + '" y="' + (T + ih + 16) + '">' + esc(m.slice(2)) + "</text>"
+      : "")).join("");
 
   /* CVR — 달마다 시리즈 수만큼 나란히 세운 막대 */
   const bw = Math.max(3, Math.min(16, (step * 0.5) / series.length));
@@ -5682,15 +5758,11 @@ function renderPerfView(force) {
     : "";
 
   /* 실적 기준 — 이 캠페인의 CTR·CVR 이 무엇을 무엇으로 나눈 값인지 */
-  $("#perfBasis").innerHTML = perfPicked.map(code => {
+  $("#perfBasis").innerHTML = perfPicked.map((code, i) => {
     const m = campByCode(code);
     if (!m) return "";
-    const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
-    if (!ctr.length && !cvr.length) return "";
-    return '<div class="basiscard"><h4>' + esc(m.label) + "</h4>" +
-      (ctr.length ? '<div class="brow"><span class="chip" style="--c:#2f6fed">CTR 기준</span><span>' + esc(ctr.join("  ·  ")) + "</span></div>" : "") +
-      (cvr.length ? '<div class="brow"><span class="chip" style="--c:#e0483f">CVR 기준</span><span>' + esc(cvr.join("  ·  ")) + "</span></div>" : "") +
-      "</div>";
+    return '<div class="basiscard" style="border-left:3px solid ' + PERF_C[i % PERF_C.length] + '">' +
+      "<h4>" + esc(m.label) + "</h4>" + basisHtml(m) + "</div>";
   }).join("");
 }
 

@@ -278,6 +278,13 @@ select.field{cursor:pointer}
 .g-name.mono{font-family:var(--f-mono)}
 .g-row.simple .g-name{font-weight:500; color:var(--ink-2)}
 .g-meta{font-size:.84em; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+/* 여정 지도 노드의 실적 한 줄 — 캠페인 이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
+.perfline{display:flex; align-items:center; gap:4px; font-family:var(--f-mono); font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px}
+.perfline .mon{color:var(--ink-3); font-weight:500; font-size:.82em}
+.perfline .ctr{color:#2f6fed} .perfline .cvr{color:#e0483f}
+.perfline .sep{color:var(--ink-3); opacity:.6}
+.perfline i{font-style:normal; font-size:.72em; opacity:.85; margin-left:1px}
 .g-more{font-size:max(12px,min(15.5px,calc(12px / max(var(--zoom,1),.65)))); color:var(--ink-3); padding-left:12px}
 .g-empty{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--ink-3); text-align:center; padding-top:2px}
 .g-miss{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--warn); display:flex; align-items:center; gap:6px}

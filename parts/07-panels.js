@@ -634,7 +634,9 @@ function initTagView() {
 }
 
 /* ---------------- 캠페인 뷰 ---------------- */
-const campFilter = { chan: "all", goal: "all", seg: "all", owner: "all", status: "all", place: "all", q: "" };
+/* 운영상태는 기본으로 "진행"만 본다 — 중단된 캠페인까지 섞이면 목록이 지저분해진다 */
+const campFilter = { chan: "all", aarrr: "all", goal: "all", seg: "all", owner: "all",
+  status: "진행", measure: "all", place: "all", q: "" };
 /* 구간(스윔레인) 배경은 지금 보고 있는 보드가 아닌 다른 보드일 수도 있어서,
    B()(현재 보드) 전제인 laneRect() 대신 보드를 인자로 받는 버전을 따로 둔다 */
 function laneExtentYFor(b) {
@@ -674,9 +676,13 @@ function renderCampView(force) {
   const seg = $("#campChanFilter");
   seg.innerHTML = '<button class="btn sm' + (campFilter.chan === "all" ? " on" : "") + '" data-ch="all">전체</button>' +
     chans.map(c => '<button class="btn sm' + (campFilter.chan === c ? " on" : "") + '" data-ch="' + esc(c) + '">' + esc(c) + "</button>").join("");
+  $("#campAarrrFilter").innerHTML = campColOptions("aarrrName", campFilter.aarrr, "모든 AARRR 구분");
   $("#campGoalFilter").innerHTML = campColOptions("goal", campFilter.goal, "모든 목표");
   $("#campSegFilter").innerHTML = campColOptions("title", campFilter.seg, "모든 캠페인구분");
   $("#campOwnerFilter").innerHTML = campColOptions("owner", campFilter.owner, "모든 담당자");
+
+  $("#campStatusFilter").value = campFilter.status;
+  $("#campMeasureFilter").value = campFilter.measure;
 
   const placed = {};
   state.boards.forEach(b => b.nodes.forEach(n => (n.camps || []).forEach(c => {
@@ -688,7 +694,9 @@ function renderCampView(force) {
     (campFilter.goal === "all" || m.goal === campFilter.goal) &&
     (campFilter.seg === "all" || m.title === campFilter.seg) &&
     (campFilter.owner === "all" || m.owner === campFilter.owner) &&
+    (campFilter.aarrr === "all" || m.aarrrName === campFilter.aarrr) &&
     (campFilter.status === "all" || m.status === campFilter.status) &&
+    (campFilter.measure === "all" || String(m.measure || "").toUpperCase() === campFilter.measure) &&
     (campFilter.place === "all" || (campFilter.place === "on" ? !!placed[m.code] : !placed[m.code])) &&
     (!campFilter.q || (m.code + " " + m.goal + " " + m.title + " " + m.fullName + " " + m.owner + " " + m.trigger).toLowerCase().includes(campFilter.q)));
 
@@ -699,33 +707,39 @@ function renderCampView(force) {
      '<div class="stat" style="--c:var(--ink-3)"><span class="n">' + rows.length + '</span><span class="t">지금 조건에 맞는 수</span></div>'].join("");
 
   /* 카드가 아니라 표로 — 칼럼끼리 세로로 맞아야 여러 캠페인을 한눈에 견준다 */
-  const head = ["캠페인코드", "캠페인구분", "채널", "목표", "상태", "담당자", "캠페인명", "실적 기준", "최신월 성과", "여정지도", "링크", ""];
+  /* '상태'(M열)와 '진행도'(H열)는 뜻이 다르다 — 헤더에서 구분해 준다 */
+  const head = [
+    ["캠페인코드", "시트 E열"], ["캠페인구분", "화면 표시명 · 시트 F열"], ["채널", "시트 I열"],
+    ["AARRR · 목표", "시트 C열 · D열"], ["운영상태", "시트 M열 — 이 캠페인을 지금 돌리고 있는지 (진행 / 중단)"],
+    ["작업 진행도", "시트 H열 — 세팅 작업이 어디까지 됐는지 (완료 등)"], ["담당자", "시트 P열"],
+    ["캠페인명", "시트 G열 — 실제 세부 이름"], ["실적 기준", "시트 R열 · S열 + 실적 수식에서 자동으로 풀어 쓴 산식"],
+    ["최신월 성과", "3.개인화RAW 의 가장 최근 달"], ["여정지도", ""], ["링크", "시트 T열 · U열"], ["", ""]];
   const body = rows.map(m => {
     const where = placed[m.code] || [];
-    const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
-    const links = [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url);
+    const links = m.linkList || [];
+    const noLink = [m.link1, m.link2].filter(Boolean).length - links.length;
     return "<tr>" +
       '<td class="nowrap mono">' + esc(m.code) + "</td>" +
       '<td class="capname"><span class="nm">' + esc(m.title || "-") + "</span>" +
         (m.aarrrName ? '<span class="sub">' + esc(m.aarrrName) + "</span>" : "") + "</td>" +
       '<td class="nowrap">' + chanChip(m.chanCode) + "</td>" +
-      "<td>" + esc(m.goal || "-") + "</td>" +
-      '<td class="nowrap"><span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span>" +
-        (m.progress ? '<span class="sub">' + esc(m.progress) + "</span>" : "") + "</td>" +
+      "<td>" + esc(m.goal || "-") + (m.aarrrName ? '<span class="sub">' + esc(m.aarrrName) + "</span>" : "") + "</td>" +
+      '<td class="nowrap"><span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span></td>" +
+      '<td class="nowrap">' + (m.progress ? esc(m.progress) : '<span style="color:var(--ink-3)">-</span>') +
+        (String(m.measure || "").toUpperCase() === "Y" ? '<span class="sub">성과측정 Y</span>' : "") + "</td>" +
       '<td class="nowrap">' + esc(m.owner || "-") + "</td>" +
       '<td class="capfull"><span class="mono" style="font-size:11px">' + esc(m.fullName || "-") + "</span>" +
         (m.path ? '<span class="sub">' + esc(m.path) + "</span>" : "") + "</td>" +
-      '<td><div class="basis">' +
-        (ctr.length ? "<div><b>CTR</b> " + esc(ctr.join(" · ")) + "</div>" : "") +
-        (cvr.length ? "<div><b>CVR</b> " + esc(cvr.join(" · ")) + "</div>" : "") +
-        (!ctr.length && !cvr.length ? '<span style="color:var(--ink-3)">기준 미기입</span>' : "") + "</div></td>" +
+      "<td>" + basisHtml(m) + "</td>" +
       "<td>" + (perfBadge(m.code) || '<span style="color:var(--ink-3)">-</span>') + "</td>" +
       '<td><div class="wherecell">' + (where.length
         ? where.map(({ b, n }) => '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' +
             ico("map", "xs") + " " + esc(n.name) + "</span>").join("")
         : '<span style="color:var(--ink-3)">미배치</span>') + "</div></td>" +
-      '<td><div class="rowseg">' + links.map((l, i) =>
-        '<button class="btn icon sm" data-goto-url="' + esc(l.url) + '" type="button" title="' + esc(l.url) + '">' + ico("link", "xs") + "</button>").join("") + "</div></td>" +
+      '<td><div class="rowseg">' + links.map(l =>
+        '<button class="btn sm" data-goto-url="' + esc(l.url) + '" type="button" title="' + esc(l.url) + '">' +
+          ico("link", "xs") + esc(l.label.length > 8 ? l.label.slice(0, 8) + "…" : l.label) + "</button>").join("") +
+        (noLink > 0 ? '<span class="chip" style="--c:var(--ink-3)" title="셀에 글자만 있고 주소가 걸려 있지 않습니다">주소 없음</span>' : "") + "</div></td>" +
       '<td>' + (canEdit() && isStaff()
         ? '<div class="rowacts"><button class="btn icon sm" data-sheet-edit="' + esc(m.code) + '" title="수정">' + ico("edit", "xs") + "</button></div>"
         : "") + "</td>" +
@@ -733,7 +747,7 @@ function renderCampView(force) {
   }).join("");
 
   $("#campTable").innerHTML = rows.length
-    ? "<thead><tr>" + head.map(h => "<th>" + esc(h) + "</th>").join("") + "</tr></thead><tbody>" + body + "</tbody>"
+    ? "<thead><tr>" + head.map(h => '<th' + (h[1] ? ' title="' + esc(h[1]) + '"' : "") + ">" + esc(h[0]) + "</th>").join("") + "</tr></thead><tbody>" + body + "</tbody>"
     : '<tbody><tr><td><div class="empty">' + ico("mega") +
       "<div>" + (SHEETS.camps.length ? "조건에 맞는 캠페인이 없습니다" : "구글 시트에서 캠페인을 아직 불러오지 못했습니다") + "</div></div></td></tr></tbody>";
 }
@@ -742,6 +756,8 @@ function initCampView() {
     const b = e.target.closest("[data-ch]"); if (!b) return;
     campFilter.chan = b.dataset.ch; $$("#campChanFilter .btn").forEach(x => x.classList.toggle("on", x === b)); renderCampView(true);
   });
+  $("#campAarrrFilter").addEventListener("change", e => { campFilter.aarrr = e.target.value; renderCampView(true); });
+  $("#campMeasureFilter").addEventListener("change", e => { campFilter.measure = e.target.value; renderCampView(true); });
   $("#campGoalFilter").addEventListener("change", e => { campFilter.goal = e.target.value; renderCampView(true); });
   $("#campSegFilter").addEventListener("change", e => { campFilter.seg = e.target.value; renderCampView(true); });
   $("#campOwnerFilter").addEventListener("change", e => { campFilter.owner = e.target.value; renderCampView(true); });
@@ -757,8 +773,9 @@ function initCampView() {
   });
   /* 시트 컬럼을 그대로 내보낸다 — 어디에 붙였는지만 한 칸 덧붙인다 */
   $("#btnCampCsv").addEventListener("click", () => {
-    const head = SHEET_COLS.map(c => c.label).concat("여정지도 배치");
-    const body = SHEETS.camps.map(m => csvLine(SHEET_COLS.map(c => m[c.key]).concat(
+    const cols = SHEET_COLS.filter(c => !c.num);      // 전달~매출 같은 수치는 빼고 정보 칸만 내보낸다
+    const head = cols.map(c => c.label).concat("링크1 주소", "링크2 주소", "여정지도 배치");
+    const body = SHEETS.camps.map(m => csvLine(cols.map(c => m[c.key]).concat(m.link1Url || "", m.link2Url || "",
       placementsOf(m.code).map(({ b, n }) => b.name + " · " + n.name).join(" / "))));
     saveFile("crm-campaigns.csv", "﻿" + [csvLine(head)].concat(body).join("\r\n"), "text/csv");
   });

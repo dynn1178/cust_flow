@@ -230,11 +230,15 @@
     <div class="listwrap glass">
       <div class="toolrow">
         <div class="seg" id="campChanFilter"></div>
+        <select class="field" id="campAarrrFilter" title="AARRR 구분명"></select>
         <select class="field" id="campGoalFilter" title="목표(대분류)"></select>
         <select class="field" id="campSegFilter" title="캠페인구분"></select>
         <select class="field" id="campOwnerFilter" title="담당자"></select>
-        <select class="field" id="campStatusFilter">
-          <option value="all">모든 상태</option><option value="진행">진행</option><option value="중단">중단</option>
+        <select class="field" id="campStatusFilter" title="운영상태 — 시트 M열">
+          <option value="all">운영상태 전체</option><option value="진행">진행</option><option value="중단">중단</option>
+        </select>
+        <select class="field" id="campMeasureFilter" title="성과측정 여부 — 시트 V열">
+          <option value="all">성과측정 전체</option><option value="Y">성과측정 Y</option><option value="N">성과측정 N</option>
         </select>
         <select class="field" id="campPlaceFilter">
           <option value="all">배치 무관</option><option value="on">여정지도에 붙은 것</option><option value="off">아직 안 붙인 것</option>
@@ -273,10 +277,12 @@
       <div class="statgrid" id="perfStats"></div>
       <div class="perfbody">
         <div class="perfside scroller" id="perfList"></div>
-        <div class="perfmain scroller">
+        <div class="perfmain">
           <div id="perfChart"></div>
-          <div id="perfBasis"></div>
-          <div id="perfTable"></div>
+          <div class="perfscroll">
+            <div id="perfBasis"></div>
+            <div id="perfTable"></div>
+          </div>
         </div>
       </div>
     </div>

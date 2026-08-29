@@ -117,6 +117,15 @@ function formulaToBasis(f) {
     .replace(/\//g, " ÷ ").replace(/\*/g, " × ")
     .replace(/\s{2,}/g, " ").trim();
 }
+/* 셀에 걸린 링크 주소를 찾는다.
+   시트에는 글자가 "ALL" 이고 주소는 따로 붙어 있는 경우가 많아 세 군데를 차례로 본다. */
+function linkUrlOf(meta, formula, text) {
+  if (meta) return meta;
+  const m = /^=\s*HYPERLINK\s*\(\s*"([^"]+)"/i.exec(String(formula || ""));
+  if (m) return m[1];
+  const t = String(text || "").trim();
+  return /^(https?:\/\/|www\.)/i.test(t) ? t : "";
+}
 /* 실적 기준 — 시트에 적어 둔 기준 문구와, 수식에서 역산한 산식을 함께 보여준다 */
 function basisOf(m, kind) {
   const written = kind === "ctr" ? m.ctrBasis : m.cvrBasis;
@@ -127,9 +136,26 @@ function basisOf(m, kind) {
   return out;
 }
 
+/* 실적 기준 블록 — 시트에 적어 둔 기준 문구를 크게, 수식에서 역산한 산식을 그 아래 흐리게.
+   둘 다 없으면 "미기입"으로 남겨 어느 캠페인이 정의가 비었는지 바로 보이게 한다. */
+function basisHtml(m) {
+  const row = (kind, label, color) => {
+    const written = String((kind === "ctr" ? m.ctrBasis : m.cvrBasis) || "").trim();
+    const derived = (kind === "ctr" ? m.ctrFormula : m.cvrFormula) || "";
+    if (!written && !derived) return '<div class="brow2 none"><span class="bk" style="--c:' + color + '">' + label +
+      '</span><span class="bv">미기입</span></div>';
+    return '<div class="brow2"><span class="bk" style="--c:' + color + '">' + label + "</span>" +
+      '<span class="bv">' + (written ? '<span class="bmain" title="' + esc(written) + '">' + esc(written) + "</span>" : "") +
+        (derived && derived !== written ? '<span class="bsub" title="시트 수식에서 자동으로 풀어 쓴 산식">' + esc(derived) + "</span>" : "") +
+      "</span></div>";
+  };
+  return '<div class="basis2">' + row("ctr", "CTR", "#2f6fed") + row("cvr", "CVR", "#e0483f") + "</div>";
+}
+
 /* ---------------- 정규화 ---------------- */
 function normCampRows(payload) {
-  const rows = (payload && payload.rows) || [], forms = (payload && payload.formulas) || [];
+  const rows = (payload && payload.rows) || [], forms = (payload && payload.formulas) || [],
+        links = (payload && payload.links) || [];
   const out = [];
   rows.forEach((r, i) => {
     if (!r || !String(r[COL_BY_KEY.code] || "").trim()) return;      // 캠페인코드 없는 줄은 건너뛴다
@@ -138,9 +164,13 @@ function normCampRows(payload) {
       const v = r[ci];
       m[c.key] = c.num ? num(v) : (v == null ? "" : String(v).trim());
     });
-    const f = forms[i] || [];
+    const f = forms[i] || [], lk = links[i] || [];
     m.ctrFormula = formulaToBasis(f[COL_BY_KEY.ctr]);
     m.cvrFormula = formulaToBasis(f[COL_BY_KEY.cvr]);
+    m.link1Url = linkUrlOf(lk[0], f[COL_BY_KEY.link1], m.link1);
+    m.link2Url = linkUrlOf(lk[1], f[COL_BY_KEY.link2], m.link2);
+    m.linkList = [{ label: m.link1 || "링크1", url: m.link1Url }, { label: m.link2 || "링크2", url: m.link2Url }]
+      .filter(l => l.url);
     m.chanCode = chanKey(m.chan);
     m.statusCode = statusKey(m.status);
     m.label = campLabel(m);
@@ -280,8 +310,8 @@ function campView(c) {
     chan: m.chanCode, chanText: m.chan,
     status: m.statusCode,
     segment: m.trigger, timing: m.index,
-    extId: m.code, landing: m.path, note: m.memo,
-    links: [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url)
+    extId: m.code, landing: m.path, note: "",     /* 메모는 카드에 띄우지 않는다 — 길고 내부 기록용이다 */
+    links: m.linkList || []
   };
 }
 const campViews = n => (n && n.camps ? n.camps.map(campView).filter(Boolean) : []);

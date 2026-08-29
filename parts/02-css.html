@@ -272,18 +272,19 @@ tr:hover .rowacts{opacity:1}
 #campTable td:last-child,#campTable th:last-child{border-right:0; width:40px}
 #campTable .nm{font-weight:600; font-size:12.5px; letter-spacing:-.01em}
 #campTable .sub{display:block; font-size:10.5px; color:var(--ink-3); margin-top:2px; overflow-wrap:anywhere}
-#campTable .basis{font-size:10.5px; color:var(--ink-2); line-height:1.5; max-width:230px}
-#campTable .basis b{display:inline-block; min-width:30px; color:var(--ink-3); font-weight:600}
 #campTable .capname{max-width:210px}
 #campTable .capfull{max-width:260px}
 #campTable .wherecell{display:flex; flex-wrap:wrap; gap:3px; max-width:180px}
 
 .perfbody{flex:1; min-height:0; display:flex; gap:0}
 .perfside{width:308px; flex:none; border-right:1px solid var(--stroke-2); padding:8px}
-.perfmain{flex:1; min-width:0; padding:12px}
+/* 그래프는 위에 고정하고, 실적 기준·표만 아래에서 스크롤한다 */
+.perfmain{flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; padding:12px; gap:12px}
+#perfChart{flex:none}
+.perfscroll{flex:1; min-height:0; overflow:auto; overscroll-behavior:contain}
 .perfgroup{font-size:11px; font-weight:600; color:var(--ink-3); padding:10px 8px 4px; letter-spacing:.02em}
 .chartwrap{position:relative; border:1px solid var(--stroke-2); border-radius:var(--r-md); background:var(--glass-2); padding:6px}
-.perfchart{width:100%; max-width:760px; height:auto; display:block; margin:0 auto}
+.perfchart{width:100%; height:auto; display:block}
 .perfchart .hit{fill:transparent; cursor:crosshair}
 .perfchart .vline{stroke:var(--ink-3); stroke-width:1; stroke-dasharray:3 3; opacity:.5}
 .perfchart .vlab{fill:var(--ink-2); font-size:8px; font-family:var(--f-mono); text-anchor:middle}
@@ -300,8 +301,18 @@ tr:hover .rowacts{opacity:1}
 .legend{display:flex; flex-wrap:wrap; gap:10px; padding:6px 4px 2px; justify-content:center}
 .legend .lg{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ink-2)}
 .legend .lg i{width:10px; height:10px; border-radius:3px; display:inline-block}
-.basiscard{border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:10px 12px; margin-top:12px; background:var(--glass-2)}
+/* 실적 기준 — 라벨은 색 있는 세로 띠, 시트 문구는 굵게, 수식 역산은 아래 흐리게 */
+.basis2{display:flex; flex-direction:column; gap:5px; max-width:280px}
+.brow2{display:flex; gap:7px; align-items:flex-start; line-height:1.45}
+.brow2 .bk{flex:none; font-family:var(--f-mono); font-size:9.5px; font-weight:700; letter-spacing:.04em;
+  color:var(--c); border-left:2.5px solid var(--c); padding:1px 0 1px 5px; min-width:30px}
+.brow2 .bv{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px}
+.brow2 .bmain{font-size:11.5px; color:var(--ink); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+.brow2 .bsub{font-size:10.5px; color:var(--ink-3); font-family:var(--f-mono); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.brow2.none .bv{font-size:11px; color:var(--ink-3); font-style:italic}
+.basiscard{border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:10px 12px; margin-bottom:12px; background:var(--glass-2)}
 .basiscard h4{margin:0 0 7px; font-size:12.5px; font-weight:600}
+.basiscard .basis2{max-width:none}
 .basiscard .brow{display:flex; gap:8px; align-items:flex-start; font-size:11.5px; color:var(--ink-2); padding:3px 0}
 .basiscard .brow .chip{flex:none}
 .ptable{width:100%; border-collapse:collapse; margin-top:14px; font-size:11.5px}
@@ -320,13 +331,8 @@ tr:hover .rowacts{opacity:1}
 .perfbadge .pb.mon{color:var(--ink-3); background:var(--glass-2); border-color:var(--stroke-2); font-weight:500}
 .perfbadge .pb i{font-style:normal; margin-left:3px; opacity:.85; font-size:9.5px}
 .perfbadge.sm .pb{font-size:11px; padding:1px 6px}
-.g-badge{padding:3px 0 5px 20px}
 .card > .perfbadge{margin:-2px 0 2px}
 .ccard > .perfbadge{margin:2px 0}
-/* 노드 카드는 폭이 좁으므로 CTR·CVR 을 두 줄로 쌓고 글자는 오히려 키운다 */
-.node .perfbadge{display:flex; flex-direction:column; align-items:flex-start; gap:3px}
-/* 노드 카드에서는 "월" 만 한 줄, 그 아래 CTR·CVR 이 각각 한 줄씩 온다 */
-.node .perfbadge .pb.mon{font-size:10px; padding:0 6px}
 .node .perfbadge .pb{font-size:11px; padding:1px 7px; line-height:1.5}
 @media (max-width:860px){ .perfbody{flex-direction:column} .perfside{width:auto; height:220px; border-right:0; border-bottom:1px solid var(--stroke-2)} }
 </style>

@@ -59,13 +59,21 @@ function perfLatest(code) {
     dCvr: prev && cur.cvr != null && prev.cvr != null ? cur.cvr - prev.cvr : null
   };
 }
-/* 캠페인 이름 옆에 붙는 최신월 실적 배지 — CTR 파랑 · CVR 빨강 */
-function perfBadge(code, small) {
+/* 캠페인 이름 옆에 붙는 최신월 실적 배지 — CTR 파랑 · CVR 빨강.
+   mode "line" 은 여정 지도 노드 카드용으로, 라벨 없이 한 줄로 줄여 캠페인 이름과 같은 크기로 나온다.
+   달마다 마지막 데이터가 있는 달이 다르므로 어느 달 실적인지 앞에 적는다. */
+function perfBadge(code, mode) {
   const p = code ? perfLatest(code) : null;
   if (!p) return "";
   const arrow = d => (d == null || Math.abs(d) < 0.05 ? "" : '<i class="' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
-  /* 어느 달 실적인지 배지 안에 같이 적는다 — 캠페인마다 마지막 달이 다르다 */
-  return '<span class="perfbadge' + (small ? " sm" : "") + '" title="' + esc(p.month) + ' 실적 · 직전 달 대비 증감">' +
+  const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR · 직전 달 대비 증감";
+  if (mode === "line") {
+    return '<span class="perfline" title="' + esc(tip) + '">' +
+      '<span class="mon">' + esc(p.month) + "</span>" +
+      '<span class="ctr">' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
+      '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + arrow(p.dCvr) + "</span></span>";
+  }
+  return '<span class="perfbadge' + (mode === "sm" ? " sm" : "") + '" title="' + esc(tip) + '">' +
     '<span class="pb mon">' + esc(p.month) + "</span>" +
     '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
     '<span class="pb cvr">CVR ' + pct1(p.cvr) + arrow(p.dCvr) + "</span>" +
@@ -106,7 +114,7 @@ function trimMonths(series, months) {
   for (let i = a; i <= b; i++) if (has(i)) out.push(i);
   return out;
 }
-const GEO = { W: 680, H: 252, L: 42, R: 42, T: 26, B: 34 };
+const GEO = { W: 880, H: 322, L: 46, R: 46, T: 28, B: 38 };
 let chartCtx = null;                       // 마우스 오버 값 표시가 참조할 마지막 렌더 정보
 
 function perfChartSvg(series, months) {
@@ -132,8 +140,13 @@ function perfChartSvg(series, months) {
       '<text class="ax l" x="' + (L - 6) + '" y="' + (y + 3) + '">' + (ctrMax * f).toFixed(dec(ctrMax)) + "%</text>" +
       '<text class="ax r" x="' + (W - R + 6) + '" y="' + (y + 3) + '">' + (cvrMax * f).toFixed(dec(cvrMax)) + "%</text>";
   }).join("");
+  /* 달이 많으면 글자가 서로 겹치므로 몇 칸씩 건너뛴다.
+     맨 마지막 달은 반드시 남기고 거기서부터 거꾸로 세어 나간다. */
+  const every = Math.max(1, Math.ceil(30 / step));
   const xlab = months.map((m, i) =>
-    '<text class="ax c" x="' + cx(i) + '" y="' + (T + ih + 15) + '">' + esc(m.slice(2)) + "</text>").join("");
+    ((months.length - 1 - i) % every === 0
+      ? '<text class="ax c" x="' + cx(i) + '" y="' + (T + ih + 16) + '">' + esc(m.slice(2)) + "</text>"
+      : "")).join("");
 
   /* CVR — 달마다 시리즈 수만큼 나란히 세운 막대 */
   const bw = Math.max(3, Math.min(16, (step * 0.5) / series.length));
@@ -315,15 +328,11 @@ function renderPerfView(force) {
     : "";
 
   /* 실적 기준 — 이 캠페인의 CTR·CVR 이 무엇을 무엇으로 나눈 값인지 */
-  $("#perfBasis").innerHTML = perfPicked.map(code => {
+  $("#perfBasis").innerHTML = perfPicked.map((code, i) => {
     const m = campByCode(code);
     if (!m) return "";
-    const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
-    if (!ctr.length && !cvr.length) return "";
-    return '<div class="basiscard"><h4>' + esc(m.label) + "</h4>" +
-      (ctr.length ? '<div class="brow"><span class="chip" style="--c:#2f6fed">CTR 기준</span><span>' + esc(ctr.join("  ·  ")) + "</span></div>" : "") +
-      (cvr.length ? '<div class="brow"><span class="chip" style="--c:#e0483f">CVR 기준</span><span>' + esc(cvr.join("  ·  ")) + "</span></div>" : "") +
-      "</div>";
+    return '<div class="basiscard" style="border-left:3px solid ' + PERF_C[i % PERF_C.length] + '">' +
+      "<h4>" + esc(m.label) + "</h4>" + basisHtml(m) + "</div>";
   }).join("");
 }
 
