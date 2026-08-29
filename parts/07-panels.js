@@ -325,7 +325,7 @@ function renderCampPanel() {
       '<div class="card-top">' + chanChip(c.chan) + '<div class="spacer"></div>' + campActs(c) + "</div>" +
       '<div class="card-title">' + esc(c.name) + "</div>" +
       (c.code ? '<div class="kv"><span>' + esc(c.code) + "</span></div>" : "") +
-      (typeof perfBadge === "function" ? perfBadge(c.code) : "") +
+      perfBadge(c.code) +
       '<div class="meta"><span><span class="dot" style="--c:' + CSTATUS_C[c.status] + '"></span> ' + CSTATUS[c.status] + "</span>" +
         (c.segment ? "<span>트리거 <b>" + esc(c.segment) + "</b></span>" : "") +
         (c.timing ? "<span>전환 <b>" + esc(c.timing) + "</b></span>" : "") + "</div>" +

@@ -157,4 +157,13 @@ Supabase가 연결되면 비밀번호 잠금 버튼은 사라지고 로그인 �
 | --- | --- |
 | `index.html` | Vercel 배포용. `<!doctype>` · `<meta charset="utf-8">` 포함 |
 
+시트 처리 로직(컬럼 매핑 · 수식 해석 · 월별 집계 · 통계 판정)은 브라우저 없이 회귀 테스트로 돌린다.
+
+```sh
+node test/sheets.test.js
+```
+
+실제 `1.개인화DB` · `3.개인화RAW` 샘플 행을 넣어 40여 개를 검증한다. 시트 컬럼 순서를 바꾸거나
+`parts/15-sheets.js`의 `SHEET_COLS`를 손대면 여기서 먼저 걸린다.
+
 `index.html`이 저장소 루트에 있어야 한다(없으면 `/`에서 404). 절차는 [DEPLOY.md](DEPLOY.md).

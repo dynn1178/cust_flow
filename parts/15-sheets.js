@@ -108,13 +108,15 @@ const colIndex = letters => {                     // "AB" → 27
    다른 시트를 가리키는 참조( '3.개인화RAW'!AB2 )는 건드리지 않는다. */
 function formulaToBasis(f) {
   if (typeof f !== "string" || f.charAt(0) !== "=") return "";
+  /* 연산자를 먼저 바꾸고 그 다음에 컬럼명을 넣는다 — 순서를 뒤집으면
+     "예약/반응" 같은 컬럼명 안의 슬래시까지 나눗셈으로 오인해 쪼개진다. */
   return f.slice(1)
+    .replace(/\//g, " ÷ ").replace(/\*/g, " × ")
     .replace(/(!?)\$?([A-Z]{1,2})\$?\d+/g, (m, bang, col) => {
       if (bang) return m;
       const c = SHEET_COLS[colIndex(col)];
       return c ? c.label : m;
     })
-    .replace(/\//g, " ÷ ").replace(/\*/g, " × ")
     .replace(/\s{2,}/g, " ").trim();
 }
 /* 셀에 걸린 링크 주소를 찾는다.
@@ -233,7 +235,9 @@ async function sheetApi(path, opts) {
 function applySheetPayload(j, at) {
   if (j.campaigns) SHEETS.camps = normCampRows(j.campaigns);
   if (j.perf) SHEETS.perf = normPerfRows(j.perf);
-  SHEETS.byCode = SHEETS.camps.reduce((m, c) => (m[c.code] = c, m), {});
+  /* 조회 키는 대문자로 통일한다 — 소문자로 친 코드도 같은 캠페인으로 찾아야
+     중복 등록을 막고, 여정 지도에 붙은 코드도 대소문자 차이로 끊기지 않는다 */
+  SHEETS.byCode = SHEETS.camps.reduce((m, c) => (m[String(c.code).toUpperCase()] = c, m), {});
   SHEETS.at = at || Date.now();
   SHEETS.loaded = true;
 }
@@ -288,7 +292,7 @@ function renderSyncBars() {
 }
 
 /* ---------------- 마스터 조회 ---------------- */
-const campByCode = code => SHEETS.byCode[String(code || "").trim()] || null;
+const campByCode = code => SHEETS.byCode[String(code || "").trim().toUpperCase()] || null;
 
 /* 노드에 붙어 있는 항목 하나를 화면에 그릴 형태로 편다.
    시트 연동 항목은 {id, code} 만 문서에 저장되고, 나머지는 여기서 시트로부터 채운다.
@@ -574,12 +578,12 @@ function editSheetCamp(code) {
       }
     },
     onSave: async v => {
-      const newCode = String(v.code || "").trim().toUpperCase();
+      const newCode = String(v.code || "").trim();
       const r = codeCheck(newCode, v.aarrrCode, m ? m.code : null);
       if (r.bad) return toast(r.msg, "bad");
-      if (m && newCode !== String(m.code).toUpperCase())
+      if (m && newCode.toUpperCase() !== String(m.code).toUpperCase())
         return toast("캠페인코드는 바꿀 수 없습니다. 시트에서 직접 고쳐 주세요.", "bad");
-      v.code = m ? m.code : newCode;
+      v.code = m ? m.code : newCode;         /* 시트에는 친 그대로 적는다 */
       v.aarrrName = map[v.aarrrCode] || v.aarrrName || "";
       v.apidb = apidbJoin(v._api, v._db);
       const row = [];

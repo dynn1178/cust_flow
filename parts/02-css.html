@@ -131,16 +131,6 @@ table.tbl td.nowrap{white-space:nowrap}
 .tagname-link:hover .evt{text-decoration:underline}
 .rowacts{display:flex; gap:4px; opacity:0; transition:opacity .16s}
 tr:hover .rowacts{opacity:1}
-.grid-cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(268px,1fr)); gap:10px; padding:12px}
-.ccard{border-radius:var(--r-md); border:1px solid var(--stroke); background:var(--glass-2); padding:12px;
-  display:flex; flex-direction:column; gap:9px; position:relative; overflow:hidden}
-.ccard::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--c,var(--camp))}
-.ccard h3{margin:0; font-size:13.5px; font-weight:600; letter-spacing:-.01em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
-.ccard .where{display:flex; flex-wrap:wrap; gap:4px}
-/* 캠페인 카드 상단 3줄 — 왼쪽·오른쪽으로 짝을 지어 정렬한다(대·소분류|상태, 이름|채널, 위치|링크) */
-.ccard .crow{display:flex; align-items:center; gap:8px}
-.ccard .crow > :first-child{flex:1; min-width:0}
-.ccard .crow .rowseg{display:flex; gap:4px; flex-wrap:wrap}
 .pagechip{font-size:10.5px; padding:2px 7px; border-radius:99px; background:var(--glass-2);
   border:1px solid var(--stroke-2); color:var(--ink-2); cursor:pointer}
 .pagechip:hover{border-color:var(--accent); color:var(--accent)}
@@ -285,7 +275,13 @@ tr:hover .rowacts{opacity:1}
 .perfmain{flex:1; min-width:0; display:flex; flex-direction:column; overflow:hidden; padding:12px; gap:12px}
 #perfChart{flex:none}
 .perfscroll{flex:1; min-height:0; overflow:auto; overscroll-behavior:contain}
-.perfgroup{font-size:11px; font-weight:600; color:var(--ink-3); padding:10px 8px 4px; letter-spacing:.02em}
+.perfgroup{font-size:11px; font-weight:700; color:var(--ink-2); padding:11px 8px 4px; letter-spacing:.02em;
+  font-family:var(--f-mono)}
+.perfgroup em{font-style:normal; font-family:var(--f-ui); font-weight:500; color:var(--ink-3); margin-left:4px}
+/* 최신월에 데이터가 없는(한동안 돌리지 않은) 캠페인은 흐리게 — 목록 아래쪽에 모인다 */
+.pickrow.stale .pickmain b{color:var(--ink-2)}
+.pickrow.stale{opacity:.62}
+.pickrow.stale.on{opacity:1}
 .chartwrap{position:relative; border:1px solid var(--stroke-2); border-radius:var(--r-md); background:var(--glass-2); padding:6px}
 .perfchart{width:100%; height:auto; display:block}
 .perfchart .hit{fill:transparent; cursor:crosshair}

@@ -102,7 +102,7 @@ function perfAlerts() {
   const out = [];
   perfCampIndex().forEach(b => {
     const h = perfHistory(b.code);
-    if (h.length < 3) return;
+    if (h.length < 2) return;                          // 비교할 직전 달이 최소 하나는 있어야 한다
     const cur = h[h.length - 1], base = h.slice(Math.max(0, h.length - 4), h.length - 1);
     ["ctr", "cvr"].forEach(kind => {
       const vals = base.map(r => r[kind]).filter(v => v != null);
@@ -183,8 +183,10 @@ function perfFunnelHtml(fromM, toM) {
 }
 
 /* ---------------- 차트 ---------------- */
-/* 점들을 부드러운 곡선으로 잇는다 (Catmull-Rom → 3차 베지어) */
-function smoothPath(pts) {
+/* 점들을 부드러운 곡선으로 잇는다 (Catmull-Rom → 3차 베지어).
+   연결선용 smoothPath() 와 이름이 겹치면 안 된다 — 조각들이 한 스크립트로 합쳐지므로
+   같은 이름이면 나중 것이 앞의 것을 덮어써 여정 지도의 곡선이 깨진다. */
+function chartCurve(pts) {
   if (!pts.length) return "";
   if (pts.length < 3) return "M" + pts.map(p => p[0] + " " + p[1]).join(" L");
   let d = "M" + pts[0][0] + " " + pts[0][1];
@@ -271,7 +273,7 @@ function perfChartSvg(series, months) {
     const pts = [];
     s.ctr.forEach((v, i) => { if (v != null) pts.push([cx(i), yCtr(v), v]); });
     if (!pts.length) return "";
-    return '<path class="ln" d="' + smoothPath(pts.map(p => [p[0], p[1]])) + '" stroke="' + s.color + '"/>' +
+    return '<path class="ln" d="' + chartCurve(pts.map(p => [p[0], p[1]])) + '" stroke="' + s.color + '"/>' +
       pts.map(p => '<circle class="dot" cx="' + p[0] + '" cy="' + p[1] + '" r="2.6" fill="' + s.color + '"/>' +
         (showLabels ? '<text class="vlab" x="' + p[0] + '" y="' + (p[1] - 7) + '" fill="' + s.color + '">' + p[2].toFixed(1) + "%</text>" : "")).join("");
   }).join("");
@@ -305,15 +307,24 @@ function perfCampIndex() {
       label: m ? m.label : (r.title ? r.title + (r.chan ? " [" + r.chan + "]" : "") : r.code),
       fullName: m ? m.fullName : r.fullName,
       goal: (m && m.goal) || r.goal || "미분류",
-      seg: (m && m.title) || r.title || "미분류",      // 캠페인구분 — 목록을 이 기준으로 묶는다
+      seg: (m && m.title) || r.title || "미분류",      // 캠페인구분 — 각 줄의 이름이 된다
+      aarrrCode: (m && String(m.aarrrCode || "").trim().toUpperCase()) || "",
+      aarrrName: (m && m.aarrrName) || "",
       chan: (m && m.chan) || r.chan || "",
       owner: (m && m.owner) || r.owner || "",
-      months: 0, inSheet: !!m
+      months: 0, last: "", inSheet: !!m
     });
     b.months++;
+    if (r.month > b.last) b.last = r.month;          // 마지막으로 성과가 쌓인 달
   });
+  /* 목록은 AARRR 단계 순서(A1 · A2 · R1 …)로 묶고,
+     같은 단계 안에서는 최근에 데이터가 쌓인 캠페인을 위로 올린다 —
+     한동안 돌리지 않은 캠페인은 자연히 아래로 내려간다.
+     구분코드가 없는 것(마스터에 없는 코드)은 맨 뒤로 보낸다. */
   const list = Object.values(byCode).sort((a, b) =>
-    (a.seg || "").localeCompare(b.seg || "", "ko") || a.code.localeCompare(b.code));
+    (a.aarrrCode || "ZZ").localeCompare(b.aarrrCode || "ZZ") ||
+    b.last.localeCompare(a.last) ||
+    a.code.localeCompare(b.code));
   perfIndexCache = { at: SHEETS.at, list: list };
   return list;
 }
@@ -396,15 +407,23 @@ function renderPerfView(force) {
     '<div class="stat" style="--c:#e0483f"><span class="n">' + pct1(wAvg("cvr")) + '</span><span class="t">' + esc(last || "-") + ' 평균 CVR</span></div>'
   ].join("");
 
-  /* 캠페인구분으로 묶은 목록 — 성과 수치는 오른쪽 차트·표에서 본다 */
-  let html = "", seg = null;
+  /* AARRR 단계로 묶은 목록 — 성과 수치는 오른쪽 차트·표에서 본다 */
+  let html = "", grp = null;
+  const lastAll = perfMonths()[perfMonths().length - 1] || "";
   list.forEach(b => {
-    if (b.seg !== seg) { seg = b.seg; html += '<div class="perfgroup">' + esc(seg || "미분류") + "</div>"; }
+    const key = b.aarrrCode || "기타";
+    if (key !== grp) {
+      grp = key;
+      html += '<div class="perfgroup">' + esc(key) +
+        (b.aarrrName ? ' <em>' + esc(b.aarrrName) + "</em>" : "") + "</div>";
+    }
     const on = perfPicked.indexOf(b.code) >= 0;
-    html += '<label class="pickrow' + (on ? " on" : "") + '">' +
+    const stale = lastAll && b.last && b.last < lastAll;
+    html += '<label class="pickrow' + (on ? " on" : "") + (stale ? " stale" : "") + '">' +
       '<input type="checkbox" data-perf-pick="' + esc(b.code) + '"' + (on ? " checked" : "") + ">" +
       '<span class="pickmain"><b>' + esc(b.label) + "</b>" +
-        "<em>" + esc(b.code) + " · " + b.months + "개월" + (b.owner ? " · " + esc(b.owner) : "") +
+        "<em>" + esc(b.code) + " · " + esc(b.last) + "까지 " + b.months + "개월" +
+        (b.owner ? " · " + esc(b.owner) : "") +
         (b.inSheet ? "" : ' · <span style="color:var(--warn)">마스터에 없음</span>') + "</em></span></label>";
   });
   $("#perfList").innerHTML = html || '<div class="empty">' + ico("mega") + "<div>조건에 맞는 캠페인이 없습니다</div></div>";
@@ -553,7 +572,8 @@ function hygieneReport() {
 }
 let hygCache = null;
 function hygieneCached() {
-  const key = SHEETS.at + "|" + state.boards.reduce((a, b) => a + b.nodes.reduce((c, n) => c + (n.camps || []).length, 0), 0);
+  const key = SHEETS.at + "|" + state.boards.reduce((a, b) =>
+    a + b.nodes.reduce((c, n) => c + (n.camps || []).map(x => x.code || "").join(","), ""), "");
   if (!hygCache || hygCache.key !== key) hygCache = { key: key, list: hygieneReport() };
   return hygCache.list;
 }
