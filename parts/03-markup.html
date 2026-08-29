@@ -247,7 +247,7 @@
         <button class="btn staff-only" id="btnCampCsv"><svg class="ico"><use href="#i-down"/></svg>CSV</button>
       </div>
       <div class="statgrid" id="campStats"></div>
-      <div class="scroller"><div class="grid-cards" id="campGrid"></div></div>
+      <div id="campTableWrap"><table class="tbl" id="campTable"></table></div>
     </div>
   </section>
 
@@ -260,6 +260,12 @@
         <select class="field" id="perfChan" title="채널"></select>
         <select class="field" id="perfOwner" title="담당자"></select>
         <input class="field" id="perfSearch" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:170px">
+        <span class="periodbox">기간
+          <select class="field" id="perfFrom" title="집계 시작월"></select>~
+          <select class="field" id="perfTo" title="집계 종료월"></select>
+        </span>
+        <label class="periodbox" title="각 점·막대에 값을 적습니다 (캠페인 3개까지)">
+          <input type="checkbox" id="perfLabels" checked>값 표시</label>
         <div class="spacer"></div>
         <span class="syncbar"></span>
         <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>

@@ -309,7 +309,7 @@ function jumpToTag(tagId) {
 function campActs(c) {
   const del = '<button class="btn icon sm" data-camp-del="' + c.id + '" title="이 페이지에서 떼기">' + ico("close", "xs") + "</button>";
   const edit = c.code && !c.missing
-    ? '<button class="btn icon sm staff-only" data-sheet-edit="' + esc(c.code) + '" title="구글 시트에서 수정">' + ico("edit", "xs") + "</button>"
+    ? '<button class="btn icon sm staff-only" data-sheet-edit="' + esc(c.code) + '" title="수정">' + ico("edit", "xs") + "</button>"
     : (c.code ? "" : '<button class="btn icon sm" data-camp-edit="' + c.id + '" title="수정">' + ico("edit", "xs") + "</button>");
   return '<div class="card-acts edit-only">' + edit + del + "</div>";
 }
@@ -698,37 +698,44 @@ function renderCampView(force) {
      '<div class="stat" style="--c:var(--accent)"><span class="n">' + Object.keys(placed).length + '</span><span class="t">여정지도에 붙임</span></div>',
      '<div class="stat" style="--c:var(--ink-3)"><span class="n">' + rows.length + '</span><span class="t">지금 조건에 맞는 수</span></div>'].join("");
 
-  $("#campGrid").innerHTML = rows.length ? rows.map(m => {
+  /* 카드가 아니라 표로 — 칼럼끼리 세로로 맞아야 여러 캠페인을 한눈에 견준다 */
+  const head = ["캠페인코드", "캠페인구분", "채널", "목표", "상태", "담당자", "캠페인명", "실적 기준", "최신월 성과", "여정지도", "링크", ""];
+  const body = rows.map(m => {
     const where = placed[m.code] || [];
     const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
-    const links = campLinkButtons({ links: [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url) });
-    return '<div class="ccard" style="--c:' + (CHAN[m.chanCode] || CHAN.push).c + '">' +
-      '<div class="crow">' +
-        '<div class="rowseg">' + (m.goal ? '<span class="chip" style="--c:var(--ink-3)">' + esc(m.goal) + "</span>" : "") +
-          (m.aarrrName ? '<span class="chip" style="--c:var(--ink-3)">' + esc(m.aarrrName) + "</span>" : "") + "</div>" +
-        '<span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span>" +
-      "</div>" +
-      '<div class="crow"><h3>' + esc(m.label) + "</h3>" + chanChip(m.chanCode) + "</div>" +
-      '<div class="kv"><span>' + esc(m.code) + "</span>" + (m.owner ? "<span>" + esc(m.owner) + "</span>" : "") +
-        (m.progress ? "<span>" + esc(m.progress) + "</span>" : "") + "</div>" +
-      (m.fullName ? '<div class="hint mono">' + esc(m.fullName) + "</div>" : "") +
-      (typeof perfBadge === "function" ? perfBadge(m.code) : "") +
-      (m.trigger || m.index ? '<div class="meta">' + (m.trigger ? "<span>트리거 <b>" + esc(m.trigger) + "</b></span>" : "") +
-        (m.index ? "<span>전환 <b>" + esc(m.index) + "</b></span>" : "") + "</div>" : "") +
-      (ctr.length || cvr.length ? '<div class="meta">' +
-        (ctr.length ? '<span>CTR 기준 <b>' + esc(ctr.join(" · ")) + "</b></span>" : "") +
-        (cvr.length ? '<span>CVR 기준 <b>' + esc(cvr.join(" · ")) + "</b></span>" : "") + "</div>" : "") +
-      (m.path ? '<div class="kv"><span>' + esc(m.path) + "</span></div>" : "") +
-      (links || "") +
-      (where.length ? '<div class="where">' + where.map(({ b, n }) =>
-        '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' + ico("map", "xs") + " " + esc(n.name) + "</span>").join("") + "</div>"
-        : '<div class="where"><span class="pagechip" style="opacity:.6">여정지도에 아직 안 붙임</span></div>') +
-      (m.memo ? '<div class="hint">' + esc(m.memo) + "</div>" : "") +
-      (canEdit() && isStaff() ? '<button class="btn sm edit-only staff-only" data-sheet-edit="' + esc(m.code) + '" style="align-self:flex-start">' +
-        ico("edit", "xs") + "시트에서 수정</button>" : "") +
-    "</div>";
-  }).join("") : '<div class="empty" style="grid-column:1/-1">' + ico("mega") +
-    "<div>" + (SHEETS.camps.length ? "조건에 맞는 캠페인이 없습니다" : "구글 시트에서 캠페인을 아직 불러오지 못했습니다") + "</div></div>";
+    const links = [{ label: "링크1", url: m.link1 }, { label: "링크2", url: m.link2 }].filter(l => l.url);
+    return "<tr>" +
+      '<td class="nowrap mono">' + esc(m.code) + "</td>" +
+      '<td class="capname"><span class="nm">' + esc(m.title || "-") + "</span>" +
+        (m.aarrrName ? '<span class="sub">' + esc(m.aarrrName) + "</span>" : "") + "</td>" +
+      '<td class="nowrap">' + chanChip(m.chanCode) + "</td>" +
+      "<td>" + esc(m.goal || "-") + "</td>" +
+      '<td class="nowrap"><span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span>" +
+        (m.progress ? '<span class="sub">' + esc(m.progress) + "</span>" : "") + "</td>" +
+      '<td class="nowrap">' + esc(m.owner || "-") + "</td>" +
+      '<td class="capfull"><span class="mono" style="font-size:11px">' + esc(m.fullName || "-") + "</span>" +
+        (m.path ? '<span class="sub">' + esc(m.path) + "</span>" : "") + "</td>" +
+      '<td><div class="basis">' +
+        (ctr.length ? "<div><b>CTR</b> " + esc(ctr.join(" · ")) + "</div>" : "") +
+        (cvr.length ? "<div><b>CVR</b> " + esc(cvr.join(" · ")) + "</div>" : "") +
+        (!ctr.length && !cvr.length ? '<span style="color:var(--ink-3)">기준 미기입</span>' : "") + "</div></td>" +
+      "<td>" + (perfBadge(m.code) || '<span style="color:var(--ink-3)">-</span>') + "</td>" +
+      '<td><div class="wherecell">' + (where.length
+        ? where.map(({ b, n }) => '<span class="pagechip" data-goto="' + n.id + '" data-bi="' + state.boards.indexOf(b) + '">' +
+            ico("map", "xs") + " " + esc(n.name) + "</span>").join("")
+        : '<span style="color:var(--ink-3)">미배치</span>') + "</div></td>" +
+      '<td><div class="rowseg">' + links.map((l, i) =>
+        '<button class="btn icon sm" data-goto-url="' + esc(l.url) + '" type="button" title="' + esc(l.url) + '">' + ico("link", "xs") + "</button>").join("") + "</div></td>" +
+      '<td>' + (canEdit() && isStaff()
+        ? '<div class="rowacts"><button class="btn icon sm" data-sheet-edit="' + esc(m.code) + '" title="수정">' + ico("edit", "xs") + "</button></div>"
+        : "") + "</td>" +
+    "</tr>";
+  }).join("");
+
+  $("#campTable").innerHTML = rows.length
+    ? "<thead><tr>" + head.map(h => "<th>" + esc(h) + "</th>").join("") + "</tr></thead><tbody>" + body + "</tbody>"
+    : '<tbody><tr><td><div class="empty">' + ico("mega") +
+      "<div>" + (SHEETS.camps.length ? "조건에 맞는 캠페인이 없습니다" : "구글 시트에서 캠페인을 아직 불러오지 못했습니다") + "</div></div></td></tr></tbody>";
 }
 function initCampView() {
   $("#campChanFilter").addEventListener("click", e => {
@@ -742,7 +749,7 @@ function initCampView() {
   $("#campPlaceFilter").addEventListener("change", e => { campFilter.place = e.target.value; renderCampView(true); });
   $("#campSearch").addEventListener("input", e => { campFilter.q = e.target.value.toLowerCase().trim(); renderCampView(true); });
   $("#btnNewSheetCamp").addEventListener("click", () => editSheetCamp(null));
-  $("#campGrid").addEventListener("click", e => {
+  $("#campTable").addEventListener("click", e => {
     const go = e.target.closest("[data-goto-url]");
     if (go) return openUrl(go.dataset.gotoUrl);
     const g = e.target.closest("[data-goto]");

@@ -438,10 +438,10 @@ function editSheetCamp(code) {
     title: m ? "캠페인 수정 · " + m.code : "새 캠페인 등록",
     icon: "mega",
     okText: m ? "시트에 저장" : "시트에 등록",
-    note: "구글 시트 <b>1.개인화DB</b> 에 그대로 반영됩니다. " +
-      "<b>CTR기준·CVR기준과 전달~매출(X~AE)은 로직·수치라 앱에서 고칠 수 없습니다</b> — 시트에서 직접 수정하세요. " +
+    note: "<b>CTR기준·CVR기준과 전달~매출(X~AE)은 로직·수치라 앱에서 고칠 수 없습니다</b> — 시트에서 직접 수정하세요. " +
       "앱에서는 삭제할 수 없습니다. 그만 쓰는 캠페인은 상태를 <b>중단</b>으로 바꾸세요." +
       (m ? "" : "<br>새로 등록하면 실적 열의 수식은 바로 윗줄에서 복사됩니다. CTR기준·CVR기준은 시트에서 채워 주세요."),
+    warn: "이 캠페인 항목은 구글 시트 데이터와 연동됩니다. 여기서 수정하면 <b>구글 시트의 데이터도 함께 변경</b>됩니다.",
     fields: sheetFormFields().concat(lockedFields(m)),
     values,
     onSave: async v => {

@@ -76,7 +76,10 @@ body.viewer .staff-only{display:none !important}
    없는 반면, 그 안에서 스크롤하거나 지도를 끌 때마다 브라우저가 그 넓은 면적을
    매 프레임 다시 블러 합성해야 해서 프레임이 크게 떨어진다. blur는 내용 위에
    겹쳐 뜨는 작은 조각(미니맵·툴바·메뉴·팝오버·토스트)에만 남긴다. */
-.topbar.glass,.flow.glass,.pane.glass,.listwrap.glass{-webkit-backdrop-filter:none; backdrop-filter:none}
+/* 모달도 같은 이유로 뺀다 — 안에서 목록이나 긴 입력 폼을 스크롤할 때마다
+   브라우저가 모달 뒤 배경 전체를 다시 블러 합성해 눈에 띄게 버벅인다. */
+.topbar.glass,.flow.glass,.pane.glass,.listwrap.glass,.modal.glass{-webkit-backdrop-filter:none; backdrop-filter:none}
+.modal.glass{background:var(--bg-3)}
 .btn{
   display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 11px;
   border-radius:var(--r-sm); border:1px solid var(--stroke); background:var(--glass-2);

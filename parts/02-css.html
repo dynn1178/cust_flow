@@ -153,12 +153,12 @@ tr:hover .rowacts{opacity:1}
 .stat .t{font-size:11px; color:var(--ink-3)}
 
 /* ============ modal / popover / toast ============ */
-.scrim{position:fixed; inset:0; z-index:100; background:color-mix(in srgb,var(--bg) 55%,transparent);
-  -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); display:grid; place-items:center; padding:20px}
+.scrim{position:fixed; inset:0; z-index:100; background:color-mix(in srgb,var(--bg) 82%,transparent);
+  display:grid; place-items:center; padding:20px}
 .modal{width:min(560px,100%); max-height:88vh; border-radius:var(--r-lg); display:flex; flex-direction:column; overflow:hidden}
 .modal-head{display:flex; align-items:center; gap:9px; padding:14px 16px; border-bottom:1px solid var(--stroke-2)}
 .modal-head h3{margin:0; font-size:15px; font-weight:600; letter-spacing:-.015em; flex:1}
-.modal-body{padding:16px; overflow:auto; display:flex; flex-direction:column; gap:13px}
+.modal-body{padding:16px; overflow:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:13px}
 .modal-foot{padding:12px 16px; border-top:1px solid var(--stroke-2); display:flex; gap:8px; justify-content:flex-end;
   background:var(--glass-2)}
 .frow{display:flex; flex-direction:column; gap:5px}
@@ -245,8 +245,10 @@ tr:hover .rowacts{opacity:1}
   border:1px solid var(--stroke-2); background:var(--glass-2); border-radius:99px; padding:4px 10px; white-space:nowrap}
 .syncchip.bad{color:var(--bad); border-color:color-mix(in srgb,var(--bad) 35%,transparent)}
 .modal.wide{width:min(880px,100%)}
-.picklist{max-height:52vh; overflow:auto; display:flex; flex-direction:column; gap:4px;
-  border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:6px}
+.picklist{max-height:52vh; overflow:auto; overscroll-behavior:contain; display:flex; flex-direction:column; gap:4px;
+  border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:6px; contain:paint}
+/* 수백 줄짜리 목록에서 화면 밖 줄은 아예 레이아웃·페인트를 건너뛰게 한다 */
+.picklist .pickrow,.perfside .pickrow{content-visibility:auto; contain-intrinsic-size:0 46px}
 .pickrow{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:var(--r-sm); cursor:pointer;
   border:1px solid transparent}
 .pickrow:hover{background:var(--glass-2)}
@@ -256,22 +258,47 @@ tr:hover .rowacts{opacity:1}
 .pickmain b{font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .pickmain em{font-style:normal; font-size:11px; color:var(--ink-3)}
 .pickfull{font-size:10.5px; color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.formwarn{font-size:12px; font-weight:500; color:var(--bad); line-height:1.6;
+  border:1px solid color-mix(in srgb,var(--bad) 38%,transparent); border-radius:var(--r-sm);
+  background:color-mix(in srgb,var(--bad) 8%,transparent); padding:9px 11px}
 .frow .ro{font-size:12px; color:var(--ink-2); background:var(--glass-2); border:1px solid var(--stroke-2);
   border-radius:var(--r-sm); padding:8px 10px; line-height:1.5; word-break:break-word}
+
+.periodbox{display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:var(--ink-3)}
+.periodbox .field{min-width:96px}
+#campTableWrap{flex:1; min-height:0; overflow:auto; overscroll-behavior:contain}
+#campTable{table-layout:auto}
+#campTable td{padding:8px 10px; border-right:1px solid var(--stroke-2)}
+#campTable td:last-child,#campTable th:last-child{border-right:0; width:40px}
+#campTable .nm{font-weight:600; font-size:12.5px; letter-spacing:-.01em}
+#campTable .sub{display:block; font-size:10.5px; color:var(--ink-3); margin-top:2px; overflow-wrap:anywhere}
+#campTable .basis{font-size:10.5px; color:var(--ink-2); line-height:1.5; max-width:230px}
+#campTable .basis b{display:inline-block; min-width:30px; color:var(--ink-3); font-weight:600}
+#campTable .capname{max-width:210px}
+#campTable .capfull{max-width:260px}
+#campTable .wherecell{display:flex; flex-wrap:wrap; gap:3px; max-width:180px}
 
 .perfbody{flex:1; min-height:0; display:flex; gap:0}
 .perfside{width:308px; flex:none; border-right:1px solid var(--stroke-2); padding:8px}
 .perfmain{flex:1; min-width:0; padding:12px}
 .perfgroup{font-size:11px; font-weight:600; color:var(--ink-3); padding:10px 8px 4px; letter-spacing:.02em}
-.chartwrap{border:1px solid var(--stroke-2); border-radius:var(--r-md); background:var(--glass-2); padding:8px}
-.perfchart{width:100%; height:auto; display:block}
+.chartwrap{position:relative; border:1px solid var(--stroke-2); border-radius:var(--r-md); background:var(--glass-2); padding:6px}
+.perfchart{width:100%; max-width:760px; height:auto; display:block; margin:0 auto}
+.perfchart .hit{fill:transparent; cursor:crosshair}
+.perfchart .vline{stroke:var(--ink-3); stroke-width:1; stroke-dasharray:3 3; opacity:.5}
+.perfchart .vlab{fill:var(--ink-2); font-size:8px; font-family:var(--f-mono); text-anchor:middle}
+.chart-tip{position:absolute; z-index:5; pointer-events:none; background:var(--bg-3); border:1px solid var(--stroke);
+  border-radius:var(--r-sm); box-shadow:var(--shadow-sm); padding:7px 9px; font-size:11px; line-height:1.6; white-space:nowrap; display:none}
+.chart-tip b{font-family:var(--f-mono)}
+.chart-tip .tr{display:flex; align-items:center; gap:6px}
+.chart-tip .tr i{width:8px; height:8px; border-radius:2px; display:inline-block; flex:none}
 .perfchart .gl{stroke:var(--grid); stroke-width:1}
-.perfchart .ax{fill:var(--ink-3); font-size:10px; font-family:var(--f-mono)}
+.perfchart .ax{fill:var(--ink-3); font-size:8.5px; font-family:var(--f-mono)}
 .perfchart .ax.l{text-anchor:end} .perfchart .ax.r{text-anchor:start} .perfchart .ax.c{text-anchor:middle}
-.perfchart .ax.cap{font-size:10.5px; font-weight:600}
-.perfchart .ln{fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round}
-.legend{display:flex; flex-wrap:wrap; gap:10px; padding:8px 4px 2px}
-.legend .lg{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-2)}
+.perfchart .ax.cap{font-size:9px; font-weight:600}
+.perfchart .ln{fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+.legend{display:flex; flex-wrap:wrap; gap:10px; padding:6px 4px 2px; justify-content:center}
+.legend .lg{display:inline-flex; align-items:center; gap:5px; font-size:10.5px; color:var(--ink-2)}
 .legend .lg i{width:10px; height:10px; border-radius:3px; display:inline-block}
 .basiscard{border:1px solid var(--stroke-2); border-radius:var(--r-md); padding:10px 12px; margin-top:12px; background:var(--glass-2)}
 .basiscard h4{margin:0 0 7px; font-size:12.5px; font-weight:600}
@@ -286,15 +313,20 @@ tr:hover .rowacts{opacity:1}
 .ptable td em{display:block; font-style:normal; font-size:10.5px; color:var(--ink-3)}
 
 .perfbadge{display:inline-flex; gap:4px; align-items:center; flex-wrap:wrap}
-.perfbadge .pb{font-family:var(--f-mono); font-size:10.5px; font-weight:600; border-radius:99px; padding:1px 6px;
+.perfbadge .pb{font-family:var(--f-mono); font-size:11.5px; font-weight:600; border-radius:99px; padding:2px 7px;
   border:1px solid transparent; white-space:nowrap}
 .perfbadge .pb.ctr{color:#2f6fed; background:rgba(47,111,237,.11); border-color:rgba(47,111,237,.28)}
 .perfbadge .pb.cvr{color:#e0483f; background:rgba(224,72,63,.11); border-color:rgba(224,72,63,.28)}
+.perfbadge .pb.mon{color:var(--ink-3); background:var(--glass-2); border-color:var(--stroke-2); font-weight:500}
 .perfbadge .pb i{font-style:normal; margin-left:3px; opacity:.85; font-size:9.5px}
-.perfbadge.sm .pb{font-size:9.5px; padding:0 5px}
-.g-badge{padding:2px 0 4px 20px}
+.perfbadge.sm .pb{font-size:11px; padding:1px 6px}
+.g-badge{padding:3px 0 5px 20px}
 .card > .perfbadge{margin:-2px 0 2px}
 .ccard > .perfbadge{margin:2px 0}
-.node .perfbadge .pb{font-size:9px; padding:0 4px}
+/* 노드 카드는 폭이 좁으므로 CTR·CVR 을 두 줄로 쌓고 글자는 오히려 키운다 */
+.node .perfbadge{display:flex; flex-direction:column; align-items:flex-start; gap:3px}
+/* 노드 카드에서는 "월" 만 한 줄, 그 아래 CTR·CVR 이 각각 한 줄씩 온다 */
+.node .perfbadge .pb.mon{font-size:10px; padding:0 6px}
+.node .perfbadge .pb{font-size:11px; padding:1px 7px; line-height:1.5}
 @media (max-width:860px){ .perfbody{flex-direction:column} .perfside{width:auto; height:220px; border-right:0; border-bottom:1px solid var(--stroke-2)} }
 </style>

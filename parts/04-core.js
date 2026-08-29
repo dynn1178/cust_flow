@@ -431,7 +431,8 @@ function openForm(opt) {
   root.innerHTML =
     '<div class="scrim"><div class="modal glass" role="dialog" aria-modal="true">' +
       '<div class="modal-head">' + ico(opt.icon || "edit") + "<h3>" + esc(opt.title) + '</h3><button class="btn icon sm" data-x>' + ico("close", "xs") + "</button></div>" +
-      '<div class="modal-body">' + rows + (opt.note ? '<p class="hint">' + opt.note + "</p>" : "") + "</div>" +
+      '<div class="modal-body">' + rows + (opt.note ? '<p class="hint">' + opt.note + "</p>" : "") +
+        (opt.warn ? '<p class="formwarn">' + opt.warn + "</p>" : "") + "</div>" +
       '<div class="modal-foot">' + (opt.onDelete ? '<button class="btn danger" data-del>' + ico("trash", "xs") + (opt.deleteText || "삭제") + "</button>" : "") +
         '<div class="spacer"></div><button class="btn" data-x>취소</button><button class="btn primary" data-ok>' + esc(opt.okText || "저장") + "</button></div>" +
     "</div></div>";
