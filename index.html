@@ -292,7 +292,10 @@ select.field{cursor:pointer}
 .perfline .mon{color:var(--ink-3); font-weight:500; font-size:.82em}
 .perfline .ctr{color:#2f6fed} .perfline .cvr{color:#e0483f}
 .perfline .sep{color:var(--ink-3); opacity:.6}
-.perfline i{font-style:normal; font-size:.72em; opacity:.85; margin-left:1px}
+/* 표본을 감안해도 의미 있는 변화만 진하게 — 흐린 화살표는 노이즈일 수 있다는 뜻 */
+.perfline i{font-style:normal; font-size:.72em; margin-left:1px; opacity:.4; font-weight:400}
+.perfline i.sig{opacity:1; font-weight:700}
+.perfline .mon{margin-left:auto}
 .g-more{font-size:max(12px,min(15.5px,calc(12px / max(var(--zoom,1),.65)))); color:var(--ink-3); padding-left:12px}
 .g-empty{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--ink-3); text-align:center; padding-top:2px}
 .g-miss{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--warn); display:flex; align-items:center; gap:6px}
@@ -601,6 +604,9 @@ tr:hover .rowacts{opacity:1}
 .pickmain b{font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .pickmain em{font-style:normal; font-size:11px; color:var(--ink-3)}
 .pickfull{font-size:10.5px; color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.fnote{font-size:11.5px; line-height:1.5; margin:-6px 0 0; padding-left:2px; color:var(--ink-3)}
+.fnote.ok{color:var(--ok)} .fnote.bad{color:var(--bad); font-weight:500}
+.field.invalid{border-color:var(--bad); box-shadow:0 0 0 2px color-mix(in srgb,var(--bad) 18%,transparent)}
 .formwarn{font-size:12px; font-weight:500; color:var(--bad); line-height:1.6;
   border:1px solid color-mix(in srgb,var(--bad) 38%,transparent); border-radius:var(--r-sm);
   background:color-mix(in srgb,var(--bad) 8%,transparent); padding:9px 11px}
@@ -672,12 +678,48 @@ tr:hover .rowacts{opacity:1}
 .perfbadge .pb.ctr{color:#2f6fed; background:rgba(47,111,237,.11); border-color:rgba(47,111,237,.28)}
 .perfbadge .pb.cvr{color:#e0483f; background:rgba(224,72,63,.11); border-color:rgba(224,72,63,.28)}
 .perfbadge .pb.mon{color:var(--ink-3); background:var(--glass-2); border-color:var(--stroke-2); font-weight:500}
-.perfbadge .pb i{font-style:normal; margin-left:3px; opacity:.85; font-size:9.5px}
+.perfbadge .pb i{font-style:normal; margin-left:3px; font-size:9.5px; opacity:.4; font-weight:400}
+.perfbadge .pb i.sig{opacity:1; font-weight:700}
 .perfbadge.sm .pb{font-size:11px; padding:1px 6px}
 .card > .perfbadge{margin:-2px 0 2px}
 .ccard > .perfbadge{margin:2px 0}
 .node .perfbadge .pb{font-size:11px; padding:1px 7px; line-height:1.5}
 @media (max-width:860px){ .perfbody{flex-direction:column} .perfside{width:auto; height:220px; border-right:0; border-bottom:1px solid var(--stroke-2)} }
+
+/* ============ AARRR 요약 · 점검 · 성과 히트맵 ============ */
+.funnel{display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:8px; padding:10px 12px 0}
+.fcell{position:relative; overflow:hidden; border-radius:var(--r-md); border:1px solid var(--stroke);
+  background:var(--glass-2); padding:9px 11px; display:flex; flex-direction:column; gap:2px}
+.fcell::before{content:""; position:absolute; left:0; bottom:0; height:3px; width:var(--fill,0%); background:var(--ok)}
+.fcell .fk{font-family:var(--f-mono); font-size:11px; font-weight:700; color:var(--ink-2)}
+.fcell .fk em{font-style:normal; font-family:var(--f-ui); font-weight:500; color:var(--ink-3); margin-left:5px; font-size:10.5px}
+.fcell .fv{display:flex; align-items:baseline; gap:5px}
+.fcell .fv b{font-family:var(--f-mono); font-size:16px; letter-spacing:-.02em}
+.fcell .fv span{font-size:10px; color:var(--ink-3)}
+.fcell .fm{font-size:10.5px; color:var(--ink-3)}
+
+.btn.warn{color:var(--warn); border-color:color-mix(in srgb,var(--warn) 45%,transparent);
+  background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.chkgroup{border-top:1px solid var(--stroke-2); padding-top:12px}
+.chkgroup:first-child{border-top:0; padding-top:0}
+.chkhead{display:flex; align-items:center; gap:6px; font-size:12.5px}
+.chkhead.bad{color:var(--bad)} .chkhead.warn{color:var(--warn)} .chkhead.info{color:var(--ink-2)}
+.chkhead .n{font-family:var(--f-mono); font-size:11px; background:var(--glass-2); border:1px solid var(--stroke-2);
+  border-radius:99px; padding:1px 7px; color:var(--ink-3)}
+.chklist{display:flex; flex-direction:column; gap:2px; max-height:230px; overflow:auto; overscroll-behavior:contain}
+.chkrow{display:grid; grid-template-columns:96px 1fr auto; gap:9px; align-items:center; text-align:left;
+  border:1px solid transparent; background:none; border-radius:var(--r-sm); padding:6px 8px; cursor:pointer;
+  font:inherit; font-size:11.5px; color:var(--ink)}
+.chkrow:hover{background:var(--glass-2); border-color:var(--stroke-2)}
+.chkrow .mono{font-family:var(--f-mono); font-size:11px; color:var(--ink-3)}
+.chkrow em{font-style:normal; font-size:10.5px; color:var(--ink-3); max-width:260px; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap}
+
+/* 성과 위주 보기 — 매출이 큰 화면일수록 초록빛이 진해진다 */
+.node.heat .node-frame{background:
+  linear-gradient(0deg, color-mix(in srgb, var(--ok) calc(var(--heat,0) * 30%), transparent), transparent 72%),
+  var(--glass-3)}
+.node.heat .node-frame{border-color:color-mix(in srgb, var(--ok) calc(var(--heat,0) * 55%), var(--stroke))}
 </style>
 </head>
 <body>
@@ -929,6 +971,7 @@ tr:hover .rowacts{opacity:1}
         <input class="field" id="campSearch" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:170px">
         <div class="spacer"></div>
         <span class="syncbar"></span>
+        <button class="btn" id="btnCampCheck" title="급락 주의·데이터 누락을 한 번에 점검합니다"><svg class="ico"><use href="#i-alert"/></svg><span id="checkCount">점검</span></button>
         <button class="btn edit-only staff-only" id="btnNewSheetCamp" title="구글 시트에 새 캠페인을 등록합니다"><svg class="ico"><use href="#i-plus"/></svg>새 캠페인</button>
         <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>
         <button class="btn staff-only" id="btnCampCsv"><svg class="ico"><use href="#i-down"/></svg>CSV</button>
@@ -958,6 +1001,7 @@ tr:hover .rowacts{opacity:1}
         <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>
       </div>
       <div class="statgrid" id="perfStats"></div>
+      <div id="perfFunnel"></div>
       <div class="perfbody">
         <div class="perfside scroller" id="perfList"></div>
         <div class="perfmain">
@@ -1035,6 +1079,7 @@ const FOCUS = {
   all:       { name: "전체", ico: "density" },
   simple:    { name: "간단", ico: "density" },
   camp:      { name: "캠페인 위주", ico: "mega", c: "var(--camp)" },
+  perf:      { name: "성과 위주", ico: "chart", c: "var(--ok)" },
   amplitude: { name: "Amplitude 위주", ico: "amp", c: "var(--amp)" },
   braze:     { name: "Braze 위주", ico: "braze", c: "var(--braze)" },
   ga4:       { name: "GA4 위주", ico: "ga4", c: "var(--ga4)" },
@@ -1363,8 +1408,11 @@ function fieldRow(f, vals) {
     return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="linklist" data-links="' + f.k + '">' + items +
       '</div><button class="btn sm" data-addlink="' + f.k + '" type="button">' + ico("plus", "xs") + "링크 추가</button></div>";
   }
-  if (f.type === "readonly")
-    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="ro' + (f.mono ? " mono" : "") + '">' + esc(v || "-") + "</div></div>";
+  if (f.type === "note")                      // 폼이 스스로 갱신하는 안내 한 줄
+    return '<p class="fnote" data-note="' + f.k + '">' + esc(v || "") + "</p>";
+  if (f.type === "readonly")                  // 보여주기만 하는 칸 — 저장값에는 들어가지 않는다
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="ro' + (f.mono ? " mono" : "") +
+      '" data-k="' + f.k + '" data-ro="1">' + esc(v || "-") + "</div></div>";
   if (f.type === "check")
     return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
   if (f.type === "action")
@@ -1422,7 +1470,7 @@ function openForm(opt) {
 
   const collect = () => {
     const out = Object.assign({}, vals);
-    $$("[data-k]", root).forEach(el => { out[el.dataset.k] = el.value.trim(); });
+    $$("[data-k]", root).forEach(el => { if (!el.dataset.ro) out[el.dataset.k] = el.value.trim(); });
     $$("[data-c]", root).forEach(el => { out[el.dataset.c] = el.checked; });
     $$("[data-hue]", root).forEach(box => { const on = $(".hue.on", box); out[box.dataset.hue] = on ? on.dataset.v : "none"; });
     const multiGroups = {};
@@ -1442,6 +1490,15 @@ function openForm(opt) {
     });
     return out;
   };
+  /* 값이 바뀌면 폼 스스로 다른 칸을 채우거나 검사할 수 있게 알려 준다 */
+  if (opt.onChange) {
+    const fire = e => {
+      const el = e.target.closest("[data-k]");
+      if (el && !el.dataset.ro) opt.onChange(el.dataset.k, el.value, root);
+    };
+    root.addEventListener("change", fire);
+    root.addEventListener("input", fire);
+  }
   root.addEventListener("click", e => {
     const t = e.target;
     /* 입력 중인 수정 창은 배경(scrim)을 눌러도 닫히지 않게 한다 — 편집 도중
@@ -1822,8 +1879,20 @@ function incompleteRowsBig(n) {
   if (!miss.length) return '<div class="g-empty">모두 등록됨</div>';
   return '<div class="node-list">' + miss.map(m => '<div class="g-miss">' + ico("alert", "xs") + esc(m) + "</div>").join("") + "</div>";
 }
+/* 이 페이지에 붙은 캠페인들의 최신월 실적을 합친다 — 성과 위주 보기의 색·배지에 쓴다 */
+function nodePerfSum(n) {
+  let rev = 0, cnt = 0;
+  (n.camps || []).forEach(c => {
+    if (!c.code) return;
+    const h = perfHistory(c.code);
+    if (!h.length) return;
+    cnt++; rev += h[h.length - 1].revenue || 0;
+  });
+  return { rev: rev, count: cnt };
+}
 function focusCount(n, f) {
   if (f === "camp") return n.camps.length;
+  if (f === "perf") return nodePerfSum(n).count;
   if (f === "incomplete") return completeness(n).length;
   if (PLAT[f]) return n.tags.filter(t => platformsOf(t).indexOf(f) >= 0).length;
   return 0;
@@ -1841,6 +1910,11 @@ function nodeHtml(n) {
     });
     if (n.camps.length)
       bd += '<span class="bdg" style="--c:var(--camp)" title="CRM 캠페인 ' + n.camps.length + '개">' + ico("mega", "xs") + "<b>" + n.camps.length + "</b></span>";
+  } else if (f === "perf") {
+    /* 성과 위주 보기에서는 개수가 아니라 이 화면이 만든 최신월 매출을 크게 보여 준다 */
+    const ps = nodePerfSum(n);
+    bd = '<span class="bdg big" style="--c:var(--ok)" title="이 페이지에 붙은 캠페인들의 최신월 매출 합계">' +
+      ico("chart", "xs") + "<b>" + (ps.count ? Math.round(ps.rev).toLocaleString("ko-KR") : "-") + "</b></span>";
   } else {
     const meta = FOCUS[f];
     bd = '<span class="bdg big" style="--c:' + (meta.c || "var(--ink-3)") + '">' + ico(meta.ico, "xs") + "<b>" + focusCount(n, f) + "</b></span>";
@@ -1858,7 +1932,7 @@ function nodeHtml(n) {
   if (f === "all") {
     body = n.camps.length ? '<div class="node-list">' + n.camps.slice(0, 4).map(campRow).join("") +
       (n.camps.length > 4 ? '<div class="g-more">+' + (n.camps.length - 4) + "개 더</div>" : "") + "</div>" : "";
-  } else if (f === "camp") body = campRowsBig(n);
+  } else if (f === "camp" || f === "perf") body = campRowsBig(n);
   else if (f === "incomplete") body = incompleteRowsBig(n);
   else if (PLAT[f]) body = tagRowsBig(n, f);
 
@@ -1882,6 +1956,9 @@ function nodeHtml(n) {
 }
 function renderNodes() {
   const layer = $("#nodeLayer");
+  const focusNow = state.ui.focus || "all";
+  const heatMax = focusNow === "perf"
+    ? Math.max.apply(null, B().nodes.map(x => nodePerfSum(x).rev).concat(0)) : 0;
   const have = {};
   $$(".node", layer).forEach(el => { have[el.dataset.node] = el; });
   const drawn = [];
@@ -1890,13 +1967,16 @@ function renderNodes() {
     if (!el) { el = document.createElement("div"); el.dataset.node = n.id; layer.appendChild(el); }
     else delete have[n.id];
     const f = state.ui.focus || "all";
-    const dim = (f === "camp" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
-    el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
+    const dim = (f === "camp" || f === "perf" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
+    el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") +
+      (dim ? " dim" : "") + (f === "perf" ? " heat" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
+    /* 성과 위주 보기 — 매출이 큰 화면일수록 진하게 칠해 여정 위에서 바로 보이게 한다 */
+    if (f === "perf") el.style.setProperty("--heat", heatMax ? (nodePerfSum(n).rev / heatMax).toFixed(3) : 0);
     const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
       state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t)).join("|"),
       /* 시트를 다시 읽으면 캠페인 이름·상태·실적이 바뀌므로 마지막 동기화 시각도 서명에 넣는다 */
-      SHEETS.at, n.camps.map(c => c.code || (c.chan + c.status + c.name)).join("|"),
+      SHEETS.at, heatMax, n.camps.map(c => c.code || (c.chan + c.status + c.name)).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
       el.innerHTML = nodeHtml(n);
@@ -3526,6 +3606,18 @@ function laneOfNode(b, n) {
 }
 /* 캠페인 탭 — 구글 시트 1.개인화DB 의 목록 그대로를 보여 준다.
    여정 지도에 붙었는지는 문서에서 캠페인코드로 찾아 표시한다. */
+/* AARRR 구분은 코드 순서(A1 · A2 · R1 …)로 보여야 여정 단계 순서와 맞는다 */
+function aarrrFilterOptions(cur) {
+  const seen = {};
+  SHEETS.camps.forEach(m => {
+    const n = String(m.aarrrName || "").trim();
+    if (n && !seen[n]) seen[n] = String(m.aarrrCode || "").trim().toUpperCase();
+  });
+  return '<option value="all">모든 AARRR 구분</option>' +
+    Object.keys(seen).sort((a, b) => (seen[a] || "ZZ").localeCompare(seen[b] || "ZZ") || a.localeCompare(b, "ko"))
+      .map(n => '<option value="' + esc(n) + '"' + (cur === n ? " selected" : "") + ">" +
+        esc((seen[n] ? seen[n] + " · " : "") + n) + "</option>").join("");
+}
 function campColOptions(key, cur, allLabel) {
   const names = Array.from(new Set(SHEETS.camps.map(m => String(m[key] || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
   return '<option value="all">' + esc(allLabel) + "</option>" +
@@ -3542,11 +3634,15 @@ function renderCampView(force) {
   const seg = $("#campChanFilter");
   seg.innerHTML = '<button class="btn sm' + (campFilter.chan === "all" ? " on" : "") + '" data-ch="all">전체</button>' +
     chans.map(c => '<button class="btn sm' + (campFilter.chan === c ? " on" : "") + '" data-ch="' + esc(c) + '">' + esc(c) + "</button>").join("");
-  $("#campAarrrFilter").innerHTML = campColOptions("aarrrName", campFilter.aarrr, "모든 AARRR 구분");
+  $("#campAarrrFilter").innerHTML = aarrrFilterOptions(campFilter.aarrr);
   $("#campGoalFilter").innerHTML = campColOptions("goal", campFilter.goal, "모든 목표");
   $("#campSegFilter").innerHTML = campColOptions("title", campFilter.seg, "모든 캠페인구분");
   $("#campOwnerFilter").innerHTML = campColOptions("owner", campFilter.owner, "모든 담당자");
 
+  const issues = hygieneCount();
+  const chk = $("#checkCount");
+  chk.textContent = issues ? "점검 " + issues : "점검";
+  $("#btnCampCheck").classList.toggle("warn", issues > 0);
   $("#campStatusFilter").value = campFilter.status;
   $("#campMeasureFilter").value = campFilter.measure;
 
@@ -3630,6 +3726,7 @@ function initCampView() {
   $("#campStatusFilter").addEventListener("change", e => { campFilter.status = e.target.value; renderCampView(true); });
   $("#campPlaceFilter").addEventListener("change", e => { campFilter.place = e.target.value; renderCampView(true); });
   $("#campSearch").addEventListener("input", e => { campFilter.q = e.target.value.toLowerCase().trim(); renderCampView(true); });
+  $("#btnCampCheck").addEventListener("click", openCheckModal);
   $("#btnNewSheetCamp").addEventListener("click", () => editSheetCamp(null));
   $("#campTable").addEventListener("click", e => {
     const go = e.target.closest("[data-goto-url]");
@@ -4970,9 +5067,9 @@ const RAW_COLS = ["date", "code", "goal", "title", "fullName", "chan", "owner",
 /* 시트의 채널 표기를 앱의 채널 코드(아이콘·색)로 옮긴다 */
 const CHAN_MATCH = [
   ["앱푸시", "push"], ["웹푸시", "push"], ["푸시", "push"], ["push", "push"],
-  ["인앱", "inapp"], ["팝업", "inapp"],
+  ["인앱", "inapp"], ["인웹", "inapp"], ["팝업", "inapp"],
   ["알림톡", "kakao"], ["카카오", "kakao"], ["친구톡", "kakao"],
-  ["이메일", "email"], ["메일", "email"], ["email", "email"],
+  ["이메일", "email"], ["메일", "email"], ["email", "email"], ["edm", "email"],
   ["문자", "sms"], ["sms", "sms"], ["lms", "sms"], ["mms", "sms"],
   ["배너", "banner"], ["띠", "banner"]
 ];
@@ -5324,25 +5421,85 @@ function openCampPicker() {
 }
 
 /* ---------------- 시트에 캠페인 추가 · 수정 ---------------- */
+/* AARRR 구분코드 → 구분명 표는 시트에 이미 쌓인 값에서 뽑는다.
+   코드에 박아 두면 시트에서 단계 이름을 바꿨을 때 앱만 옛 이름을 들고 있게 된다. */
+function aarrrMap() {
+  const tally = {};
+  SHEETS.camps.forEach(c => {
+    const k = String(c.aarrrCode || "").trim().toUpperCase(), n = String(c.aarrrName || "").trim();
+    if (!k || !n) return;
+    (tally[k] = tally[k] || {})[n] = (tally[k][n] || 0) + 1;
+  });
+  const out = {};
+  Object.keys(tally).sort().forEach(k => {
+    out[k] = Object.keys(tally[k]).sort((a, b) => tally[k][b] - tally[k][a])[0];
+  });
+  return out;
+}
+const aarrrLabel = code => {
+  const n = aarrrMap()[String(code || "").trim().toUpperCase()];
+  return n ? code + " · " + n : String(code || "");
+};
+/* 같은 구분코드에서 가장 큰 일련번호를 찾아 그 다음 번호를 제안한다.
+   A1-002 · R1-101 처럼 세 자리를 쓰고, A2-001-01 같은 꼬리표는 무시한다. */
+function nextCampCode(prefix) {
+  const p = String(prefix || "").trim().toUpperCase();
+  if (!p) return "";
+  let max = 0, width = 3;
+  SHEETS.camps.forEach(c => {
+    const m = new RegExp("^" + p.replace(/[^A-Z0-9]/g, "") + "-(\\d+)").exec(String(c.code || "").trim().toUpperCase());
+    if (!m) return;
+    width = Math.max(width, m[1].length);
+    max = Math.max(max, parseInt(m[1], 10));
+  });
+  return p + "-" + String(max + 1).padStart(width, "0");
+}
+/* 시트에 이미 쓰이고 있는 값을 모아 선택지로 만든다 (기본 목록 + 시트 실제 값) */
+function optsFrom(key, base) {
+  const seen = { "": "-" };
+  (base || []).forEach(v => { seen[v] = v; });
+  SHEETS.camps.forEach(c => {
+    const v = String(c[key] || "").trim();
+    if (v) seen[v] = v;
+  });
+  return seen;
+}
+const CHAN_OPTS = ["앱푸시", "LMS", "EDM", "인앱", "인웹", "인앱/웹", "알림톡"];
+const PROGRESS_OPTS = ["기획", "제작", "검수", "완료", "보류"];
+/* O열 API/DB 는 한 칸이라 "API" · "DB" · "API/DB" 로 적힌다. 폼에서는 두 칸으로 나눠 고른다. */
+function apidbSplit(v) {
+  const t = String(v || "").toUpperCase();
+  return { _api: t.indexOf("API") >= 0 ? "Y" : "", _db: t.indexOf("DB") >= 0 ? "Y" : "" };
+}
+const apidbJoin = (api, db) => [api === "Y" ? "API" : "", db === "Y" ? "DB" : ""].filter(Boolean).join("/");
+
 function sheetFormFields() {
+  const map = aarrrMap();
+  const aarrrOpts = {};
+  Object.keys(map).forEach(k => { aarrrOpts[k] = k + " · " + map[k]; });
+  const YN = { "": "-", "Y": "Y", "N": "N" };
   return [
-    { k: "code", label: "캠페인코드", mono: true, ph: "A1-002" },
+    { type: "group", label: "AARRR 구분 — 먼저 고르면 캠페인코드가 자동으로 제안됩니다", open: true, fields: [
+      { k: "aarrrCode", label: "AARRR구분코드", type: "select", opts: aarrrOpts },
+      { k: "aarrrName", label: "AARRR구분명", type: "readonly" },
+      { k: "code", label: "캠페인코드", mono: true, ph: "A1-002" },
+      { k: "_codeMsg", label: "", type: "note" }
+    ] },
     { k: "title", label: "캠페인구분 (화면 표시명)", ph: "회원가입 유도" },
     { k: "fullName", label: "캠페인명 (세부 이름)", ph: "IN_P_CRM_가입_트리거기반_공통_앱_회원가입유도_260701~260731" },
-    { k: "chan", label: "채널", ph: "인앱 · 앱푸시 · 인앱/웹" },
+    { k: "chan", label: "채널", type: "select", opts: optsFrom("chan", CHAN_OPTS) },
     { k: "goal", label: "목표", ph: "회원가입 증대" },
-    { k: "mkt", label: "마케팅구분", ph: "개인화" },
-    { k: "aarrrCode", label: "AARRR구분코드", mono: true, ph: "A1" },
-    { k: "aarrrName", label: "AARRR구분명", ph: "획득 (인지)" },
-    { k: "status", label: "상태", type: "select", opts: { "진행": "진행", "중단": "중단" } },
-    { k: "progress", label: "진행도", ph: "완료" },
-    { k: "owner", label: "담당자", ph: "홍길동" },
+    { k: "mkt", label: "마케팅구분", type: "select", opts: optsFrom("mkt", ["개인화"]) },
+    { k: "status", label: "운영상태 (시트 M열)", type: "select", opts: { "진행": "진행", "중단": "중단" } },
+    { k: "progress", label: "작업 진행도 (시트 H열)", type: "select", opts: optsFrom("progress", PROGRESS_OPTS) },
+    { k: "owner", label: "담당자", type: "select", opts: optsFrom("owner", []) },
     { type: "group", label: "실행 조건", open: true, fields: [
       { k: "trigger", label: "트리거", ph: "메인 페이지 로딩 시 & 로그인 = N" },
-      { k: "index", label: "Index", ph: "7일 이내 회원가입 = Y" },
+      { k: "index", label: "Index (전환 조건)", ph: "7일 이내 회원가입 = Y" },
       { k: "path", label: "경로", mono: true, ph: "/product/main.yb" },
-      { k: "event", label: "이벤트", ph: "" },
-      { k: "apidb", label: "API/DB", ph: "" }
+      { k: "event", label: "이벤트", type: "select", opts: optsFrom("event", ["O", "X"]) },
+      { k: "_api", label: "API 사용", type: "select", opts: YN },
+      { k: "_db", label: "DB 사용", type: "select", opts: YN }
     ] },
     { type: "group", label: "링크 · 성과측정", fields: [
       { k: "link1", label: "링크1", mono: true, ph: "https://dashboard-05.braze.com/..." },
@@ -5362,14 +5519,37 @@ function lockedFields(m) {
     { k: "_nums", label: "시트 집계", type: "readonly" }
   ] }];
 }
+/* 캠페인코드가 이미 있는지 · 구분코드와 앞자리가 맞는지 그 자리에서 알려 준다 */
+function codeCheck(codeVal, prefix, editing) {
+  const v = String(codeVal || "").trim().toUpperCase();
+  if (!v) return { bad: true, msg: "캠페인코드는 반드시 필요합니다" };
+  if (editing && v === String(editing).toUpperCase()) return { bad: false, msg: "" };
+  const dup = campByCode(v);
+  if (dup) return { bad: true, msg: "이미 있는 캠페인코드입니다 — " + (dup.title || dup.fullName || "") };
+  if (prefix && v.indexOf(String(prefix).toUpperCase() + "-") !== 0)
+    return { bad: true, msg: "AARRR구분코드가 " + prefix + " 이므로 " + prefix + "- 로 시작해야 합니다" };
+  return { bad: false, msg: "쓸 수 있는 코드입니다" };
+}
+
 function editSheetCamp(code) {
   if (!isStaff()) return toast("캠페인 등록·수정은 운영자 이상만 할 수 있습니다", "bad");
   const m = code ? campByCode(code) : null;
   if (code && !m) return toast("시트에서 이 캠페인을 찾지 못했습니다. 새로고침해 보세요.", "bad");
+  if (!m && !SHEETS.camps.length) return toast("캠페인 목록을 먼저 불러와야 코드를 제안할 수 있습니다", "bad");
 
+  const map = aarrrMap();
   const values = {};
   SHEET_COLS.forEach(c => { values[c.key] = m ? (m[c.key] == null ? "" : m[c.key]) : ""; });
-  if (!m) values.status = "진행";
+  Object.assign(values, apidbSplit(m ? m.apidb : ""));
+  if (!m) {
+    const first = Object.keys(map)[0] || "";
+    values.status = "진행";
+    values.aarrrCode = first;
+    values.aarrrName = map[first] || "";
+    values.code = nextCampCode(first);
+    values.mkt = "개인화";
+  }
+  values._codeMsg = m ? "" : "시트의 마지막 번호 다음으로 제안한 코드입니다. 바꿔도 됩니다.";
   if (m) {
     const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
     values._ctrBasis = ctr.length ? ctr.join("  ·  ") : "시트에 기준이 적혀 있지 않습니다";
@@ -5389,12 +5569,32 @@ function editSheetCamp(code) {
       (m ? "" : "<br>새로 등록하면 실적 열의 수식은 바로 윗줄에서 복사됩니다. CTR기준·CVR기준은 시트에서 채워 주세요."),
     warn: "이 캠페인 항목은 구글 시트 데이터와 연동됩니다. 여기서 수정하면 <b>구글 시트의 데이터도 함께 변경</b>됩니다.",
     fields: sheetFormFields().concat(lockedFields(m)),
-    values,
+    values: values,
+    /* 구분코드를 고르면 구분명과 캠페인코드를 따라 바꾸고, 코드는 칠 때마다 중복을 확인한다 */
+    onChange: (k, v, root) => {
+      const codeEl = $('[data-k="code"]', root);
+      const prefEl = $('[data-k="aarrrCode"]', root);
+      if (k === "aarrrCode") {
+        const nameEl = $('[data-k="aarrrName"]', root);
+        if (nameEl) nameEl.textContent = map[v] || "-";
+        if (!m) codeEl.value = nextCampCode(v);
+      }
+      if (k === "aarrrCode" || k === "code") {
+        const r = codeCheck(codeEl.value, prefEl ? prefEl.value : "", m ? m.code : null);
+        const msg = $('[data-note="_codeMsg"]', root);
+        if (msg) { msg.textContent = r.msg; msg.className = "fnote " + (r.bad ? "bad" : "ok"); }
+        codeEl.classList.toggle("invalid", r.bad);
+      }
+    },
     onSave: async v => {
-      const newCode = String(v.code || "").trim();
-      if (!newCode) return toast("캠페인코드는 반드시 필요합니다", "bad");
-      if (!m && campByCode(newCode)) return toast("이미 있는 캠페인코드입니다: " + newCode, "bad");
-      if (m && newCode !== m.code) return toast("캠페인코드는 바꿀 수 없습니다. 시트에서 직접 고쳐 주세요.", "bad");
+      const newCode = String(v.code || "").trim().toUpperCase();
+      const r = codeCheck(newCode, v.aarrrCode, m ? m.code : null);
+      if (r.bad) return toast(r.msg, "bad");
+      if (m && newCode !== String(m.code).toUpperCase())
+        return toast("캠페인코드는 바꿀 수 없습니다. 시트에서 직접 고쳐 주세요.", "bad");
+      v.code = m ? m.code : newCode;
+      v.aarrrName = map[v.aarrrCode] || v.aarrrName || "";
+      v.apidb = apidbJoin(v._api, v._db);
       const row = [];
       SHEET_COLS.forEach((c, i) => { row[i] = c.edit ? (v[c.key] == null ? "" : String(v[c.key])) : ""; });
       toast(m ? "시트에 저장하는 중…" : "시트에 등록하는 중…");
@@ -5402,10 +5602,10 @@ function editSheetCamp(code) {
         await sheetApi("", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "upsert", code: m ? m.code : newCode, values: row })
+          body: JSON.stringify({ action: "upsert", code: v.code, values: row })
         });
         await loadSheets({ fresh: true });
-        toast(m ? "시트에 저장했습니다" : "시트에 등록했습니다 · " + newCode, "ok");
+        toast(m ? "시트에 저장했습니다" : "시트에 등록했습니다 · " + v.code, "ok");
       } catch (e) {
         toast("시트에 쓰지 못했습니다: " + ((e && e.message) || "알 수 없는 오류"), "bad");
       }
@@ -5474,20 +5674,78 @@ function perfRows() {
 }
 const perfMonths = () => Array.from(new Set(perfRows().map(r => r.month))).sort();
 
-/* 캠페인 하나의 월별 이력 (오래된 달 → 최근 달) */
+/* 캠페인 하나의 월별 이력 (오래된 달 → 최근 달).
+   여정 지도·점검처럼 캠페인 수만큼 반복해 부르는 곳이 있어 색인을 한 번만 만들어 둔다. */
+let histCache = null;
 function perfHistory(code) {
-  return perfRows().filter(r => r.code === code).sort((a, b) => a.month.localeCompare(b.month));
+  if (!histCache || histCache.at !== SHEETS.at) {
+    const by = {};
+    perfRows().forEach(r => { (by[r.code] = by[r.code] || []).push(r); });
+    Object.keys(by).forEach(k => by[k].sort((a, b) => a.month.localeCompare(b.month)));
+    histCache = { at: SHEETS.at, by: by };
+  }
+  return histCache.by[code] || [];
+}
+/* 비율의 분모를 되돌려 구한다 — 캠페인마다 CTR·CVR 의 분모가 달라서
+   시트가 준 비율과 분자로부터 역산하는 편이 정확하다. 안 되면 수신 수로 대신한다. */
+function denomOf(count, pct, fallback) {
+  if (count != null && pct) {
+    const d = count / (pct / 100);
+    if (isFinite(d) && d >= 1) return Math.round(d);
+  }
+  return fallback || null;
+}
+/* 두 달의 비율 차이가 표본 수를 감안해도 의미가 있는지 (이항 비율 z-검정).
+   수신 5만 건의 0.4%p 와 수신 71건의 0.4%p 는 전혀 다른 이야기다. */
+function ratioZ(p1, n1, p2, n2) {
+  if (p1 == null || p2 == null || !n1 || !n2) return null;
+  const a = p1 / 100, b = p2 / 100;
+  const pool = (a * n1 + b * n2) / (n1 + n2);
+  const se = Math.sqrt(pool * (1 - pool) * (1 / n1 + 1 / n2));
+  if (!se || !isFinite(se)) return null;
+  return (a - b) / se;
+}
+const SIG_Z = 1.96;                        // 95% 신뢰수준
+function monthZ(cur, prev, kind) {
+  if (!cur || !prev) return null;
+  const k = kind === "ctr" ? "open" : "conv";
+  return ratioZ(cur[kind], denomOf(cur[k], cur[kind], cur.recv),
+                prev[kind], denomOf(prev[k], prev[kind], prev.recv));
 }
 /* 가장 최근 달과 그 직전 달 — 여정 지도 배지에 쓴다 */
 function perfLatest(code) {
   const h = perfHistory(code);
   if (!h.length) return null;
   const cur = h[h.length - 1], prev = h[h.length - 2] || null;
+  const zc = monthZ(cur, prev, "ctr"), zv = monthZ(cur, prev, "cvr");
   return {
-    month: cur.month, ctr: cur.ctr, cvr: cur.cvr,
+    month: cur.month, ctr: cur.ctr, cvr: cur.cvr, prevMonth: prev ? prev.month : null,
     dCtr: prev && cur.ctr != null && prev.ctr != null ? cur.ctr - prev.ctr : null,
-    dCvr: prev && cur.cvr != null && prev.cvr != null ? cur.cvr - prev.cvr : null
+    dCvr: prev && cur.cvr != null && prev.cvr != null ? cur.cvr - prev.cvr : null,
+    sigCtr: zc != null && Math.abs(zc) >= SIG_Z,
+    sigCvr: zv != null && Math.abs(zv) >= SIG_Z
   };
+}
+/* 급락 감지 — 최신월이 직전 3개월 평균보다 30% 이상 낮고, 그 차이가 통계적으로도 유의할 때 */
+const DROP_RATE = 0.3;
+function perfAlerts() {
+  const out = [];
+  perfCampIndex().forEach(b => {
+    const h = perfHistory(b.code);
+    if (h.length < 3) return;
+    const cur = h[h.length - 1], base = h.slice(Math.max(0, h.length - 4), h.length - 1);
+    ["ctr", "cvr"].forEach(kind => {
+      const vals = base.map(r => r[kind]).filter(v => v != null);
+      if (!vals.length || cur[kind] == null) return;
+      const avg = vals.reduce((a, v) => a + v, 0) / vals.length;
+      if (!avg || cur[kind] >= avg * (1 - DROP_RATE)) return;
+      const z = monthZ(cur, base[base.length - 1], kind);
+      if (z == null || Math.abs(z) < SIG_Z) return;      // 표본이 적어 흔들린 것은 거른다
+      out.push({ code: b.code, label: b.label, kind: kind, month: cur.month,
+        cur: cur[kind], base: avg, drop: (avg - cur[kind]) / avg });
+    });
+  });
+  return out.sort((a, b) => b.drop - a.drop);
 }
 /* 캠페인 이름 옆에 붙는 최신월 실적 배지 — CTR 파랑 · CVR 빨강.
    mode "line" 은 여정 지도 노드 카드용으로, 라벨 없이 한 줄로 줄여 캠페인 이름과 같은 크기로 나온다.
@@ -5495,19 +5753,63 @@ function perfLatest(code) {
 function perfBadge(code, mode) {
   const p = code ? perfLatest(code) : null;
   if (!p) return "";
-  const arrow = d => (d == null || Math.abs(d) < 0.05 ? "" : '<i class="' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
-  const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR · 직전 달 대비 증감";
+  /* 화살표는 통계적으로 의미 있는 변화만 진하게 — 표본이 적어 흔들린 값은 흐리게 둔다 */
+  const arrow = (d, sig) => (d == null || Math.abs(d) < 0.05 ? "" :
+    '<i class="' + (d > 0 ? "up" : "dn") + (sig ? " sig" : "") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
+  const short = p.month.slice(2).replace("-", "");                 // 2026-07 → 2607
+  const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR" +
+    (p.prevMonth ? " · " + p.prevMonth + " 대비 증감 (진한 화살표 = 표본을 감안해도 의미 있는 변화)" : "");
   if (mode === "line") {
     return '<span class="perfline" title="' + esc(tip) + '">' +
-      '<span class="mon">' + esc(p.month) + "</span>" +
-      '<span class="ctr">' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
-      '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + arrow(p.dCvr) + "</span></span>";
+      '<span class="ctr">' + pct1(p.ctr) + arrow(p.dCtr, p.sigCtr) + "</span>" +
+      '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + arrow(p.dCvr, p.sigCvr) + "</span>" +
+      '<span class="mon">(' + esc(short) + ")</span></span>";
   }
   return '<span class="perfbadge' + (mode === "sm" ? " sm" : "") + '" title="' + esc(tip) + '">' +
-    '<span class="pb mon">' + esc(p.month) + "</span>" +
-    '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
-    '<span class="pb cvr">CVR ' + pct1(p.cvr) + arrow(p.dCvr) + "</span>" +
+    '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr, p.sigCtr) + "</span>" +
+    '<span class="pb cvr">CVR ' + pct1(p.cvr) + arrow(p.dCvr, p.sigCvr) + "</span>" +
+    '<span class="pb mon">' + esc(short) + "</span>" +
   "</span>";
+}
+
+/* ---------------- AARRR 단계 요약 ----------------
+   목표별로 흩어져 있는 캠페인을 획득·활성화·유지·매출 같은 단계로 묶어
+   "우리 CRM 이 어느 단계에 몰려 있고 어디가 비어 있는가"를 한 줄로 보여 준다. */
+function perfFunnel(fromM, toM) {
+  const bucket = {};
+  perfRows().forEach(r => {
+    if (fromM && r.month < fromM) return;
+    if (toM && r.month > toM) return;
+    const m = campByCode(r.code);
+    const key = (m && String(m.aarrrCode || "").trim().toUpperCase()) || "기타";
+    const b = bucket[key] || (bucket[key] = {
+      code: key, name: (m && m.aarrrName) || "구분 없음",
+      codes: {}, recv: 0, conv: 0, revenue: 0, _w: 0, _ctr: 0, _cvr: 0
+    });
+    b.codes[r.code] = 1;
+    b.recv += r.recv || 0; b.conv += r.conv || 0; b.revenue += r.revenue || 0;
+    const w = r.recv || r.sent || 0;
+    if (w) { b._w += w; if (r.ctr != null) b._ctr += r.ctr * w; if (r.cvr != null) b._cvr += r.cvr * w; }
+  });
+  return Object.keys(bucket).sort().map(k => {
+    const b = bucket[k];
+    b.count = Object.keys(b.codes).length;
+    b.ctr = b._w ? b._ctr / b._w : null;
+    b.cvr = b._w ? b._cvr / b._w : null;
+    return b;
+  });
+}
+function perfFunnelHtml(fromM, toM) {
+  const rows = perfFunnel(fromM, toM);
+  if (!rows.length) return "";
+  const maxRev = Math.max.apply(null, rows.map(r => r.revenue).concat(1));
+  return '<div class="funnel">' + rows.map(r =>
+    '<div class="fcell" style="--fill:' + Math.round((r.revenue / maxRev) * 100) + '%">' +
+      '<div class="fk">' + esc(r.code) + '<em>' + esc(r.name) + "</em></div>" +
+      '<div class="fv"><b>' + kNum(r.revenue) + "</b><span>매출</span></div>" +
+      '<div class="fm">캠페인 ' + r.count + " · 수신 " + kNum(r.recv) + " · 전환 " + kNum(r.conv) + "</div>" +
+      '<div class="fm"><span style="color:#2f6fed">CTR ' + pct1(r.ctr) + '</span> · <span style="color:#e0483f">CVR ' + pct1(r.cvr) + "</span></div>" +
+    "</div>").join("") + "</div>";
 }
 
 /* ---------------- 차트 ---------------- */
@@ -5544,7 +5846,7 @@ function trimMonths(series, months) {
   for (let i = a; i <= b; i++) if (has(i)) out.push(i);
   return out;
 }
-const GEO = { W: 880, H: 322, L: 46, R: 46, T: 28, B: 38 };
+const GEO = { W: 880, H: 176, L: 46, R: 46, T: 22, B: 30 };
 let chartCtx = null;                       // 마우스 오버 값 표시가 참조할 마지막 렌더 정보
 
 function perfChartSvg(series, months) {
@@ -5554,20 +5856,26 @@ function perfChartSvg(series, months) {
   if (!months.length || !series.length)
     return '<div class="empty">' + ico("chart") + "<div>왼쪽 목록에서 캠페인을 고르면 추이가 그려집니다</div></div>";
 
-  const flat = k => series.reduce((a, s) => a.concat(s[k].filter(v => v != null)), [0]);
-  const ctrMax = niceMax(Math.max.apply(null, flat("ctr")));
-  const cvrMax = niceMax(Math.max.apply(null, flat("cvr")));
+  const flat = k => series.reduce((a, s) => a.concat(s[k].filter(v => v != null)), []);
+  const cv = flat("ctr"), vv = flat("cvr");
+  /* CTR(곡선)은 값들이 0에서 멀면 축 아래쪽을 잘라 낸다 — 낮은 그래프에서 등락이 눌리지 않게.
+     CVR(막대)은 길이가 곧 크기라서 언제나 0에서 시작한다. */
+  const ctrHi = cv.length ? Math.max.apply(null, cv) : 1;
+  const ctrLo = cv.length ? Math.min.apply(null, cv) : 0;
+  const ctrMax = niceMax(ctrHi + (ctrHi - ctrLo) * 0.15 || ctrHi);
+  const ctrMin = ctrLo > ctrMax * 0.45 ? Math.max(0, Math.floor((ctrLo - (ctrHi - ctrLo) * 0.3) * 10) / 10) : 0;
+  const cvrMax = niceMax(vv.length ? Math.max.apply(null, vv) : 1);
   const step = iw / months.length;
   const cx = i => L + step * (i + 0.5);
-  const yCtr = v => T + ih - (v / ctrMax) * ih;
+  const yCtr = v => T + ih - ((v - ctrMin) / (ctrMax - ctrMin || 1)) * ih;
   const yCvr = v => T + ih - (v / cvrMax) * ih;
   const dec = m => (m < 5 ? 1 : 0);
   const showLabels = perfShowLabels && series.length <= 3;   // 넷 이상이면 겹쳐서 못 읽는다
 
-  const grid = [0, 0.25, 0.5, 0.75, 1].map(f => {
+  const grid = [0, 0.5, 1].map(f => {
     const y = T + ih - f * ih;
     return '<line class="gl" x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '"/>' +
-      '<text class="ax l" x="' + (L - 6) + '" y="' + (y + 3) + '">' + (ctrMax * f).toFixed(dec(ctrMax)) + "%</text>" +
+      '<text class="ax l" x="' + (L - 6) + '" y="' + (y + 3) + '">' + (ctrMin + (ctrMax - ctrMin) * f).toFixed(dec(ctrMax)) + "%</text>" +
       '<text class="ax r" x="' + (W - R + 6) + '" y="' + (y + 3) + '">' + (cvrMax * f).toFixed(dec(cvrMax)) + "%</text>";
   }).join("");
   /* 달이 많으면 글자가 서로 겹치므로 몇 칸씩 건너뛴다.
@@ -5579,7 +5887,7 @@ function perfChartSvg(series, months) {
       : "")).join("");
 
   /* CVR — 달마다 시리즈 수만큼 나란히 세운 막대 */
-  const bw = Math.max(3, Math.min(16, (step * 0.5) / series.length));
+  const bw = Math.max(3, Math.min(13, (step * 0.5) / series.length));
   const bars = series.map((s, si) => s.cvr.map((v, i) => {
     if (v == null) return "";
     const x = cx(i) - (series.length * bw) / 2 + si * bw;
@@ -5607,8 +5915,8 @@ function perfChartSvg(series, months) {
   return '<div class="chartwrap"><svg class="perfchart" id="perfSvg" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet">' +
       grid + xlab + bars + lines +
       '<line class="vline" id="perfGuide" x1="0" y1="' + T + '" x2="0" y2="' + (T + ih) + '" style="display:none"/>' + hits +
-      '<text class="ax cap l" x="' + L + '" y="' + (T - 8) + '">CTR (곡선 · 왼쪽 축)</text>' +
-      '<text class="ax cap r" x="' + (W - R) + '" y="' + (T - 8) + '">CVR (막대 · 오른쪽 축)</text>' +
+      '<text class="ax cap l" x="' + L + '" y="' + (T - 7) + '">CTR 곡선 · 왼쪽 축' + (ctrMin > 0 ? " (0부터가 아님)" : "") + "</text>" +
+      '<text class="ax cap r" x="' + (W - R) + '" y="' + (T - 7) + '">CVR 막대 · 오른쪽 축</text>' +
     "</svg>" +
     '<div class="chart-tip" id="perfTip"></div>' +
     '<div class="legend">' + series.map(s =>
@@ -5738,6 +6046,7 @@ function renderPerfView(force) {
   const series = full.map(s => Object.assign({}, s, {
     ctr: keep.map(i => s.ctr[i]), cvr: keep.map(i => s.cvr[i]), rows: keep.map(i => s.rows[i])
   }));
+  $("#perfFunnel").innerHTML = perfFunnelHtml(perfPeriod.from, perfPeriod.to);
   $("#perfChart").innerHTML = perfChartSvg(series, months);
 
   const picked = perfPicked
@@ -5823,6 +6132,89 @@ function initPerfView() {
   const chart = $("#perfChart");
   chart.addEventListener("mousemove", perfTipMove);
   chart.addEventListener("mouseleave", perfTipOut);
+}
+
+/* ---------------- 점검 — 급락 주의 · 데이터 누락 ----------------
+   시트를 여럿이 함께 쓰다 보면 "측정하기로 해 놓고 데이터가 안 쌓이는 캠페인",
+   "진행중인데 여정지도에 안 붙은 캠페인", "CTR·CVR 기준이 비어 있는 캠페인" 이 쌓인다.
+   사람이 눈으로 찾을 수 없으니 앱이 대신 모아 보여 준다. */
+function hygieneReport() {
+  const withPerf = {};
+  SHEETS.perf.forEach(r => { withPerf[r.code] = 1; });
+  const placedCodes = {};
+  state.boards.forEach(b => b.nodes.forEach(n => (n.camps || []).forEach(c => { if (c.code) placedCodes[c.code] = 1; })));
+  const live = SHEETS.camps.filter(m => m.statusCode === "live");
+
+  return [
+    { key: "drop", icon: "alert", tone: "bad", title: "성과 급락 주의",
+      hint: "최신월이 직전 3개월 평균보다 30% 이상 낮고, 표본을 감안해도 의미 있는 하락입니다.",
+      rows: perfAlerts().map(a => ({
+        code: a.code, name: a.label,
+        detail: (a.kind === "ctr" ? "CTR" : "CVR") + " " + pct1(a.base) + " → " + pct1(a.cur) +
+          " (" + Math.round(a.drop * 100) + "% 하락 · " + a.month + ")"
+      })) },
+    { key: "nodata", icon: "chart", tone: "warn", title: "성과측정 Y 인데 데이터가 없음",
+      hint: "시트 V열이 Y 인데 3.개인화RAW 에 이 캠페인코드로 쌓인 줄이 하나도 없습니다.",
+      rows: SHEETS.camps.filter(m => String(m.measure || "").toUpperCase() === "Y" && !withPerf[m.code])
+        .map(m => ({ code: m.code, name: m.label, detail: m.owner || "담당자 미지정" })) },
+    { key: "unplaced", icon: "map", tone: "warn", title: "진행중인데 여정지도에 안 붙음",
+      hint: "운영상태가 진행인데 어느 페이지에도 배치되지 않았습니다. 어느 화면에서 나가는 캠페인인지 알 수 없습니다.",
+      rows: live.filter(m => !placedCodes[m.code])
+        .map(m => ({ code: m.code, name: m.label, detail: m.path || "경로 미기입" })) },
+    { key: "nobasis", icon: "edit", tone: "warn", title: "CTR · CVR 기준 미기입",
+      hint: "분모가 캠페인마다 달라 기준이 없으면 숫자를 비교할 수 없습니다. 시트 R열·S열을 채워 주세요.",
+      rows: live.filter(m => !String(m.ctrBasis || "").trim() && !m.ctrFormula &&
+                             !String(m.cvrBasis || "").trim() && !m.cvrFormula)
+        .map(m => ({ code: m.code, name: m.label, detail: m.owner || "담당자 미지정" })) },
+    { key: "orphan", icon: "alert", tone: "warn", title: "성과는 있는데 마스터에 없는 코드",
+      hint: "3.개인화RAW 에는 있지만 1.개인화DB 에 같은 캠페인코드가 없습니다. 코드 오타이거나 마스터 등록이 빠졌습니다.",
+      rows: Object.keys(withPerf).filter(c => !campByCode(c)).map(c => {
+        const r = SHEETS.perf.find(x => x.code === c) || {};
+        return { code: c, name: r.title || r.fullName || "-", detail: r.month || "" };
+      }) },
+    { key: "nolink", icon: "link", tone: "info", title: "링크 글자만 있고 주소가 없음",
+      hint: "시트 T·U열에 글자는 있는데 하이퍼링크가 걸려 있지 않습니다. 셀에서 Ctrl+K 로 주소를 걸어 주세요.",
+      rows: SHEETS.camps.filter(m => (m.link1 && !m.link1Url) || (m.link2 && !m.link2Url))
+        .map(m => ({ code: m.code, name: m.label, detail: [m.link1, m.link2].filter(Boolean).join(" · ") })) }
+  ].filter(g => g.rows.length);
+}
+let hygCache = null;
+function hygieneCached() {
+  const key = SHEETS.at + "|" + state.boards.reduce((a, b) => a + b.nodes.reduce((c, n) => c + (n.camps || []).length, 0), 0);
+  if (!hygCache || hygCache.key !== key) hygCache = { key: key, list: hygieneReport() };
+  return hygCache.list;
+}
+function hygieneCount() {
+  try { return hygieneCached().reduce((a, g) => a + g.rows.length, 0); } catch (e) { return 0; }
+}
+function openCheckModal() {
+  const groups = hygieneCached();
+  const root = modalHost();
+  const body = groups.length
+    ? groups.map(g =>
+        '<div class="chkgroup"><div class="chkhead ' + g.tone + '">' + ico(g.icon, "xs") +
+          "<b>" + esc(g.title) + "</b><span class=\"n\">" + g.rows.length + "</span></div>" +
+          '<p class="hint">' + esc(g.hint) + "</p>" +
+          '<div class="chklist">' + g.rows.slice(0, 40).map(r =>
+            '<button class="chkrow" type="button" data-chk="' + esc(r.code) + '">' +
+              '<span class="mono">' + esc(r.code) + "</span>" +
+              "<span>" + esc(r.name) + "</span>" +
+              '<em>' + esc(r.detail || "") + "</em></button>").join("") +
+            (g.rows.length > 40 ? '<div class="hint">외 ' + (g.rows.length - 40) + "건</div>" : "") +
+          "</div></div>").join("")
+    : '<div class="empty">' + ico("check") + "<div>지금은 걸리는 항목이 없습니다</div></div>";
+
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass wide" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("alert") + '<h3>점검</h3><button class="btn icon sm" data-x>' + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' + body + "</div>" +
+      '<div class="modal-foot"><div class="spacer"></div><button class="btn primary" data-x>닫기</button></div>' +
+    "</div></div>";
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
+    const row = e.target.closest("[data-chk]");
+    if (row && isStaff() && campByCode(row.dataset.chk)) { closeModal(); editSheetCamp(row.dataset.chk); }
+  });
 }
 
 /* ========================================================================

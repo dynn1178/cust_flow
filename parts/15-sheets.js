@@ -54,9 +54,9 @@ const RAW_COLS = ["date", "code", "goal", "title", "fullName", "chan", "owner",
 /* 시트의 채널 표기를 앱의 채널 코드(아이콘·색)로 옮긴다 */
 const CHAN_MATCH = [
   ["앱푸시", "push"], ["웹푸시", "push"], ["푸시", "push"], ["push", "push"],
-  ["인앱", "inapp"], ["팝업", "inapp"],
+  ["인앱", "inapp"], ["인웹", "inapp"], ["팝업", "inapp"],
   ["알림톡", "kakao"], ["카카오", "kakao"], ["친구톡", "kakao"],
-  ["이메일", "email"], ["메일", "email"], ["email", "email"],
+  ["이메일", "email"], ["메일", "email"], ["email", "email"], ["edm", "email"],
   ["문자", "sms"], ["sms", "sms"], ["lms", "sms"], ["mms", "sms"],
   ["배너", "banner"], ["띠", "banner"]
 ];
@@ -408,25 +408,85 @@ function openCampPicker() {
 }
 
 /* ---------------- 시트에 캠페인 추가 · 수정 ---------------- */
+/* AARRR 구분코드 → 구분명 표는 시트에 이미 쌓인 값에서 뽑는다.
+   코드에 박아 두면 시트에서 단계 이름을 바꿨을 때 앱만 옛 이름을 들고 있게 된다. */
+function aarrrMap() {
+  const tally = {};
+  SHEETS.camps.forEach(c => {
+    const k = String(c.aarrrCode || "").trim().toUpperCase(), n = String(c.aarrrName || "").trim();
+    if (!k || !n) return;
+    (tally[k] = tally[k] || {})[n] = (tally[k][n] || 0) + 1;
+  });
+  const out = {};
+  Object.keys(tally).sort().forEach(k => {
+    out[k] = Object.keys(tally[k]).sort((a, b) => tally[k][b] - tally[k][a])[0];
+  });
+  return out;
+}
+const aarrrLabel = code => {
+  const n = aarrrMap()[String(code || "").trim().toUpperCase()];
+  return n ? code + " · " + n : String(code || "");
+};
+/* 같은 구분코드에서 가장 큰 일련번호를 찾아 그 다음 번호를 제안한다.
+   A1-002 · R1-101 처럼 세 자리를 쓰고, A2-001-01 같은 꼬리표는 무시한다. */
+function nextCampCode(prefix) {
+  const p = String(prefix || "").trim().toUpperCase();
+  if (!p) return "";
+  let max = 0, width = 3;
+  SHEETS.camps.forEach(c => {
+    const m = new RegExp("^" + p.replace(/[^A-Z0-9]/g, "") + "-(\\d+)").exec(String(c.code || "").trim().toUpperCase());
+    if (!m) return;
+    width = Math.max(width, m[1].length);
+    max = Math.max(max, parseInt(m[1], 10));
+  });
+  return p + "-" + String(max + 1).padStart(width, "0");
+}
+/* 시트에 이미 쓰이고 있는 값을 모아 선택지로 만든다 (기본 목록 + 시트 실제 값) */
+function optsFrom(key, base) {
+  const seen = { "": "-" };
+  (base || []).forEach(v => { seen[v] = v; });
+  SHEETS.camps.forEach(c => {
+    const v = String(c[key] || "").trim();
+    if (v) seen[v] = v;
+  });
+  return seen;
+}
+const CHAN_OPTS = ["앱푸시", "LMS", "EDM", "인앱", "인웹", "인앱/웹", "알림톡"];
+const PROGRESS_OPTS = ["기획", "제작", "검수", "완료", "보류"];
+/* O열 API/DB 는 한 칸이라 "API" · "DB" · "API/DB" 로 적힌다. 폼에서는 두 칸으로 나눠 고른다. */
+function apidbSplit(v) {
+  const t = String(v || "").toUpperCase();
+  return { _api: t.indexOf("API") >= 0 ? "Y" : "", _db: t.indexOf("DB") >= 0 ? "Y" : "" };
+}
+const apidbJoin = (api, db) => [api === "Y" ? "API" : "", db === "Y" ? "DB" : ""].filter(Boolean).join("/");
+
 function sheetFormFields() {
+  const map = aarrrMap();
+  const aarrrOpts = {};
+  Object.keys(map).forEach(k => { aarrrOpts[k] = k + " · " + map[k]; });
+  const YN = { "": "-", "Y": "Y", "N": "N" };
   return [
-    { k: "code", label: "캠페인코드", mono: true, ph: "A1-002" },
+    { type: "group", label: "AARRR 구분 — 먼저 고르면 캠페인코드가 자동으로 제안됩니다", open: true, fields: [
+      { k: "aarrrCode", label: "AARRR구분코드", type: "select", opts: aarrrOpts },
+      { k: "aarrrName", label: "AARRR구분명", type: "readonly" },
+      { k: "code", label: "캠페인코드", mono: true, ph: "A1-002" },
+      { k: "_codeMsg", label: "", type: "note" }
+    ] },
     { k: "title", label: "캠페인구분 (화면 표시명)", ph: "회원가입 유도" },
     { k: "fullName", label: "캠페인명 (세부 이름)", ph: "IN_P_CRM_가입_트리거기반_공통_앱_회원가입유도_260701~260731" },
-    { k: "chan", label: "채널", ph: "인앱 · 앱푸시 · 인앱/웹" },
+    { k: "chan", label: "채널", type: "select", opts: optsFrom("chan", CHAN_OPTS) },
     { k: "goal", label: "목표", ph: "회원가입 증대" },
-    { k: "mkt", label: "마케팅구분", ph: "개인화" },
-    { k: "aarrrCode", label: "AARRR구분코드", mono: true, ph: "A1" },
-    { k: "aarrrName", label: "AARRR구분명", ph: "획득 (인지)" },
-    { k: "status", label: "상태", type: "select", opts: { "진행": "진행", "중단": "중단" } },
-    { k: "progress", label: "진행도", ph: "완료" },
-    { k: "owner", label: "담당자", ph: "홍길동" },
+    { k: "mkt", label: "마케팅구분", type: "select", opts: optsFrom("mkt", ["개인화"]) },
+    { k: "status", label: "운영상태 (시트 M열)", type: "select", opts: { "진행": "진행", "중단": "중단" } },
+    { k: "progress", label: "작업 진행도 (시트 H열)", type: "select", opts: optsFrom("progress", PROGRESS_OPTS) },
+    { k: "owner", label: "담당자", type: "select", opts: optsFrom("owner", []) },
     { type: "group", label: "실행 조건", open: true, fields: [
       { k: "trigger", label: "트리거", ph: "메인 페이지 로딩 시 & 로그인 = N" },
-      { k: "index", label: "Index", ph: "7일 이내 회원가입 = Y" },
+      { k: "index", label: "Index (전환 조건)", ph: "7일 이내 회원가입 = Y" },
       { k: "path", label: "경로", mono: true, ph: "/product/main.yb" },
-      { k: "event", label: "이벤트", ph: "" },
-      { k: "apidb", label: "API/DB", ph: "" }
+      { k: "event", label: "이벤트", type: "select", opts: optsFrom("event", ["O", "X"]) },
+      { k: "_api", label: "API 사용", type: "select", opts: YN },
+      { k: "_db", label: "DB 사용", type: "select", opts: YN }
     ] },
     { type: "group", label: "링크 · 성과측정", fields: [
       { k: "link1", label: "링크1", mono: true, ph: "https://dashboard-05.braze.com/..." },
@@ -446,14 +506,37 @@ function lockedFields(m) {
     { k: "_nums", label: "시트 집계", type: "readonly" }
   ] }];
 }
+/* 캠페인코드가 이미 있는지 · 구분코드와 앞자리가 맞는지 그 자리에서 알려 준다 */
+function codeCheck(codeVal, prefix, editing) {
+  const v = String(codeVal || "").trim().toUpperCase();
+  if (!v) return { bad: true, msg: "캠페인코드는 반드시 필요합니다" };
+  if (editing && v === String(editing).toUpperCase()) return { bad: false, msg: "" };
+  const dup = campByCode(v);
+  if (dup) return { bad: true, msg: "이미 있는 캠페인코드입니다 — " + (dup.title || dup.fullName || "") };
+  if (prefix && v.indexOf(String(prefix).toUpperCase() + "-") !== 0)
+    return { bad: true, msg: "AARRR구분코드가 " + prefix + " 이므로 " + prefix + "- 로 시작해야 합니다" };
+  return { bad: false, msg: "쓸 수 있는 코드입니다" };
+}
+
 function editSheetCamp(code) {
   if (!isStaff()) return toast("캠페인 등록·수정은 운영자 이상만 할 수 있습니다", "bad");
   const m = code ? campByCode(code) : null;
   if (code && !m) return toast("시트에서 이 캠페인을 찾지 못했습니다. 새로고침해 보세요.", "bad");
+  if (!m && !SHEETS.camps.length) return toast("캠페인 목록을 먼저 불러와야 코드를 제안할 수 있습니다", "bad");
 
+  const map = aarrrMap();
   const values = {};
   SHEET_COLS.forEach(c => { values[c.key] = m ? (m[c.key] == null ? "" : m[c.key]) : ""; });
-  if (!m) values.status = "진행";
+  Object.assign(values, apidbSplit(m ? m.apidb : ""));
+  if (!m) {
+    const first = Object.keys(map)[0] || "";
+    values.status = "진행";
+    values.aarrrCode = first;
+    values.aarrrName = map[first] || "";
+    values.code = nextCampCode(first);
+    values.mkt = "개인화";
+  }
+  values._codeMsg = m ? "" : "시트의 마지막 번호 다음으로 제안한 코드입니다. 바꿔도 됩니다.";
   if (m) {
     const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
     values._ctrBasis = ctr.length ? ctr.join("  ·  ") : "시트에 기준이 적혀 있지 않습니다";
@@ -473,12 +556,32 @@ function editSheetCamp(code) {
       (m ? "" : "<br>새로 등록하면 실적 열의 수식은 바로 윗줄에서 복사됩니다. CTR기준·CVR기준은 시트에서 채워 주세요."),
     warn: "이 캠페인 항목은 구글 시트 데이터와 연동됩니다. 여기서 수정하면 <b>구글 시트의 데이터도 함께 변경</b>됩니다.",
     fields: sheetFormFields().concat(lockedFields(m)),
-    values,
+    values: values,
+    /* 구분코드를 고르면 구분명과 캠페인코드를 따라 바꾸고, 코드는 칠 때마다 중복을 확인한다 */
+    onChange: (k, v, root) => {
+      const codeEl = $('[data-k="code"]', root);
+      const prefEl = $('[data-k="aarrrCode"]', root);
+      if (k === "aarrrCode") {
+        const nameEl = $('[data-k="aarrrName"]', root);
+        if (nameEl) nameEl.textContent = map[v] || "-";
+        if (!m) codeEl.value = nextCampCode(v);
+      }
+      if (k === "aarrrCode" || k === "code") {
+        const r = codeCheck(codeEl.value, prefEl ? prefEl.value : "", m ? m.code : null);
+        const msg = $('[data-note="_codeMsg"]', root);
+        if (msg) { msg.textContent = r.msg; msg.className = "fnote " + (r.bad ? "bad" : "ok"); }
+        codeEl.classList.toggle("invalid", r.bad);
+      }
+    },
     onSave: async v => {
-      const newCode = String(v.code || "").trim();
-      if (!newCode) return toast("캠페인코드는 반드시 필요합니다", "bad");
-      if (!m && campByCode(newCode)) return toast("이미 있는 캠페인코드입니다: " + newCode, "bad");
-      if (m && newCode !== m.code) return toast("캠페인코드는 바꿀 수 없습니다. 시트에서 직접 고쳐 주세요.", "bad");
+      const newCode = String(v.code || "").trim().toUpperCase();
+      const r = codeCheck(newCode, v.aarrrCode, m ? m.code : null);
+      if (r.bad) return toast(r.msg, "bad");
+      if (m && newCode !== String(m.code).toUpperCase())
+        return toast("캠페인코드는 바꿀 수 없습니다. 시트에서 직접 고쳐 주세요.", "bad");
+      v.code = m ? m.code : newCode;
+      v.aarrrName = map[v.aarrrCode] || v.aarrrName || "";
+      v.apidb = apidbJoin(v._api, v._db);
       const row = [];
       SHEET_COLS.forEach((c, i) => { row[i] = c.edit ? (v[c.key] == null ? "" : String(v[c.key])) : ""; });
       toast(m ? "시트에 저장하는 중…" : "시트에 등록하는 중…");
@@ -486,10 +589,10 @@ function editSheetCamp(code) {
         await sheetApi("", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "upsert", code: m ? m.code : newCode, values: row })
+          body: JSON.stringify({ action: "upsert", code: v.code, values: row })
         });
         await loadSheets({ fresh: true });
-        toast(m ? "시트에 저장했습니다" : "시트에 등록했습니다 · " + newCode, "ok");
+        toast(m ? "시트에 저장했습니다" : "시트에 등록했습니다 · " + v.code, "ok");
       } catch (e) {
         toast("시트에 쓰지 못했습니다: " + ((e && e.message) || "알 수 없는 오류"), "bad");
       }

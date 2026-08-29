@@ -52,6 +52,7 @@ const FOCUS = {
   all:       { name: "전체", ico: "density" },
   simple:    { name: "간단", ico: "density" },
   camp:      { name: "캠페인 위주", ico: "mega", c: "var(--camp)" },
+  perf:      { name: "성과 위주", ico: "chart", c: "var(--ok)" },
   amplitude: { name: "Amplitude 위주", ico: "amp", c: "var(--amp)" },
   braze:     { name: "Braze 위주", ico: "braze", c: "var(--braze)" },
   ga4:       { name: "GA4 위주", ico: "ga4", c: "var(--ga4)" },
@@ -380,8 +381,11 @@ function fieldRow(f, vals) {
     return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="linklist" data-links="' + f.k + '">' + items +
       '</div><button class="btn sm" data-addlink="' + f.k + '" type="button">' + ico("plus", "xs") + "링크 추가</button></div>";
   }
-  if (f.type === "readonly")
-    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="ro' + (f.mono ? " mono" : "") + '">' + esc(v || "-") + "</div></div>";
+  if (f.type === "note")                      // 폼이 스스로 갱신하는 안내 한 줄
+    return '<p class="fnote" data-note="' + f.k + '">' + esc(v || "") + "</p>";
+  if (f.type === "readonly")                  // 보여주기만 하는 칸 — 저장값에는 들어가지 않는다
+    return '<div class="frow"><span class="lbl">' + esc(f.label) + '</span><div class="ro' + (f.mono ? " mono" : "") +
+      '" data-k="' + f.k + '" data-ro="1">' + esc(v || "-") + "</div></div>";
   if (f.type === "check")
     return '<label class="bulkbar"><input type="checkbox" data-c="' + f.k + '"' + (v ? " checked" : "") + "> " + esc(f.label) + "</label>";
   if (f.type === "action")
@@ -439,7 +443,7 @@ function openForm(opt) {
 
   const collect = () => {
     const out = Object.assign({}, vals);
-    $$("[data-k]", root).forEach(el => { out[el.dataset.k] = el.value.trim(); });
+    $$("[data-k]", root).forEach(el => { if (!el.dataset.ro) out[el.dataset.k] = el.value.trim(); });
     $$("[data-c]", root).forEach(el => { out[el.dataset.c] = el.checked; });
     $$("[data-hue]", root).forEach(box => { const on = $(".hue.on", box); out[box.dataset.hue] = on ? on.dataset.v : "none"; });
     const multiGroups = {};
@@ -459,6 +463,15 @@ function openForm(opt) {
     });
     return out;
   };
+  /* 값이 바뀌면 폼 스스로 다른 칸을 채우거나 검사할 수 있게 알려 준다 */
+  if (opt.onChange) {
+    const fire = e => {
+      const el = e.target.closest("[data-k]");
+      if (el && !el.dataset.ro) opt.onChange(el.dataset.k, el.value, root);
+    };
+    root.addEventListener("change", fire);
+    root.addEventListener("input", fire);
+  }
   root.addEventListener("click", e => {
     const t = e.target;
     /* 입력 중인 수정 창은 배경(scrim)을 눌러도 닫히지 않게 한다 — 편집 도중

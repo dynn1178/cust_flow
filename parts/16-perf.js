@@ -44,20 +44,78 @@ function perfRows() {
 }
 const perfMonths = () => Array.from(new Set(perfRows().map(r => r.month))).sort();
 
-/* 캠페인 하나의 월별 이력 (오래된 달 → 최근 달) */
+/* 캠페인 하나의 월별 이력 (오래된 달 → 최근 달).
+   여정 지도·점검처럼 캠페인 수만큼 반복해 부르는 곳이 있어 색인을 한 번만 만들어 둔다. */
+let histCache = null;
 function perfHistory(code) {
-  return perfRows().filter(r => r.code === code).sort((a, b) => a.month.localeCompare(b.month));
+  if (!histCache || histCache.at !== SHEETS.at) {
+    const by = {};
+    perfRows().forEach(r => { (by[r.code] = by[r.code] || []).push(r); });
+    Object.keys(by).forEach(k => by[k].sort((a, b) => a.month.localeCompare(b.month)));
+    histCache = { at: SHEETS.at, by: by };
+  }
+  return histCache.by[code] || [];
+}
+/* 비율의 분모를 되돌려 구한다 — 캠페인마다 CTR·CVR 의 분모가 달라서
+   시트가 준 비율과 분자로부터 역산하는 편이 정확하다. 안 되면 수신 수로 대신한다. */
+function denomOf(count, pct, fallback) {
+  if (count != null && pct) {
+    const d = count / (pct / 100);
+    if (isFinite(d) && d >= 1) return Math.round(d);
+  }
+  return fallback || null;
+}
+/* 두 달의 비율 차이가 표본 수를 감안해도 의미가 있는지 (이항 비율 z-검정).
+   수신 5만 건의 0.4%p 와 수신 71건의 0.4%p 는 전혀 다른 이야기다. */
+function ratioZ(p1, n1, p2, n2) {
+  if (p1 == null || p2 == null || !n1 || !n2) return null;
+  const a = p1 / 100, b = p2 / 100;
+  const pool = (a * n1 + b * n2) / (n1 + n2);
+  const se = Math.sqrt(pool * (1 - pool) * (1 / n1 + 1 / n2));
+  if (!se || !isFinite(se)) return null;
+  return (a - b) / se;
+}
+const SIG_Z = 1.96;                        // 95% 신뢰수준
+function monthZ(cur, prev, kind) {
+  if (!cur || !prev) return null;
+  const k = kind === "ctr" ? "open" : "conv";
+  return ratioZ(cur[kind], denomOf(cur[k], cur[kind], cur.recv),
+                prev[kind], denomOf(prev[k], prev[kind], prev.recv));
 }
 /* 가장 최근 달과 그 직전 달 — 여정 지도 배지에 쓴다 */
 function perfLatest(code) {
   const h = perfHistory(code);
   if (!h.length) return null;
   const cur = h[h.length - 1], prev = h[h.length - 2] || null;
+  const zc = monthZ(cur, prev, "ctr"), zv = monthZ(cur, prev, "cvr");
   return {
-    month: cur.month, ctr: cur.ctr, cvr: cur.cvr,
+    month: cur.month, ctr: cur.ctr, cvr: cur.cvr, prevMonth: prev ? prev.month : null,
     dCtr: prev && cur.ctr != null && prev.ctr != null ? cur.ctr - prev.ctr : null,
-    dCvr: prev && cur.cvr != null && prev.cvr != null ? cur.cvr - prev.cvr : null
+    dCvr: prev && cur.cvr != null && prev.cvr != null ? cur.cvr - prev.cvr : null,
+    sigCtr: zc != null && Math.abs(zc) >= SIG_Z,
+    sigCvr: zv != null && Math.abs(zv) >= SIG_Z
   };
+}
+/* 급락 감지 — 최신월이 직전 3개월 평균보다 30% 이상 낮고, 그 차이가 통계적으로도 유의할 때 */
+const DROP_RATE = 0.3;
+function perfAlerts() {
+  const out = [];
+  perfCampIndex().forEach(b => {
+    const h = perfHistory(b.code);
+    if (h.length < 3) return;
+    const cur = h[h.length - 1], base = h.slice(Math.max(0, h.length - 4), h.length - 1);
+    ["ctr", "cvr"].forEach(kind => {
+      const vals = base.map(r => r[kind]).filter(v => v != null);
+      if (!vals.length || cur[kind] == null) return;
+      const avg = vals.reduce((a, v) => a + v, 0) / vals.length;
+      if (!avg || cur[kind] >= avg * (1 - DROP_RATE)) return;
+      const z = monthZ(cur, base[base.length - 1], kind);
+      if (z == null || Math.abs(z) < SIG_Z) return;      // 표본이 적어 흔들린 것은 거른다
+      out.push({ code: b.code, label: b.label, kind: kind, month: cur.month,
+        cur: cur[kind], base: avg, drop: (avg - cur[kind]) / avg });
+    });
+  });
+  return out.sort((a, b) => b.drop - a.drop);
 }
 /* 캠페인 이름 옆에 붙는 최신월 실적 배지 — CTR 파랑 · CVR 빨강.
    mode "line" 은 여정 지도 노드 카드용으로, 라벨 없이 한 줄로 줄여 캠페인 이름과 같은 크기로 나온다.
@@ -65,19 +123,63 @@ function perfLatest(code) {
 function perfBadge(code, mode) {
   const p = code ? perfLatest(code) : null;
   if (!p) return "";
-  const arrow = d => (d == null || Math.abs(d) < 0.05 ? "" : '<i class="' + (d > 0 ? "up" : "dn") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
-  const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR · 직전 달 대비 증감";
+  /* 화살표는 통계적으로 의미 있는 변화만 진하게 — 표본이 적어 흔들린 값은 흐리게 둔다 */
+  const arrow = (d, sig) => (d == null || Math.abs(d) < 0.05 ? "" :
+    '<i class="' + (d > 0 ? "up" : "dn") + (sig ? " sig" : "") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
+  const short = p.month.slice(2).replace("-", "");                 // 2026-07 → 2607
+  const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR" +
+    (p.prevMonth ? " · " + p.prevMonth + " 대비 증감 (진한 화살표 = 표본을 감안해도 의미 있는 변화)" : "");
   if (mode === "line") {
     return '<span class="perfline" title="' + esc(tip) + '">' +
-      '<span class="mon">' + esc(p.month) + "</span>" +
-      '<span class="ctr">' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
-      '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + arrow(p.dCvr) + "</span></span>";
+      '<span class="ctr">' + pct1(p.ctr) + arrow(p.dCtr, p.sigCtr) + "</span>" +
+      '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + arrow(p.dCvr, p.sigCvr) + "</span>" +
+      '<span class="mon">(' + esc(short) + ")</span></span>";
   }
   return '<span class="perfbadge' + (mode === "sm" ? " sm" : "") + '" title="' + esc(tip) + '">' +
-    '<span class="pb mon">' + esc(p.month) + "</span>" +
-    '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr) + "</span>" +
-    '<span class="pb cvr">CVR ' + pct1(p.cvr) + arrow(p.dCvr) + "</span>" +
+    '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr, p.sigCtr) + "</span>" +
+    '<span class="pb cvr">CVR ' + pct1(p.cvr) + arrow(p.dCvr, p.sigCvr) + "</span>" +
+    '<span class="pb mon">' + esc(short) + "</span>" +
   "</span>";
+}
+
+/* ---------------- AARRR 단계 요약 ----------------
+   목표별로 흩어져 있는 캠페인을 획득·활성화·유지·매출 같은 단계로 묶어
+   "우리 CRM 이 어느 단계에 몰려 있고 어디가 비어 있는가"를 한 줄로 보여 준다. */
+function perfFunnel(fromM, toM) {
+  const bucket = {};
+  perfRows().forEach(r => {
+    if (fromM && r.month < fromM) return;
+    if (toM && r.month > toM) return;
+    const m = campByCode(r.code);
+    const key = (m && String(m.aarrrCode || "").trim().toUpperCase()) || "기타";
+    const b = bucket[key] || (bucket[key] = {
+      code: key, name: (m && m.aarrrName) || "구분 없음",
+      codes: {}, recv: 0, conv: 0, revenue: 0, _w: 0, _ctr: 0, _cvr: 0
+    });
+    b.codes[r.code] = 1;
+    b.recv += r.recv || 0; b.conv += r.conv || 0; b.revenue += r.revenue || 0;
+    const w = r.recv || r.sent || 0;
+    if (w) { b._w += w; if (r.ctr != null) b._ctr += r.ctr * w; if (r.cvr != null) b._cvr += r.cvr * w; }
+  });
+  return Object.keys(bucket).sort().map(k => {
+    const b = bucket[k];
+    b.count = Object.keys(b.codes).length;
+    b.ctr = b._w ? b._ctr / b._w : null;
+    b.cvr = b._w ? b._cvr / b._w : null;
+    return b;
+  });
+}
+function perfFunnelHtml(fromM, toM) {
+  const rows = perfFunnel(fromM, toM);
+  if (!rows.length) return "";
+  const maxRev = Math.max.apply(null, rows.map(r => r.revenue).concat(1));
+  return '<div class="funnel">' + rows.map(r =>
+    '<div class="fcell" style="--fill:' + Math.round((r.revenue / maxRev) * 100) + '%">' +
+      '<div class="fk">' + esc(r.code) + '<em>' + esc(r.name) + "</em></div>" +
+      '<div class="fv"><b>' + kNum(r.revenue) + "</b><span>매출</span></div>" +
+      '<div class="fm">캠페인 ' + r.count + " · 수신 " + kNum(r.recv) + " · 전환 " + kNum(r.conv) + "</div>" +
+      '<div class="fm"><span style="color:#2f6fed">CTR ' + pct1(r.ctr) + '</span> · <span style="color:#e0483f">CVR ' + pct1(r.cvr) + "</span></div>" +
+    "</div>").join("") + "</div>";
 }
 
 /* ---------------- 차트 ---------------- */
@@ -114,7 +216,7 @@ function trimMonths(series, months) {
   for (let i = a; i <= b; i++) if (has(i)) out.push(i);
   return out;
 }
-const GEO = { W: 880, H: 322, L: 46, R: 46, T: 28, B: 38 };
+const GEO = { W: 880, H: 176, L: 46, R: 46, T: 22, B: 30 };
 let chartCtx = null;                       // 마우스 오버 값 표시가 참조할 마지막 렌더 정보
 
 function perfChartSvg(series, months) {
@@ -124,20 +226,26 @@ function perfChartSvg(series, months) {
   if (!months.length || !series.length)
     return '<div class="empty">' + ico("chart") + "<div>왼쪽 목록에서 캠페인을 고르면 추이가 그려집니다</div></div>";
 
-  const flat = k => series.reduce((a, s) => a.concat(s[k].filter(v => v != null)), [0]);
-  const ctrMax = niceMax(Math.max.apply(null, flat("ctr")));
-  const cvrMax = niceMax(Math.max.apply(null, flat("cvr")));
+  const flat = k => series.reduce((a, s) => a.concat(s[k].filter(v => v != null)), []);
+  const cv = flat("ctr"), vv = flat("cvr");
+  /* CTR(곡선)은 값들이 0에서 멀면 축 아래쪽을 잘라 낸다 — 낮은 그래프에서 등락이 눌리지 않게.
+     CVR(막대)은 길이가 곧 크기라서 언제나 0에서 시작한다. */
+  const ctrHi = cv.length ? Math.max.apply(null, cv) : 1;
+  const ctrLo = cv.length ? Math.min.apply(null, cv) : 0;
+  const ctrMax = niceMax(ctrHi + (ctrHi - ctrLo) * 0.15 || ctrHi);
+  const ctrMin = ctrLo > ctrMax * 0.45 ? Math.max(0, Math.floor((ctrLo - (ctrHi - ctrLo) * 0.3) * 10) / 10) : 0;
+  const cvrMax = niceMax(vv.length ? Math.max.apply(null, vv) : 1);
   const step = iw / months.length;
   const cx = i => L + step * (i + 0.5);
-  const yCtr = v => T + ih - (v / ctrMax) * ih;
+  const yCtr = v => T + ih - ((v - ctrMin) / (ctrMax - ctrMin || 1)) * ih;
   const yCvr = v => T + ih - (v / cvrMax) * ih;
   const dec = m => (m < 5 ? 1 : 0);
   const showLabels = perfShowLabels && series.length <= 3;   // 넷 이상이면 겹쳐서 못 읽는다
 
-  const grid = [0, 0.25, 0.5, 0.75, 1].map(f => {
+  const grid = [0, 0.5, 1].map(f => {
     const y = T + ih - f * ih;
     return '<line class="gl" x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '"/>' +
-      '<text class="ax l" x="' + (L - 6) + '" y="' + (y + 3) + '">' + (ctrMax * f).toFixed(dec(ctrMax)) + "%</text>" +
+      '<text class="ax l" x="' + (L - 6) + '" y="' + (y + 3) + '">' + (ctrMin + (ctrMax - ctrMin) * f).toFixed(dec(ctrMax)) + "%</text>" +
       '<text class="ax r" x="' + (W - R + 6) + '" y="' + (y + 3) + '">' + (cvrMax * f).toFixed(dec(cvrMax)) + "%</text>";
   }).join("");
   /* 달이 많으면 글자가 서로 겹치므로 몇 칸씩 건너뛴다.
@@ -149,7 +257,7 @@ function perfChartSvg(series, months) {
       : "")).join("");
 
   /* CVR — 달마다 시리즈 수만큼 나란히 세운 막대 */
-  const bw = Math.max(3, Math.min(16, (step * 0.5) / series.length));
+  const bw = Math.max(3, Math.min(13, (step * 0.5) / series.length));
   const bars = series.map((s, si) => s.cvr.map((v, i) => {
     if (v == null) return "";
     const x = cx(i) - (series.length * bw) / 2 + si * bw;
@@ -177,8 +285,8 @@ function perfChartSvg(series, months) {
   return '<div class="chartwrap"><svg class="perfchart" id="perfSvg" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="xMidYMid meet">' +
       grid + xlab + bars + lines +
       '<line class="vline" id="perfGuide" x1="0" y1="' + T + '" x2="0" y2="' + (T + ih) + '" style="display:none"/>' + hits +
-      '<text class="ax cap l" x="' + L + '" y="' + (T - 8) + '">CTR (곡선 · 왼쪽 축)</text>' +
-      '<text class="ax cap r" x="' + (W - R) + '" y="' + (T - 8) + '">CVR (막대 · 오른쪽 축)</text>' +
+      '<text class="ax cap l" x="' + L + '" y="' + (T - 7) + '">CTR 곡선 · 왼쪽 축' + (ctrMin > 0 ? " (0부터가 아님)" : "") + "</text>" +
+      '<text class="ax cap r" x="' + (W - R) + '" y="' + (T - 7) + '">CVR 막대 · 오른쪽 축</text>' +
     "</svg>" +
     '<div class="chart-tip" id="perfTip"></div>' +
     '<div class="legend">' + series.map(s =>
@@ -308,6 +416,7 @@ function renderPerfView(force) {
   const series = full.map(s => Object.assign({}, s, {
     ctr: keep.map(i => s.ctr[i]), cvr: keep.map(i => s.cvr[i]), rows: keep.map(i => s.rows[i])
   }));
+  $("#perfFunnel").innerHTML = perfFunnelHtml(perfPeriod.from, perfPeriod.to);
   $("#perfChart").innerHTML = perfChartSvg(series, months);
 
   const picked = perfPicked
@@ -393,4 +502,87 @@ function initPerfView() {
   const chart = $("#perfChart");
   chart.addEventListener("mousemove", perfTipMove);
   chart.addEventListener("mouseleave", perfTipOut);
+}
+
+/* ---------------- 점검 — 급락 주의 · 데이터 누락 ----------------
+   시트를 여럿이 함께 쓰다 보면 "측정하기로 해 놓고 데이터가 안 쌓이는 캠페인",
+   "진행중인데 여정지도에 안 붙은 캠페인", "CTR·CVR 기준이 비어 있는 캠페인" 이 쌓인다.
+   사람이 눈으로 찾을 수 없으니 앱이 대신 모아 보여 준다. */
+function hygieneReport() {
+  const withPerf = {};
+  SHEETS.perf.forEach(r => { withPerf[r.code] = 1; });
+  const placedCodes = {};
+  state.boards.forEach(b => b.nodes.forEach(n => (n.camps || []).forEach(c => { if (c.code) placedCodes[c.code] = 1; })));
+  const live = SHEETS.camps.filter(m => m.statusCode === "live");
+
+  return [
+    { key: "drop", icon: "alert", tone: "bad", title: "성과 급락 주의",
+      hint: "최신월이 직전 3개월 평균보다 30% 이상 낮고, 표본을 감안해도 의미 있는 하락입니다.",
+      rows: perfAlerts().map(a => ({
+        code: a.code, name: a.label,
+        detail: (a.kind === "ctr" ? "CTR" : "CVR") + " " + pct1(a.base) + " → " + pct1(a.cur) +
+          " (" + Math.round(a.drop * 100) + "% 하락 · " + a.month + ")"
+      })) },
+    { key: "nodata", icon: "chart", tone: "warn", title: "성과측정 Y 인데 데이터가 없음",
+      hint: "시트 V열이 Y 인데 3.개인화RAW 에 이 캠페인코드로 쌓인 줄이 하나도 없습니다.",
+      rows: SHEETS.camps.filter(m => String(m.measure || "").toUpperCase() === "Y" && !withPerf[m.code])
+        .map(m => ({ code: m.code, name: m.label, detail: m.owner || "담당자 미지정" })) },
+    { key: "unplaced", icon: "map", tone: "warn", title: "진행중인데 여정지도에 안 붙음",
+      hint: "운영상태가 진행인데 어느 페이지에도 배치되지 않았습니다. 어느 화면에서 나가는 캠페인인지 알 수 없습니다.",
+      rows: live.filter(m => !placedCodes[m.code])
+        .map(m => ({ code: m.code, name: m.label, detail: m.path || "경로 미기입" })) },
+    { key: "nobasis", icon: "edit", tone: "warn", title: "CTR · CVR 기준 미기입",
+      hint: "분모가 캠페인마다 달라 기준이 없으면 숫자를 비교할 수 없습니다. 시트 R열·S열을 채워 주세요.",
+      rows: live.filter(m => !String(m.ctrBasis || "").trim() && !m.ctrFormula &&
+                             !String(m.cvrBasis || "").trim() && !m.cvrFormula)
+        .map(m => ({ code: m.code, name: m.label, detail: m.owner || "담당자 미지정" })) },
+    { key: "orphan", icon: "alert", tone: "warn", title: "성과는 있는데 마스터에 없는 코드",
+      hint: "3.개인화RAW 에는 있지만 1.개인화DB 에 같은 캠페인코드가 없습니다. 코드 오타이거나 마스터 등록이 빠졌습니다.",
+      rows: Object.keys(withPerf).filter(c => !campByCode(c)).map(c => {
+        const r = SHEETS.perf.find(x => x.code === c) || {};
+        return { code: c, name: r.title || r.fullName || "-", detail: r.month || "" };
+      }) },
+    { key: "nolink", icon: "link", tone: "info", title: "링크 글자만 있고 주소가 없음",
+      hint: "시트 T·U열에 글자는 있는데 하이퍼링크가 걸려 있지 않습니다. 셀에서 Ctrl+K 로 주소를 걸어 주세요.",
+      rows: SHEETS.camps.filter(m => (m.link1 && !m.link1Url) || (m.link2 && !m.link2Url))
+        .map(m => ({ code: m.code, name: m.label, detail: [m.link1, m.link2].filter(Boolean).join(" · ") })) }
+  ].filter(g => g.rows.length);
+}
+let hygCache = null;
+function hygieneCached() {
+  const key = SHEETS.at + "|" + state.boards.reduce((a, b) => a + b.nodes.reduce((c, n) => c + (n.camps || []).length, 0), 0);
+  if (!hygCache || hygCache.key !== key) hygCache = { key: key, list: hygieneReport() };
+  return hygCache.list;
+}
+function hygieneCount() {
+  try { return hygieneCached().reduce((a, g) => a + g.rows.length, 0); } catch (e) { return 0; }
+}
+function openCheckModal() {
+  const groups = hygieneCached();
+  const root = modalHost();
+  const body = groups.length
+    ? groups.map(g =>
+        '<div class="chkgroup"><div class="chkhead ' + g.tone + '">' + ico(g.icon, "xs") +
+          "<b>" + esc(g.title) + "</b><span class=\"n\">" + g.rows.length + "</span></div>" +
+          '<p class="hint">' + esc(g.hint) + "</p>" +
+          '<div class="chklist">' + g.rows.slice(0, 40).map(r =>
+            '<button class="chkrow" type="button" data-chk="' + esc(r.code) + '">' +
+              '<span class="mono">' + esc(r.code) + "</span>" +
+              "<span>" + esc(r.name) + "</span>" +
+              '<em>' + esc(r.detail || "") + "</em></button>").join("") +
+            (g.rows.length > 40 ? '<div class="hint">외 ' + (g.rows.length - 40) + "건</div>" : "") +
+          "</div></div>").join("")
+    : '<div class="empty">' + ico("check") + "<div>지금은 걸리는 항목이 없습니다</div></div>";
+
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass wide" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("alert") + '<h3>점검</h3><button class="btn icon sm" data-x>' + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' + body + "</div>" +
+      '<div class="modal-foot"><div class="spacer"></div><button class="btn primary" data-x>닫기</button></div>' +
+    "</div></div>";
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
+    const row = e.target.closest("[data-chk]");
+    if (row && isStaff() && campByCode(row.dataset.chk)) { closeModal(); editSheetCamp(row.dataset.chk); }
+  });
 }

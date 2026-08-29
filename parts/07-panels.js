@@ -660,6 +660,18 @@ function laneOfNode(b, n) {
 }
 /* 캠페인 탭 — 구글 시트 1.개인화DB 의 목록 그대로를 보여 준다.
    여정 지도에 붙었는지는 문서에서 캠페인코드로 찾아 표시한다. */
+/* AARRR 구분은 코드 순서(A1 · A2 · R1 …)로 보여야 여정 단계 순서와 맞는다 */
+function aarrrFilterOptions(cur) {
+  const seen = {};
+  SHEETS.camps.forEach(m => {
+    const n = String(m.aarrrName || "").trim();
+    if (n && !seen[n]) seen[n] = String(m.aarrrCode || "").trim().toUpperCase();
+  });
+  return '<option value="all">모든 AARRR 구분</option>' +
+    Object.keys(seen).sort((a, b) => (seen[a] || "ZZ").localeCompare(seen[b] || "ZZ") || a.localeCompare(b, "ko"))
+      .map(n => '<option value="' + esc(n) + '"' + (cur === n ? " selected" : "") + ">" +
+        esc((seen[n] ? seen[n] + " · " : "") + n) + "</option>").join("");
+}
 function campColOptions(key, cur, allLabel) {
   const names = Array.from(new Set(SHEETS.camps.map(m => String(m[key] || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
   return '<option value="all">' + esc(allLabel) + "</option>" +
@@ -676,11 +688,15 @@ function renderCampView(force) {
   const seg = $("#campChanFilter");
   seg.innerHTML = '<button class="btn sm' + (campFilter.chan === "all" ? " on" : "") + '" data-ch="all">전체</button>' +
     chans.map(c => '<button class="btn sm' + (campFilter.chan === c ? " on" : "") + '" data-ch="' + esc(c) + '">' + esc(c) + "</button>").join("");
-  $("#campAarrrFilter").innerHTML = campColOptions("aarrrName", campFilter.aarrr, "모든 AARRR 구분");
+  $("#campAarrrFilter").innerHTML = aarrrFilterOptions(campFilter.aarrr);
   $("#campGoalFilter").innerHTML = campColOptions("goal", campFilter.goal, "모든 목표");
   $("#campSegFilter").innerHTML = campColOptions("title", campFilter.seg, "모든 캠페인구분");
   $("#campOwnerFilter").innerHTML = campColOptions("owner", campFilter.owner, "모든 담당자");
 
+  const issues = hygieneCount();
+  const chk = $("#checkCount");
+  chk.textContent = issues ? "점검 " + issues : "점검";
+  $("#btnCampCheck").classList.toggle("warn", issues > 0);
   $("#campStatusFilter").value = campFilter.status;
   $("#campMeasureFilter").value = campFilter.measure;
 
@@ -764,6 +780,7 @@ function initCampView() {
   $("#campStatusFilter").addEventListener("change", e => { campFilter.status = e.target.value; renderCampView(true); });
   $("#campPlaceFilter").addEventListener("change", e => { campFilter.place = e.target.value; renderCampView(true); });
   $("#campSearch").addEventListener("input", e => { campFilter.q = e.target.value.toLowerCase().trim(); renderCampView(true); });
+  $("#btnCampCheck").addEventListener("click", openCheckModal);
   $("#btnNewSheetCamp").addEventListener("click", () => editSheetCamp(null));
   $("#campTable").addEventListener("click", e => {
     const go = e.target.closest("[data-goto-url]");

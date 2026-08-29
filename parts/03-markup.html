@@ -246,6 +246,7 @@
         <input class="field" id="campSearch" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:170px">
         <div class="spacer"></div>
         <span class="syncbar"></span>
+        <button class="btn" id="btnCampCheck" title="급락 주의·데이터 누락을 한 번에 점검합니다"><svg class="ico"><use href="#i-alert"/></svg><span id="checkCount">점검</span></button>
         <button class="btn edit-only staff-only" id="btnNewSheetCamp" title="구글 시트에 새 캠페인을 등록합니다"><svg class="ico"><use href="#i-plus"/></svg>새 캠페인</button>
         <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>
         <button class="btn staff-only" id="btnCampCsv"><svg class="ico"><use href="#i-down"/></svg>CSV</button>
@@ -275,6 +276,7 @@
         <button class="btn staff-only" data-sheet-refresh title="구글 시트에서 다시 불러오기"><svg class="ico"><use href="#i-loop"/></svg>새로고침</button>
       </div>
       <div class="statgrid" id="perfStats"></div>
+      <div id="perfFunnel"></div>
       <div class="perfbody">
         <div class="perfside scroller" id="perfList"></div>
         <div class="perfmain">

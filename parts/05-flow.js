@@ -235,8 +235,20 @@ function incompleteRowsBig(n) {
   if (!miss.length) return '<div class="g-empty">모두 등록됨</div>';
   return '<div class="node-list">' + miss.map(m => '<div class="g-miss">' + ico("alert", "xs") + esc(m) + "</div>").join("") + "</div>";
 }
+/* 이 페이지에 붙은 캠페인들의 최신월 실적을 합친다 — 성과 위주 보기의 색·배지에 쓴다 */
+function nodePerfSum(n) {
+  let rev = 0, cnt = 0;
+  (n.camps || []).forEach(c => {
+    if (!c.code) return;
+    const h = perfHistory(c.code);
+    if (!h.length) return;
+    cnt++; rev += h[h.length - 1].revenue || 0;
+  });
+  return { rev: rev, count: cnt };
+}
 function focusCount(n, f) {
   if (f === "camp") return n.camps.length;
+  if (f === "perf") return nodePerfSum(n).count;
   if (f === "incomplete") return completeness(n).length;
   if (PLAT[f]) return n.tags.filter(t => platformsOf(t).indexOf(f) >= 0).length;
   return 0;
@@ -254,6 +266,11 @@ function nodeHtml(n) {
     });
     if (n.camps.length)
       bd += '<span class="bdg" style="--c:var(--camp)" title="CRM 캠페인 ' + n.camps.length + '개">' + ico("mega", "xs") + "<b>" + n.camps.length + "</b></span>";
+  } else if (f === "perf") {
+    /* 성과 위주 보기에서는 개수가 아니라 이 화면이 만든 최신월 매출을 크게 보여 준다 */
+    const ps = nodePerfSum(n);
+    bd = '<span class="bdg big" style="--c:var(--ok)" title="이 페이지에 붙은 캠페인들의 최신월 매출 합계">' +
+      ico("chart", "xs") + "<b>" + (ps.count ? Math.round(ps.rev).toLocaleString("ko-KR") : "-") + "</b></span>";
   } else {
     const meta = FOCUS[f];
     bd = '<span class="bdg big" style="--c:' + (meta.c || "var(--ink-3)") + '">' + ico(meta.ico, "xs") + "<b>" + focusCount(n, f) + "</b></span>";
@@ -271,7 +288,7 @@ function nodeHtml(n) {
   if (f === "all") {
     body = n.camps.length ? '<div class="node-list">' + n.camps.slice(0, 4).map(campRow).join("") +
       (n.camps.length > 4 ? '<div class="g-more">+' + (n.camps.length - 4) + "개 더</div>" : "") + "</div>" : "";
-  } else if (f === "camp") body = campRowsBig(n);
+  } else if (f === "camp" || f === "perf") body = campRowsBig(n);
   else if (f === "incomplete") body = incompleteRowsBig(n);
   else if (PLAT[f]) body = tagRowsBig(n, f);
 
@@ -295,6 +312,9 @@ function nodeHtml(n) {
 }
 function renderNodes() {
   const layer = $("#nodeLayer");
+  const focusNow = state.ui.focus || "all";
+  const heatMax = focusNow === "perf"
+    ? Math.max.apply(null, B().nodes.map(x => nodePerfSum(x).rev).concat(0)) : 0;
   const have = {};
   $$(".node", layer).forEach(el => { have[el.dataset.node] = el; });
   const drawn = [];
@@ -303,13 +323,16 @@ function renderNodes() {
     if (!el) { el = document.createElement("div"); el.dataset.node = n.id; layer.appendChild(el); }
     else delete have[n.id];
     const f = state.ui.focus || "all";
-    const dim = (f === "camp" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
-    el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") + (dim ? " dim" : "");
+    const dim = (f === "camp" || f === "perf" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
+    el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") +
+      (dim ? " dim" : "") + (f === "perf" ? " heat" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
+    /* 성과 위주 보기 — 매출이 큰 화면일수록 진하게 칠해 여정 위에서 바로 보이게 한다 */
+    if (f === "perf") el.style.setProperty("--heat", heatMax ? (nodePerfSum(n).rev / heatMax).toFixed(3) : 0);
     const sig = [n.name, n.path, n.kind, n.size, n.hue, n.sharp, n.tags.length, n.camps.length, (n.layers || []).length,
       state.ui.focus, n.tags.map(t => platformsOf(t).join(",") + t.status + tagEventEn(t)).join("|"),
       /* 시트를 다시 읽으면 캠페인 이름·상태·실적이 바뀌므로 마지막 동기화 시각도 서명에 넣는다 */
-      SHEETS.at, n.camps.map(c => c.code || (c.chan + c.status + c.name)).join("|"),
+      SHEETS.at, heatMax, n.camps.map(c => c.code || (c.chan + c.status + c.name)).join("|"),
       (thumbSrc(n) || "").length].join("§");
     if (el.dataset.sig !== sig) {
       el.innerHTML = nodeHtml(n);
