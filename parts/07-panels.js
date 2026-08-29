@@ -684,10 +684,20 @@ function renderCampView(force) {
   if (!wrap) return;
   $(".syncbar", wrap).innerHTML = syncBarHtml();
 
-  const chans = Array.from(new Set(SHEETS.camps.map(m => String(m.chan || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
+  /* 채널 버튼은 시트에 지금 값이 있는 것만이 아니라 고를 수 있는 채널을 전부 보여 준다.
+     해당 캠페인이 없는 채널은 흐리게 두되 눌러 볼 수는 있게 한다. */
+  const chanCount = {};
+  SHEETS.camps.forEach(m => {
+    const c = String(m.chan || "").trim();
+    if (c) chanCount[c] = (chanCount[c] || 0) + 1;
+  });
+  const chans = Object.keys(optsFrom("chan", CHAN_OPTS)).filter(Boolean)
+    .sort((a, b) => (CHAN_OPTS.indexOf(a) < 0) - (CHAN_OPTS.indexOf(b) < 0) ||
+      (CHAN_OPTS.indexOf(a) >= 0 ? CHAN_OPTS.indexOf(a) - CHAN_OPTS.indexOf(b) : a.localeCompare(b, "ko")));
   const seg = $("#campChanFilter");
   seg.innerHTML = '<button class="btn sm' + (campFilter.chan === "all" ? " on" : "") + '" data-ch="all">전체</button>' +
-    chans.map(c => '<button class="btn sm' + (campFilter.chan === c ? " on" : "") + '" data-ch="' + esc(c) + '">' + esc(c) + "</button>").join("");
+    chans.map(c => '<button class="btn sm' + (campFilter.chan === c ? " on" : "") + (chanCount[c] ? "" : " off") +
+      '" data-ch="' + esc(c) + '" title="' + (chanCount[c] || 0) + '건">' + esc(c) + "</button>").join("");
   $("#campAarrrFilter").innerHTML = aarrrFilterOptions(campFilter.aarrr);
   $("#campGoalFilter").innerHTML = campColOptions("goal", campFilter.goal, "모든 목표");
   $("#campSegFilter").innerHTML = campColOptions("title", campFilter.seg, "모든 캠페인구분");

@@ -419,8 +419,11 @@ function renderPerfView(force) {
   $("#perfFunnel").innerHTML = perfFunnelHtml(perfPeriod.from, perfPeriod.to);
   $("#perfChart").innerHTML = perfChartSvg(series, months);
 
+  /* 표에서도 값이 통째로 비었거나 전부 0인 달은 뺀다 — 그래프에서 걷어낸 것과 같은 기준 */
+  const hasValue = r => ["sent", "recv", "recvU", "open", "conv", "revenue", "ctr", "cvr"]
+    .some(k => r[k] != null && r[k] !== 0);
   const picked = perfPicked
-    .map(c => ({ code: c, h: perfHistory(c).filter(r => r.month >= perfPeriod.from && r.month <= perfPeriod.to) }))
+    .map(c => ({ code: c, h: perfHistory(c).filter(r => r.month >= perfPeriod.from && r.month <= perfPeriod.to && hasValue(r)) }))
     .filter(x => x.h.length);
   $("#perfTable").innerHTML = picked.length
     ? '<table class="ptable"><thead><tr><th>캠페인</th><th>월</th><th class="r">전달</th><th class="r">수신</th>' +
