@@ -4,10 +4,10 @@
 set -e
 cd "$(dirname "$0")"
 
-HEAD="parts/01-head.html parts/02-css.html"
+HEAD="parts/01-head.html parts/02-css.html parts/17-mobile.html"
 BODY="parts/03-markup.html parts/04-core.js parts/05-flow.js parts/06-stage.js \
 parts/07-panels.js parts/09-storage.js parts/10-import.js parts/11-lock.js \
-parts/12-boards.js parts/14-extras.js parts/15-sheets.js parts/16-perf.js parts/13-auth.js parts/08-shell.js"
+parts/12-boards.js parts/14-extras.js parts/15-sheets.js parts/16-perf.js parts/17-mobile.js parts/13-auth.js parts/08-shell.js"
 
 {
   printf '%s\n' '<!doctype html>'

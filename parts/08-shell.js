@@ -4,6 +4,9 @@
    ======================================================================== */
 function applySizes() {
   const u = state.ui;
+  /* 모바일에서는 영역 크기를 CSS 가 정한다. 여기서 문서의 값을 좁은 화면에 맞춰
+     줄여 버리면, 폰으로 열었다 저장한 순간 PC 에서 맞춰 둔 배치가 사라진다. */
+  if (typeof isMobileLayout === "function" && isMobileLayout()) return;
   u.flowH = clamp(u.flowH, 130, Math.max(180, innerHeight - 260));
   u.leftW = clamp(u.leftW, 190, 520);
   u.rightW = clamp(u.rightW, 190, 560);
@@ -261,7 +264,7 @@ function renderAll() {
 }
 
 async function boot() {
-  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initPerfView(); initSheets(); initShell(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
+  initFlow(); initStage(); initPanels(); initTagView(); initCampView(); initPerfView(); initSheets(); initShell(); initMobile(); initSplitters(); initPaneExpand(); initImport(); initBoards(); initAuth();
   initMinimap(); wireUndoRedoButtons(); initLaneInteractions();
 
   /* 0) 서버(Supabase) 모드 — 구글 로그인 + 역할 권한 */

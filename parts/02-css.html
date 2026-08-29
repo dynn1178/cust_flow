@@ -218,17 +218,7 @@ tr:hover .rowacts{opacity:1}
 .toast.bad{color:var(--bad)} .toast.ok{color:var(--ok)}
 @keyframes pop{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important; transition-duration:.01ms !important}}
-@media (max-width:860px){
-  /* 좁은 화면에선 아래위로 쌓이므로 확장 배치는 의미가 없다 — 평소 배치로 되돌린다 */
-  #view-map[data-expand] #paneLeft,
-  #view-map[data-expand] #paneRight{position:static}
-  #view-map[data-expand] #splitL,
-  #view-map[data-expand] #splitR{position:static}
-  .deck{flex-direction:column; overflow:auto}
-  .pane.side{width:auto !important; flex:none; height:220px}
-  .splitter-v{display:none}
-  .pane.center{min-height:320px}
-}
+/* 모바일 레이아웃은 parts/17-mobile.html 에서 따로 관리한다 */
 
 /* ============ 구글 시트 연동 · 성과 추이 ============ */
 .syncchip{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-3);
@@ -334,7 +324,6 @@ tr:hover .rowacts{opacity:1}
 .card > .perfbadge{margin:-2px 0 2px}
 .ccard > .perfbadge{margin:2px 0}
 .node .perfbadge .pb{font-size:11px; padding:1px 7px; line-height:1.5}
-@media (max-width:860px){ .perfbody{flex-direction:column} .perfside{width:auto; height:220px; border-right:0; border-bottom:1px solid var(--stroke-2)} }
 
 /* ============ AARRR 요약 · 점검 · 성과 히트맵 ============ */
 .funnel{display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:8px; padding:10px 12px 0}

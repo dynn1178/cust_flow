@@ -379,7 +379,10 @@ function settleTransform() {
      캔버스 안 카드 전부의 스타일과 레이아웃이 다시 계산된다 — 끌거나 확대하는 매
      프레임마다 그러고 있었던 것이 끊김의 가장 큰 원인이었다. 움직이는 동안에는
      GPU가 화면만 옮기고, 손을 뗀 뒤(=여기서) 한 번만 보정한다. */
-  if (zoomVar !== v.zoom) { w.style.setProperty("--zoom", v.zoom); zoomVar = v.zoom; }
+  /* 모바일에서는 zoomVarFor()가 1을 돌려준다 — 카드 폭·글자 크기를 배율에 맞춰
+     키우던 보정을 꺼서, 지도가 PC 100% 화면을 그대로 축소한 모습이 되게 한다. */
+  const zv = zoomVarFor(v.zoom);
+  if (zoomVar !== zv) { w.style.setProperty("--zoom", zv); zoomVar = zv; }
   w.style.transform = "translate(" + v.panX + "px," + v.panY + "px) scale(" + v.zoom + ")";
   renderMinimap();                          /* 움직임이 멈춘 뒤 한 번만 제대로 그린다 */
 }
@@ -453,6 +456,22 @@ function drawGuides(guides) {
   if (g.innerHTML !== html) g.innerHTML = html;
 }
 
+/* 배경(또는 보기 전용일 때 카드 위)을 끌어 화면을 민다 */
+function startPan(e, surf) {
+  const sx = e.clientX, sy = e.clientY, v = B().view, px = v.panX, py = v.panY;
+  surf.classList.add("panning");
+  $("#flowPane").classList.add("busy");
+  const mv = ev => { v.panX = px + (ev.clientX - sx); v.panY = py + (ev.clientY - sy); applyTransformSoon(); };
+  const up = () => {
+    surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
+    surf.classList.remove("panning");
+    $("#flowPane").classList.remove("busy");
+    markDirty();
+  };
+  try { surf.setPointerCapture(e.pointerId); } catch (err) {}
+  surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
+}
+
 /* ---------------- 상호작용 ---------------- */
 function initFlow() {
   const surf = $("#flowSurface");
@@ -467,6 +486,9 @@ function initFlow() {
 
   surf.addEventListener("pointerdown", e => {
     if (e.target.closest("[data-nedit]")) return;   /* 카드 안 버튼 위에서는 드래그를 준비하지 않는다 */
+    /* 손가락 조작은 전용 제스처로 — 한 손가락은 밀기, 두 손가락은 확대/축소.
+       노드가 실수로 끌려 옮겨지지 않게 하려는 것이기도 하다. */
+    if (mobileFlowPointer(e, surf)) return;
     if (laneMode && canEdit() && !e.target.closest(".lane-label") && !e.target.closest(".lane-edge")) { startLaneDraw(e, surf, surf.getBoundingClientRect()); return; }
     const r = surf.getBoundingClientRect();
     const wp = e.target.closest("[data-wp]"), add = e.target.closest("[data-add]");
@@ -526,7 +548,7 @@ function initFlow() {
       }
       if (sel.node !== id) selectNode(id);
       if (sel.edge) { sel.edge = null; drawEdges(); }
-      if (!editable) return;
+      if (!editable) { startPan(e, surf); return; }   /* 보기 전용 — 카드 위에서도 화면을 민다 */
       const n = nodeById(id), sx = e.clientX, sy = e.clientY, ox = n.x, oy = n.y;
       let moved = false;
       nodeEl.classList.add("dragging"); busy(true);
@@ -553,15 +575,7 @@ function initFlow() {
     if (edgeHit && editable) { sel.edge = edgeHit.dataset.edge; drawEdges(); openEdgePop(sel.edge, e.clientX, e.clientY); return; }
 
     if (sel.edge) { sel.edge = null; drawEdges(); }       /* 배경 → 패닝 */
-    const sx = e.clientX, sy = e.clientY, v = B().view, px = v.panX, py = v.panY;
-    surf.classList.add("panning"); busy(true);
-    const mv = ev => { v.panX = px + (ev.clientX - sx); v.panY = py + (ev.clientY - sy); applyTransformSoon(); };
-    const up = () => {
-      surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
-      surf.classList.remove("panning"); busy(false); markDirty();
-    };
-    surf.setPointerCapture(e.pointerId);
-    surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
+    startPan(e, surf);
   });
 
   surf.addEventListener("dblclick", e => {
