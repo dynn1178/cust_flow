@@ -51,6 +51,39 @@ function setMobilePane(k) {
   /* 숨어 있던 영역이 나타나면 크기를 다시 재야 스테이지 배율이 맞는다 */
   if (k === "stage" && !stageZoom) renderStage();
 }
+/* ---------------- 화면 위치(배율·이동) ----------------
+   PC 에서 맞춰 둔 화면 위치를 폰 화면에 그대로 쓰면 지도가 화면 밖으로 밀려나
+   빈 캔버스만 보인다. 모바일에서는 폰 화면에 맞게 다시 잡되, 문서에 저장되는
+   값은 PC 것을 그대로 지켜 준다 — 폰으로 열었다 저장해도 PC 배치가 안 바뀐다. */
+const deskViews = {};
+let mFittedBoard = null;
+
+function keepDeskView() {
+  const b = B();
+  if (!deskViews[b.id]) deskViews[b.id] = Object.assign({}, b.view);
+}
+function restoreDeskViews() {
+  state.boards.forEach(b => {
+    if (deskViews[b.id]) { b.view = deskViews[b.id]; delete deskViews[b.id]; }
+  });
+}
+/* 저장할 때 쓸 화면 위치 — 모바일에서 맞춘 값 대신 PC 값을 돌려준다 */
+function viewForSave(b) { return deskViews[b.id] || b.view; }
+
+/* 지도를 다시 그린 뒤마다 부른다. 보드가 바뀌었으면 폰 화면에 맞춰 다시 잡는다. */
+function mobileAfterRender() {
+  if (!isMobileLayout()) { mFittedBoard = null; return; }
+  const b = B();
+  /* 보드 id 만 보면, 서버에서 문서를 받아 와 내용이 통째로 바뀌어도 같은 판으로
+     보여 다시 맞추지 않는다. 노드 수·첫/끝 노드까지 함께 본다. */
+  const key = b.id + "|" + b.nodes.length + "|" + ((b.nodes[0] || {}).id || "") +
+    "|" + ((b.nodes[b.nodes.length - 1] || {}).id || "");
+  if (mFittedBoard === key) return;
+  mFittedBoard = key;
+  keepDeskView();
+  requestAnimationFrame(() => { if (isMobileLayout()) { fitFlow(); applyTransform(); } });
+}
+
 /* 화면 크기가 바뀔 때마다 모바일 여부를 다시 판단한다 */
 function syncMobileLayout() {
   const on = isMobileLayout();
@@ -60,10 +93,12 @@ function syncMobileLayout() {
   if (on) $("#deck").dataset.mpane = mPane; else delete $("#deck").dataset.mpane;
   if (mobileOn === on) return;
   mobileOn = on;
+  if (!on) { restoreDeskViews(); mFittedBoard = null; }   // PC 로 돌아가면 원래 화면 위치로
   /* 보정 배율이 달라지므로 지도를 다시 그린다 */
   zoomVar = null;
   applyTransform();
   renderFlow();
+  mobileAfterRender();
 }
 function initMobile() {
   const deck = $("#deck");

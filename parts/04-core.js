@@ -160,7 +160,7 @@ function seed() {
 
   const E = (from, to, label, style, extra) => Object.assign({
     id: uid("e"), from, to, label: label || "", style: style || "solid", kind: "arrow",
-    route: "curve", hue: "none", width: 2, head: "m", a1: "auto", a2: "auto", points: []
+    route: "curve", hue: "none", width: 2, head: "l", a1: "auto", a2: "auto", points: []
   }, extra || {});
   const edges = [
     E("n1", "n2", "앱 진입"),
@@ -309,7 +309,8 @@ function buildSnapshot() {
       if (c.shot && c.shot.ref) used.push(c.shot.ref);
       return c;
     });
-    return Object.assign({}, b, { nodes });
+    /* 모바일에서 맞춘 화면 위치가 아니라 PC 에서 쓰던 값을 저장한다 */
+    return Object.assign({}, b, { nodes, view: viewForSave(b) });
   });
   const data = Object.assign({}, state, { boards, updatedAt: Date.now() });
   const removals = savedRefs.filter(r => used.indexOf(r) < 0);

@@ -344,11 +344,18 @@ function renderNodes() {
   Object.keys(have).forEach(id => { have[id].remove(); delete NSZ[id]; });
   /* 크기 재기는 쓰기가 다 끝난 뒤에 한 번에 — 카드마다 "쓰고 바로 읽으면"
      그때마다 브라우저가 레이아웃을 다시 계산해서, 카드 수만큼 멈칫거린다 */
-  drawn.forEach(pair => {
-    const n = pair[0], el = pair[1], frameEl = el.querySelector(".node-frame");
-    NSZ[n.id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150, frameH: frameEl ? frameEl.offsetHeight : 0 };
-  });
+  measureNodes();
   paintSelection();
+}
+/* 카드 실제 크기를 다시 재 NSZ 에 담는다. 연결선은 이 값으로 붙을 자리를 정하므로,
+   카드 크기가 달라질 수 있는 일(--zoom 변경 등) 뒤에는 반드시 다시 재야 한다. */
+function measureNodes() {
+  $$("#nodeLayer .node").forEach(el => {
+    const id = el.dataset.node, frameEl = el.querySelector(".node-frame");
+    const n = nodeById(id);
+    if (!n) return;
+    NSZ[id] = { w: el.offsetWidth || nodeW(n), h: el.offsetHeight || 150, frameH: frameEl ? frameEl.offsetHeight : 0 };
+  });
 }
 function paintSelection() {
   $$("#nodeLayer .node").forEach(el => {
@@ -382,7 +389,12 @@ function settleTransform() {
   /* 모바일에서는 zoomVarFor()가 1을 돌려준다 — 카드 폭·글자 크기를 배율에 맞춰
      키우던 보정을 꺼서, 지도가 PC 100% 화면을 그대로 축소한 모습이 되게 한다. */
   const zv = zoomVarFor(v.zoom);
-  if (zoomVar !== zv) { w.style.setProperty("--zoom", zv); zoomVar = zv; }
+  if (zoomVar !== zv) {
+    w.style.setProperty("--zoom", zv); zoomVar = zv;
+    /* 카드 폭·글자 크기가 방금 달라졌다. 크기를 다시 재고 연결선도 다시 그린다 —
+       이걸 빼먹으면 다음에 화면을 다시 그리는 순간(예: 저장) 화살표가 튄다. */
+    measureNodes(); drawEdges();
+  }
   w.style.transform = "translate(" + v.panX + "px," + v.panY + "px) scale(" + v.zoom + ")";
   renderMinimap();                          /* 움직임이 멈춘 뒤 한 번만 제대로 그린다 */
 }
@@ -646,7 +658,7 @@ function addEdge(from, to) {
   if (B().edges.some(e => e.from === from && e.to === to)) { toast("이미 연결되어 있습니다"); paintSelection(); return; }
   B().edges.push({
     id: uid("e"), from, to, label: "", style: "solid", kind: "arrow",
-    route: "curve", hue: "none", width: 2, a1: "auto", a2: "auto", points: []
+    route: "curve", hue: "none", width: 2, head: "l", a1: "auto", a2: "auto", points: []
   });
   markDirty(); renderFlow();
 }

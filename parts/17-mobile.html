@@ -16,8 +16,18 @@
    ========================================================================== */
 @media (max-width: 860px) {
 
+  /* ── 화면 높이 ───────────────────────────────────────────────
+     모바일 브라우저는 주소창·하단 바가 접혔다 펴져 100% 높이가 실제로 보이는
+     높이보다 큰 경우가 많다. 그러면 아래쪽 내용이 화면 밖으로 밀려나는데,
+     본문 스크롤은 막혀 있어 닿을 방법이 없었다(캠페인 목록이 안 보이던 원인).
+     지금 실제로 보이는 높이(dvh)를 쓰고, 각 영역은 자기 안에서 스크롤한다. */
+  html,body{height:100dvh}
+  .app{height:100dvh; padding:6px; gap:6px}
+  .view.on{gap:6px}
+
   /* ── 상단 바 ─────────────────────────────────────────────── */
-  .topbar{flex-wrap:wrap; gap:6px; padding:7px 9px; row-gap:6px}
+  .topbar{flex-wrap:wrap; gap:5px; padding:6px 8px; row-gap:5px}
+  .brand{display:none}                            /* 보드 이름이 어느 문서인지 알려 준다 */
   .topbar .btn{height:34px}                       /* 손가락으로 누를 최소 크기 */
   .topbar .btn.icon{width:34px; padding:0}
   #viewTabs{order:10; width:100%; overflow-x:auto; overflow-y:hidden; flex-wrap:nowrap;
@@ -32,7 +42,7 @@
 
   /* ── 여정 지도 ───────────────────────────────────────────── */
   /* PC 에서 드래그해 저장해 둔 높이·폭은 모바일에서 쓰지 않는다(인라인 값을 덮어쓴다) */
-  #flowPane{height:52vh !important; min-height:260px; margin:0 !important}
+  #flowPane{height:44dvh !important; min-height:200px; margin:0 !important}
   #splitH{display:none}
   .deck{flex-direction:column; overflow:hidden; padding:0 !important; gap:0}
   .pane.side,.pane.center{width:auto !important; flex:1; min-height:0; height:auto}
@@ -53,7 +63,7 @@
   .flow-seltools{bottom:56px}
 
   /* ── 지도 아래: 한 번에 한 패널 ─────────────────────────── */
-  .mtabs{display:flex; gap:5px; padding:7px 9px; flex:none;
+  .mtabs{display:flex; gap:5px; padding:6px 8px; flex:none;
     border-bottom:1px solid var(--stroke-2); background:var(--glass-2); overflow-x:auto;
     -webkit-overflow-scrolling:touch; scrollbar-width:none}
   .mtabs::-webkit-scrollbar{display:none}
@@ -64,7 +74,8 @@
   #deck[data-mpane="stage"] #paneRight,
   #deck[data-mpane="tag"] #paneLeft,
   #deck[data-mpane="tag"] #paneStage{display:none}
-  .pane-head{padding:9px 10px}
+  .pane-head{padding:8px 10px}
+  .pane.side .pane-body,.pane.center{min-height:0}
   .pane-head h2{font-size:12.5px}
   #btnExpLeft,#btnExpRight{display:none}          /* 옆면 확장은 넓은 화면 전용 */
 
@@ -85,7 +96,7 @@
 
   /* ── 성과 추이 ───────────────────────────────────────────── */
   .perfbody{flex-direction:column}
-  .perfside{width:auto; height:38vh; min-height:190px; border-right:0;
+  .perfside{width:auto; height:34dvh; min-height:150px; border-right:0;
     border-bottom:1px solid var(--stroke-2)}
   .perfmain{padding:9px; gap:9px}
   .funnel{grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); padding:9px 9px 0}
@@ -95,17 +106,17 @@
 
   /* ── 창(모달) ────────────────────────────────────────────── */
   .scrim{padding:0; place-items:end center}
-  .modal,.modal.wide{width:100%; max-width:100%; max-height:92vh;
+  .modal,.modal.wide{width:100%; max-width:100%; max-height:92dvh;
     border-radius:var(--r-lg) var(--r-lg) 0 0}
   .modal-body{padding:13px; gap:11px}
   .modal-foot{padding:10px 13px; padding-bottom:max(10px, env(safe-area-inset-bottom))}
   .modal-foot .btn{height:38px}
   .frow .field{height:36px}
-  .picklist{max-height:52vh}
+  .picklist{max-height:46dvh}
   .chklist{max-height:none}
   .chkrow{grid-template-columns:78px 1fr; row-gap:2px}
   .chkrow em{grid-column:1/-1; max-width:none}
-  .qs-results{max-height:56vh}
+  .qs-results{max-height:50dvh}
 
   /* 화면 아래쪽 안전 영역(홈 바) 만큼 띄운다 */
   #toast{bottom:max(22px, calc(env(safe-area-inset-bottom) + 12px))}

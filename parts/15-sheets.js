@@ -464,16 +464,22 @@ function apidbSplit(v) {
 }
 const apidbJoin = (api, db) => [api === "Y" ? "API" : "", db === "Y" ? "DB" : ""].filter(Boolean).join("/");
 
-function sheetFormFields() {
+function sheetFormFields(locked) {
   const map = aarrrMap();
   const aarrrOpts = {};
   Object.keys(map).forEach(k => { aarrrOpts[k] = k + " · " + map[k]; });
   const YN = { "": "-", "Y": "Y", "N": "N" };
+  /* 이미 있는 캠페인을 고칠 때는 AARRR 구분과 캠페인코드를 잠근다.
+     이 값들은 성과 시트와 이어 붙이는 열쇠이자 분류 기준이라, 여기서 바꾸면
+     지금까지 쌓인 성과 이력과 연결이 끊긴다. 바꿔야 하면 시트에서 직접 고친다. */
   return [
-    { type: "group", label: "AARRR 구분 — 먼저 고르면 캠페인코드가 자동으로 제안됩니다", open: true, fields: [
-      { k: "aarrrCode", label: "AARRR구분코드", type: "select", opts: aarrrOpts },
+    { type: "group", label: locked ? "AARRR 구분 · 캠페인코드 (수정 불가)"
+        : "AARRR 구분 — 먼저 고르면 캠페인코드가 자동으로 제안됩니다", open: true, fields: [
+      locked ? { k: "aarrrCode", label: "AARRR구분코드", type: "readonly", mono: true }
+             : { k: "aarrrCode", label: "AARRR구분코드", type: "select", opts: aarrrOpts },
       { k: "aarrrName", label: "AARRR구분명", type: "readonly" },
-      { k: "code", label: "캠페인코드", mono: true, ph: "A1-002" },
+      locked ? { k: "code", label: "캠페인코드", type: "readonly", mono: true }
+             : { k: "code", label: "캠페인코드", mono: true, ph: "A1-002" },
       { k: "_codeMsg", label: "", type: "note" }
     ] },
     { k: "title", label: "캠페인구분 (화면 표시명)", ph: "회원가입 유도" },
@@ -540,7 +546,9 @@ function editSheetCamp(code) {
     values.code = nextCampCode(first);
     values.mkt = "개인화";
   }
-  values._codeMsg = m ? "" : "시트의 마지막 번호 다음으로 제안한 코드입니다. 바꿔도 됩니다.";
+  values._codeMsg = m
+    ? "AARRR 구분과 캠페인코드는 성과 이력을 잇는 열쇠라 여기서 바꿀 수 없습니다. 시트에서 직접 고치세요."
+    : "시트의 마지막 번호 다음으로 제안한 코드입니다. 바꿔도 됩니다.";
   if (m) {
     const ctr = basisOf(m, "ctr"), cvr = basisOf(m, "cvr");
     values._ctrBasis = ctr.length ? ctr.join("  ·  ") : "시트에 기준이 적혀 있지 않습니다";
@@ -559,10 +567,11 @@ function editSheetCamp(code) {
       "앱에서는 삭제할 수 없습니다. 그만 쓰는 캠페인은 상태를 <b>중단</b>으로 바꾸세요." +
       (m ? "" : "<br>새로 등록하면 실적 열의 수식은 바로 윗줄에서 복사됩니다. CTR기준·CVR기준은 시트에서 채워 주세요."),
     warn: "이 캠페인 항목은 구글 시트 데이터와 연동됩니다. 여기서 수정하면 <b>구글 시트의 데이터도 함께 변경</b>됩니다.",
-    fields: sheetFormFields().concat(lockedFields(m)),
+    fields: sheetFormFields(!!m).concat(lockedFields(m)),
     values: values,
     /* 구분코드를 고르면 구분명과 캠페인코드를 따라 바꾸고, 코드는 칠 때마다 중복을 확인한다 */
     onChange: (k, v, root) => {
+      if (m) return;                            /* 수정 중에는 코드·구분이 잠겨 있다 */
       const codeEl = $('[data-k="code"]', root);
       const prefEl = $('[data-k="aarrrCode"]', root);
       if (k === "aarrrCode") {
@@ -584,7 +593,8 @@ function editSheetCamp(code) {
       if (m && newCode.toUpperCase() !== String(m.code).toUpperCase())
         return toast("캠페인코드는 바꿀 수 없습니다. 시트에서 직접 고쳐 주세요.", "bad");
       v.code = m ? m.code : newCode;         /* 시트에는 친 그대로 적는다 */
-      v.aarrrName = map[v.aarrrCode] || v.aarrrName || "";
+      if (m) { v.aarrrCode = m.aarrrCode; v.aarrrName = m.aarrrName; }
+      else v.aarrrName = map[v.aarrrCode] || v.aarrrName || "";
       v.apidb = apidbJoin(v._api, v._db);
       const row = [];
       SHEET_COLS.forEach((c, i) => { row[i] = c.edit ? (v[c.key] == null ? "" : String(v[c.key])) : ""; });

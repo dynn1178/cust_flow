@@ -225,7 +225,7 @@ function normalizeBoard(b) {
   }, n));
   b.nodes.forEach(n => { n.tags = (n.tags || []).map(normalizeTag); });
   b.edges = (b.edges || []).map(e => Object.assign({
-    label: "", style: "solid", kind: "arrow", route: "curve", hue: "none", width: 2, head: "m", a1: "auto", a2: "auto", points: []
+    label: "", style: "solid", kind: "arrow", route: "curve", hue: "none", width: 2, head: "l", a1: "auto", a2: "auto", points: []
   }, e));
   b.edges.forEach(e => { if (e.kind === "loop") e.kind = "arrow"; });   // 루프 화살표는 더 이상 쓰지 않는다
   b.view = Object.assign({ zoom: 0.8, panX: 24, panY: 12, fitted: true }, b.view || {});
@@ -261,6 +261,7 @@ function renderAll() {
   if (!B().nodes.some(n => n.id === sel.node)) sel.node = (B().nodes[0] || {}).id || null;
   renderStage(); renderPanels(); invalidateViews();
   seedHistoryForAllBoards();
+  mobileAfterRender();          /* 모바일이면 폰 화면에 맞게 지도 위치를 다시 잡는다 */
 }
 
 async function boot() {
