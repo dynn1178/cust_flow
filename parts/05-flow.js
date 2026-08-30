@@ -386,8 +386,6 @@ function settleTransform() {
      캔버스 안 카드 전부의 스타일과 레이아웃이 다시 계산된다 — 끌거나 확대하는 매
      프레임마다 그러고 있었던 것이 끊김의 가장 큰 원인이었다. 움직이는 동안에는
      GPU가 화면만 옮기고, 손을 뗀 뒤(=여기서) 한 번만 보정한다. */
-  /* 모바일에서는 zoomVarFor()가 1을 돌려준다 — 카드 폭·글자 크기를 배율에 맞춰
-     키우던 보정을 꺼서, 지도가 PC 100% 화면을 그대로 축소한 모습이 되게 한다. */
   const zv = zoomVarFor(v.zoom);
   if (zoomVar !== zv) {
     w.style.setProperty("--zoom", zv); zoomVar = zv;

@@ -710,143 +710,36 @@ tr:hover .rowacts{opacity:1}
 </style>
 <style>
 /* ============================================================================
-   모바일 전용 레이아웃 (≤860px)
+   모바일 안내 화면 (≤860px)
 
-   이 파일만 고치면 모바일 화면이 바뀐다 — PC 레이아웃(01-head·02-css)은 건드리지
-   않는다. build.sh 에서 맨 마지막에 붙으므로 여기 규칙이 항상 이긴다.
+   이 도구는 넓은 화면을 전제로 만들어졌다 — 여정 지도 옆에 캠페인·화면·태깅
+   세 영역을 나란히 두고, 카드를 끌어 옮기며 편집한다. 폰 화면에서는 어느 쪽도
+   제대로 되지 않으므로 좁은 화면에서는 본 화면을 감추고 안내만 보여 준다.
 
-   핵심 원칙
-     1) 여정 지도는 PC 와 "똑같이" 보여야 한다. 카드 폭·글자 크기를 배율에 맞춰
-        키우던 보정(--zoom)을 모바일에서는 끈다(17-mobile.js). 그래서 지도는
-        PC 100% 화면을 그대로 축소한 모습이 되고, 노드 위치·줄바꿈이 달라지지 않는다.
-     2) 좁은 화면에 세 패널을 쌓지 않는다. 지도 아래는 한 번에 하나만 보여주고
-        캠페인 · 화면 · 태깅을 탭으로 오간다.
-     3) 손가락으로 하는 조작을 우선한다 — 한 손가락은 항상 화면 밀기,
-        두 손가락은 확대/축소. 실수로 노드가 끌려 옮겨지지 않는다.
+   짝이 되는 표시(주소 채우기)는 parts/17-mobile.js, 안내 문구의 마크업은
+   parts/03-markup.html 의 #pcGate 에 있다.
    ========================================================================== */
+.pcgate{display:none}
+
 @media (max-width: 860px) {
+  /* 본 화면은 통째로 감춘다 — 뒤에서 스크롤되거나 소리 없이 눌리지 않도록 */
+  .app,#modalRoot,#popRoot,#menuRoot,#toast{display:none !important}
 
-  /* ── 화면 높이 ───────────────────────────────────────────────
-     모바일 브라우저는 주소창·하단 바가 접혔다 펴져 100% 높이가 실제로 보이는
-     높이보다 큰 경우가 많다. 그러면 아래쪽 내용이 화면 밖으로 밀려나는데,
-     본문 스크롤은 막혀 있어 닿을 방법이 없었다(캠페인 목록이 안 보이던 원인).
-     지금 실제로 보이는 높이(dvh)를 쓰고, 각 영역은 자기 안에서 스크롤한다. */
-  html,body{height:100dvh}
-  .app{height:100dvh; padding:6px; gap:6px}
-  .view.on{gap:6px}
-
-  /* ── 상단 바 ─────────────────────────────────────────────── */
-  .topbar{flex-wrap:wrap; gap:5px; padding:6px 8px; row-gap:5px}
-  .brand{display:none}                            /* 보드 이름이 어느 문서인지 알려 준다 */
-  .topbar .btn{height:34px}                       /* 손가락으로 누를 최소 크기 */
-  .topbar .btn.icon{width:34px; padding:0}
-  #viewTabs{order:10; width:100%; overflow-x:auto; overflow-y:hidden; flex-wrap:nowrap;
-    -webkit-overflow-scrolling:touch; scrollbar-width:none}
-  #viewTabs::-webkit-scrollbar{display:none}
-  #viewTabs .btn{flex:none; white-space:nowrap}
-  #btnBoards{max-width:42vw}
-  #btnBoards .bn{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-  #authName{max-width:0; overflow:hidden}         /* 이름 대신 아이콘만 */
-  #btnShare span,#lockText{display:none}
-  .savechip{font-size:10.5px; padding:3px 8px}
-
-  /* ── 여정 지도 ───────────────────────────────────────────── */
-  /* PC 에서 드래그해 저장해 둔 높이·폭은 모바일에서 쓰지 않는다(인라인 값을 덮어쓴다) */
-  #flowPane{height:44dvh !important; min-height:200px; margin:0 !important}
-  #splitH{display:none}
-  .deck{flex-direction:column; overflow:hidden; padding:0 !important; gap:0}
-  .pane.side,.pane.center{width:auto !important; flex:1; min-height:0; height:auto}
-  .splitter-v{display:none}
-  #view-map[data-expand] #paneLeft,
-  #view-map[data-expand] #paneRight,
-  #view-map[data-expand] #splitL,
-  #view-map[data-expand] #splitR{position:static}
-
-  /* 확대/축소·도구 막대는 손가락에 맞춰 키우고, 겹치지 않게 자리를 나눈다 */
-  .flow-tools{left:8px; right:8px; bottom:8px; overflow-x:auto; flex-wrap:nowrap;
-    -webkit-overflow-scrolling:touch; scrollbar-width:none; padding:5px 7px}
-  .flow-tools::-webkit-scrollbar{display:none}
-  .flow-tools .btn{flex:none; height:32px}
-  .flow-zoom{top:8px; right:8px; bottom:auto}
-  .flow-zoom .btn.icon{width:34px; height:34px}
-  .minimap{display:none}                          /* 좁은 화면에서는 자리만 차지한다 */
-  .flow-seltools{bottom:56px}
-
-  /* ── 지도 아래: 한 번에 한 패널 ─────────────────────────── */
-  .mtabs{display:flex; gap:5px; padding:6px 8px; flex:none;
-    border-bottom:1px solid var(--stroke-2); background:var(--glass-2); overflow-x:auto;
-    -webkit-overflow-scrolling:touch; scrollbar-width:none}
-  .mtabs::-webkit-scrollbar{display:none}
-  .mtabs .btn{flex:1; min-width:88px; height:34px; justify-content:center}
-  #deck[data-mpane="camp"] #paneStage,
-  #deck[data-mpane="camp"] #paneRight,
-  #deck[data-mpane="stage"] #paneLeft,
-  #deck[data-mpane="stage"] #paneRight,
-  #deck[data-mpane="tag"] #paneLeft,
-  #deck[data-mpane="tag"] #paneStage{display:none}
-  .pane-head{padding:8px 10px}
-  .pane.side .pane-body,.pane.center{min-height:0}
-  .pane-head h2{font-size:12.5px}
-  #btnExpLeft,#btnExpRight{display:none}          /* 옆면 확장은 넓은 화면 전용 */
-
-  /* ── 목록·표 ─────────────────────────────────────────────── */
-  .toolrow{padding:8px 9px; gap:6px}
-  .toolrow .field{min-width:0; flex:1 1 132px; height:34px}
-  .toolrow .btn{height:34px}
-  .seg{overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; max-width:100%}
-  .seg::-webkit-scrollbar{display:none}
-  .seg .btn{flex:none}
-  .statgrid{grid-template-columns:repeat(2,1fr); padding:9px 9px 0}
-  .stat .n{font-size:16px}
-  #campTableWrap{-webkit-overflow-scrolling:touch}
-  #campTable td,#campTable th{padding:7px 8px}
-  #campTable .capname{max-width:150px}
-  #campTable .capfull{max-width:180px}
-  .basis2{max-width:200px}
-
-  /* ── 성과 추이 ───────────────────────────────────────────── */
-  .perfbody{flex-direction:column}
-  .perfside{width:auto; height:34dvh; min-height:150px; border-right:0;
-    border-bottom:1px solid var(--stroke-2)}
-  .perfmain{padding:9px; gap:9px}
-  .funnel{grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); padding:9px 9px 0}
-  .periodbox{flex:1 1 100%}
-  .periodbox .field{flex:1; min-width:0}
-  .chart-tip{font-size:10.5px}
-
-  /* ── 창(모달) ────────────────────────────────────────────── */
-  .scrim{padding:0; place-items:end center}
-  .modal,.modal.wide{width:100%; max-width:100%; max-height:92dvh;
-    border-radius:var(--r-lg) var(--r-lg) 0 0}
-  .modal-body{padding:13px; gap:11px}
-  .modal-foot{padding:10px 13px; padding-bottom:max(10px, env(safe-area-inset-bottom))}
-  .modal-foot .btn{height:38px}
-  .frow .field{height:36px}
-  .picklist{max-height:46dvh}
-  .chklist{max-height:none}
-  .chkrow{grid-template-columns:78px 1fr; row-gap:2px}
-  .chkrow em{grid-column:1/-1; max-width:none}
-  .qs-results{max-height:50dvh}
-
-  /* 화면 아래쪽 안전 영역(홈 바) 만큼 띄운다 */
-  #toast{bottom:max(22px, calc(env(safe-area-inset-bottom) + 12px))}
-}
-
-/* 아주 좁은 화면 — 표는 가로로 밀어 보는 것을 전제로 한다 */
-@media (max-width: 520px) {
-  .statgrid{grid-template-columns:1fr 1fr}
-  .funnel{grid-template-columns:1fr}
-  .topbar .btn span{display:none}
-  .topbar #btnBoards .bn{display:inline}
-  #viewTabs .btn span{display:inline}
-}
-
-/* 마우스가 아예 없는 기기 — 마우스오버로만 나타나던 것을 항상 보이게 한다.
-   터치에는 hover 가 없어서, 숨겨 두면 아예 누를 방법이 없다.
-   (hover:none 까지 걸어 터치 지원 노트북은 지금 동작 그대로 둔다) */
-@media (pointer: coarse) and (hover: none) {
-  .card-acts,.rowacts,.thumb-acts{opacity:1 !important}
-  .node .port{opacity:.55}
+  html,body{height:100dvh; overflow:hidden}
+  .pcgate{display:grid; place-items:center; position:fixed; inset:0; z-index:9999;
+    padding:24px; padding-bottom:max(24px, env(safe-area-inset-bottom))}
+  .pcgate-card{width:100%; max-width:420px; padding:30px 24px 26px; text-align:center;
+    border-radius:var(--r-lg)}
+  .pcgate-ico{width:38px; height:38px; margin-bottom:14px; color:var(--accent);
+    fill:none; stroke:currentColor; stroke-width:1.6;
+    stroke-linecap:round; stroke-linejoin:round}
+  .pcgate h1{margin:0 0 10px; font-size:17px; font-weight:700; line-height:1.4;
+    letter-spacing:-.01em; color:var(--ink)}
+  .pcgate p{margin:0; font-size:13px; line-height:1.7; color:var(--ink-2)}
+  .pcgate-url{margin-top:18px; padding:9px 12px; border-radius:var(--r-sm);
+    border:1px solid var(--stroke-2); background:var(--glass-2);
+    font-size:11.5px; color:var(--ink-3); word-break:break-all}
+  .pcgate-url:empty{display:none}
 }
 </style>
 </head>
@@ -959,11 +852,11 @@ tr:hover .rowacts{opacity:1}
         <button class="btn icon sm edit-only" id="btnUndo" title="되돌리기 (Ctrl+Z)" disabled><svg class="ico xs"><use href="#i-undo"/></svg></button>
         <button class="btn icon sm edit-only" id="btnRedo" title="다시 실행 (Ctrl+Shift+Z)" disabled><svg class="ico xs"><use href="#i-redo"/></svg></button>
         <div class="tool-sep edit-only"></div>
-        <button class="btn sm edit-only" id="btnAutoLayout" title="흐름 순서대로 정렬"><svg class="ico xs"><use href="#i-grid"/></svg>정렬<svg class="ico xs"><use href="#i-chev"/></svg></button>
         <button class="btn icon sm" id="btnMinimap" title="미니맵 표시/숨김"><svg class="ico xs"><use href="#i-map"/></svg></button>
-        <button class="btn sm edit-only" id="btnLanes" title="캔버스를 드래그해서 구간(스윔레인) 배경 그리기"><svg class="ico xs"><use href="#i-lanes"/></svg>구간 그리기</button>
         <button class="btn sm edit-only on" id="btnSnap" title="자석 정렬 — 다른 페이지에 맞춰 달라붙기"><svg class="ico xs"><use href="#i-magnet"/></svg></button>
+        <button class="btn sm edit-only" id="btnLanes" title="캔버스를 드래그해서 구간(스윔레인) 배경 그리기"><svg class="ico xs"><use href="#i-lanes"/></svg>구간 그리기</button>
         <button class="btn sm" id="btnFocus" title="카드에서 무엇을 크게 볼지"><svg class="ico xs" id="focusIco"><use href="#i-density"/></svg><span id="focusName">전체</span><svg class="ico xs"><use href="#i-chev"/></svg></button>
+        <button class="btn sm edit-only" id="btnAutoLayout" title="흐름 순서대로 정렬"><svg class="ico xs"><use href="#i-grid"/></svg>정렬<svg class="ico xs"><use href="#i-chev"/></svg></button>
       </div>
       <div class="minimap glass" id="minimap"><svg id="minimapSvg" viewBox="0 0 168 112"></svg></div>
       <div class="flow-zoom glass">
@@ -1142,6 +1035,16 @@ tr:hover .rowacts{opacity:1}
       </div>
     </div>
   </section>
+</div>
+
+<!-- 모바일 안내 — 좁은 화면에서만 보인다(스타일은 parts/17-mobile.html) -->
+<div class="pcgate" id="pcGate">
+  <div class="pcgate-card glass">
+    <svg class="pcgate-ico"><use href="#i-route"/></svg>
+    <h1>모바일 페이지는 지원하지 않습니다</h1>
+    <p>고객 여정 지도는 넓은 화면에서 쓰도록 만들어졌습니다.<br>PC로 접속해 주세요.</p>
+    <div class="pcgate-url mono" id="pcGateUrl"></div>
+  </div>
 </div>
 
 <div id="modalRoot"></div>
@@ -2159,8 +2062,6 @@ function settleTransform() {
      캔버스 안 카드 전부의 스타일과 레이아웃이 다시 계산된다 — 끌거나 확대하는 매
      프레임마다 그러고 있었던 것이 끊김의 가장 큰 원인이었다. 움직이는 동안에는
      GPU가 화면만 옮기고, 손을 뗀 뒤(=여기서) 한 번만 보정한다. */
-  /* 모바일에서는 zoomVarFor()가 1을 돌려준다 — 카드 폭·글자 크기를 배율에 맞춰
-     키우던 보정을 꺼서, 지도가 PC 100% 화면을 그대로 축소한 모습이 되게 한다. */
   const zv = zoomVarFor(v.zoom);
   if (zoomVar !== zv) {
     w.style.setProperty("--zoom", zv); zoomVar = zv;
@@ -6418,123 +6319,33 @@ function openCheckModal() {
     if (row && isStaff() && campByCode(row.dataset.chk)) { closeModal(); editSheetCamp(row.dataset.chk); }
   });
 }
-
 /* ========================================================================
-   모바일 전용 동작 — 레이아웃 전환 · 터치 제스처
+   좁은 화면 안내 · 터치 제스처
 
-   짝이 되는 스타일은 parts/17-mobile.html 에 모여 있다. 모바일에서 뭔가
-   달라져야 하면 두 파일만 보면 된다.
+   이 도구는 넓은 화면 전용이다. 폰 크기(≤860px)에서는 본 화면 대신 안내만
+   보여 준다 — 화면을 감추는 일은 CSS 가 하고(parts/17-mobile.html), 여기서는
+   안내에 지금 주소를 채워 PC 에서 열 수 있게만 해 준다.
 
-   여기서 해결하는 것
-     1) 여정 지도가 PC 와 다르게 보이던 문제
-        카드 폭·글자 크기는 배율이 낮아질수록 커지도록 보정돼 있다(--zoom).
-        화면이 좁으면 배율이 낮게 잡히므로 카드가 넓어지고 줄바꿈·겹침이
-        달라져 "다른 지도"처럼 보였다. 모바일에서는 이 보정을 끄고 배율 100%
-        기준 크기로 고정한다 — PC 화면을 그대로 축소한 모습이 된다.
-     2) 확대/축소가 안 되던 문제
-        휠 이벤트만 있어서 손가락으로는 배율을 바꿀 수 없었다. 두 손가락
-        오므리기/벌리기를 직접 처리한다.
-     3) 실수로 노드가 끌려 옮겨지던 문제
-        한 손가락은 기본이 화면 밀기다. 탭하면 선택, 카드를 옮기려면 0.45초
-        길게 누른 뒤 끈다(편집 권한이 있을 때만). 고치는 것은 카드의 `설정` 버튼.
+   태블릿·터치 노트북처럼 화면은 넓은데 마우스가 없는 기기는 그대로 쓴다.
+   다만 휠 이벤트만으로는 배율을 바꿀 수 없고, 스치듯 밀다 카드가 딸려 옮겨지므로
+   손가락 조작을 따로 처리한다 — 한 손가락은 화면 밀기(탭은 선택), 두 손가락은
+   확대/축소, 카드를 옮기려면 0.45초 길게 누른 뒤 끈다.
    ======================================================================== */
 const MOBILE_MAX = 860;
-let mobileOn = null;
 
+/* 안내 화면이 뜨는 폭 — 여기서는 본 화면이 감춰져 있다(레이아웃 계산을 건너뛴다) */
 function isMobileLayout() { return innerWidth <= MOBILE_MAX; }
-/* 지도 조작을 손가락 기준으로 바꿀지 — 좁은 화면이거나 마우스가 없는 기기 */
+/* 지도 조작을 손가락 기준으로 바꿀지 — 화면은 넓지만 마우스가 없는 기기 */
 function isTouchFlow() {
-  return isMobileLayout() || (matchMedia("(pointer: coarse)").matches && innerWidth <= 1180);
+  return matchMedia("(pointer: coarse)").matches && innerWidth <= 1180;
 }
-/* 카드 크기 보정에 쓸 배율. 모바일에서는 1로 고정해 지도 모습을 PC 와 맞춘다. */
-function zoomVarFor(z) { return isMobileLayout() ? 1 : z; }
+/* 05-flow.js·04-core.js 가 부르는 자리 — 지금은 PC 값을 그대로 쓴다 */
+function zoomVarFor(z) { return z; }
+function viewForSave(b) { return b.view; }
 
-/* ---------------- 레이아웃 전환 ---------------- */
-const MPANES = [
-  { k: "camp", ico: "mega", name: "캠페인" },
-  { k: "stage", ico: "layers", name: "화면" },
-  { k: "tag", ico: "tag", name: "태깅" }
-];
-let mPane = "camp";
-
-function renderMobileTabs() {
-  const bar = $("#mTabs");
-  if (!bar) return;
-  bar.innerHTML = MPANES.map(p =>
-    '<button class="btn sm' + (mPane === p.k ? " on" : "") + '" data-mpane="' + p.k + '">' +
-      ico(p.ico, "xs") + p.name + "</button>").join("");
-  $("#deck").dataset.mpane = mPane;
-}
-function setMobilePane(k) {
-  mPane = k;
-  renderMobileTabs();
-  /* 숨어 있던 영역이 나타나면 크기를 다시 재야 스테이지 배율이 맞는다 */
-  if (k === "stage" && !stageZoom) renderStage();
-}
-/* ---------------- 화면 위치(배율·이동) ----------------
-   PC 에서 맞춰 둔 화면 위치를 폰 화면에 그대로 쓰면 지도가 화면 밖으로 밀려나
-   빈 캔버스만 보인다. 모바일에서는 폰 화면에 맞게 다시 잡되, 문서에 저장되는
-   값은 PC 것을 그대로 지켜 준다 — 폰으로 열었다 저장해도 PC 배치가 안 바뀐다. */
-const deskViews = {};
-let mFittedBoard = null;
-
-function keepDeskView() {
-  const b = B();
-  if (!deskViews[b.id]) deskViews[b.id] = Object.assign({}, b.view);
-}
-function restoreDeskViews() {
-  state.boards.forEach(b => {
-    if (deskViews[b.id]) { b.view = deskViews[b.id]; delete deskViews[b.id]; }
-  });
-}
-/* 저장할 때 쓸 화면 위치 — 모바일에서 맞춘 값 대신 PC 값을 돌려준다 */
-function viewForSave(b) { return deskViews[b.id] || b.view; }
-
-/* 지도를 다시 그린 뒤마다 부른다. 보드가 바뀌었으면 폰 화면에 맞춰 다시 잡는다. */
-function mobileAfterRender() {
-  if (!isMobileLayout()) { mFittedBoard = null; return; }
-  const b = B();
-  /* 보드 id 만 보면, 서버에서 문서를 받아 와 내용이 통째로 바뀌어도 같은 판으로
-     보여 다시 맞추지 않는다. 노드 수·첫/끝 노드까지 함께 본다. */
-  const key = b.id + "|" + b.nodes.length + "|" + ((b.nodes[0] || {}).id || "") +
-    "|" + ((b.nodes[b.nodes.length - 1] || {}).id || "");
-  if (mFittedBoard === key) return;
-  mFittedBoard = key;
-  keepDeskView();
-  requestAnimationFrame(() => { if (isMobileLayout()) { fitFlow(); applyTransform(); } });
-}
-
-/* 화면 크기가 바뀔 때마다 모바일 여부를 다시 판단한다 */
-function syncMobileLayout() {
-  const on = isMobileLayout();
-  document.body.classList.toggle("mobile", on);
-  const bar = $("#mTabs");
-  if (bar) bar.style.display = on ? "" : "none";
-  if (on) $("#deck").dataset.mpane = mPane; else delete $("#deck").dataset.mpane;
-  if (mobileOn === on) return;
-  mobileOn = on;
-  if (!on) { restoreDeskViews(); mFittedBoard = null; }   // PC 로 돌아가면 원래 화면 위치로
-  /* 보정 배율이 달라지므로 지도를 다시 그린다 */
-  zoomVar = null;
-  applyTransform();
-  renderFlow();
-  mobileAfterRender();
-}
 function initMobile() {
-  const deck = $("#deck");
-  if (!deck || $("#mTabs")) return;
-  const bar = document.createElement("div");
-  bar.className = "mtabs";
-  bar.id = "mTabs";
-  deck.parentNode.insertBefore(bar, deck);
-  bar.addEventListener("click", e => {
-    const b = e.target.closest("[data-mpane]");
-    if (b) setMobilePane(b.dataset.mpane);
-  });
-  renderMobileTabs();
-  syncMobileLayout();
-  addEventListener("resize", syncMobileLayout);
-  addEventListener("orientationchange", () => setTimeout(syncMobileLayout, 120));
+  const url = $("#pcGateUrl");
+  if (url) url.textContent = location.host + location.pathname;
 }
 
 /* ---------------- 터치 제스처 ----------------
@@ -7025,8 +6836,8 @@ function initAuth() {
    ======================================================================== */
 function applySizes() {
   const u = state.ui;
-  /* 모바일에서는 영역 크기를 CSS 가 정한다. 여기서 문서의 값을 좁은 화면에 맞춰
-     줄여 버리면, 폰으로 열었다 저장한 순간 PC 에서 맞춰 둔 배치가 사라진다. */
+  /* 좁은 화면에서는 본 화면 대신 "PC로 접속" 안내만 보인다(parts/17-mobile.html).
+     보이지도 않는 레이아웃을 좁은 화면 기준으로 줄여 문서에 써 넣지 않는다. */
   if (typeof isMobileLayout === "function" && isMobileLayout()) return;
   u.flowH = clamp(u.flowH, 130, Math.max(180, innerHeight - 260));
   u.leftW = clamp(u.leftW, 190, 520);
@@ -7282,7 +7093,6 @@ function renderAll() {
   if (!B().nodes.some(n => n.id === sel.node)) sel.node = (B().nodes[0] || {}).id || null;
   renderStage(); renderPanels(); invalidateViews();
   seedHistoryForAllBoards();
-  mobileAfterRender();          /* 모바일이면 폰 화면에 맞게 지도 위치를 다시 잡는다 */
 }
 
 async function boot() {

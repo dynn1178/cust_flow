@@ -1,120 +1,30 @@
-
 /* ========================================================================
-   모바일 전용 동작 — 레이아웃 전환 · 터치 제스처
+   좁은 화면 안내 · 터치 제스처
 
-   짝이 되는 스타일은 parts/17-mobile.html 에 모여 있다. 모바일에서 뭔가
-   달라져야 하면 두 파일만 보면 된다.
+   이 도구는 넓은 화면 전용이다. 폰 크기(≤860px)에서는 본 화면 대신 안내만
+   보여 준다 — 화면을 감추는 일은 CSS 가 하고(parts/17-mobile.html), 여기서는
+   안내에 지금 주소를 채워 PC 에서 열 수 있게만 해 준다.
 
-   여기서 해결하는 것
-     1) 여정 지도가 PC 와 다르게 보이던 문제
-        카드 폭·글자 크기는 배율이 낮아질수록 커지도록 보정돼 있다(--zoom).
-        화면이 좁으면 배율이 낮게 잡히므로 카드가 넓어지고 줄바꿈·겹침이
-        달라져 "다른 지도"처럼 보였다. 모바일에서는 이 보정을 끄고 배율 100%
-        기준 크기로 고정한다 — PC 화면을 그대로 축소한 모습이 된다.
-     2) 확대/축소가 안 되던 문제
-        휠 이벤트만 있어서 손가락으로는 배율을 바꿀 수 없었다. 두 손가락
-        오므리기/벌리기를 직접 처리한다.
-     3) 실수로 노드가 끌려 옮겨지던 문제
-        한 손가락은 기본이 화면 밀기다. 탭하면 선택, 카드를 옮기려면 0.45초
-        길게 누른 뒤 끈다(편집 권한이 있을 때만). 고치는 것은 카드의 `설정` 버튼.
+   태블릿·터치 노트북처럼 화면은 넓은데 마우스가 없는 기기는 그대로 쓴다.
+   다만 휠 이벤트만으로는 배율을 바꿀 수 없고, 스치듯 밀다 카드가 딸려 옮겨지므로
+   손가락 조작을 따로 처리한다 — 한 손가락은 화면 밀기(탭은 선택), 두 손가락은
+   확대/축소, 카드를 옮기려면 0.45초 길게 누른 뒤 끈다.
    ======================================================================== */
 const MOBILE_MAX = 860;
-let mobileOn = null;
 
+/* 안내 화면이 뜨는 폭 — 여기서는 본 화면이 감춰져 있다(레이아웃 계산을 건너뛴다) */
 function isMobileLayout() { return innerWidth <= MOBILE_MAX; }
-/* 지도 조작을 손가락 기준으로 바꿀지 — 좁은 화면이거나 마우스가 없는 기기 */
+/* 지도 조작을 손가락 기준으로 바꿀지 — 화면은 넓지만 마우스가 없는 기기 */
 function isTouchFlow() {
-  return isMobileLayout() || (matchMedia("(pointer: coarse)").matches && innerWidth <= 1180);
+  return matchMedia("(pointer: coarse)").matches && innerWidth <= 1180;
 }
-/* 카드 크기 보정에 쓸 배율. 모바일에서는 1로 고정해 지도 모습을 PC 와 맞춘다. */
-function zoomVarFor(z) { return isMobileLayout() ? 1 : z; }
+/* 05-flow.js·04-core.js 가 부르는 자리 — 지금은 PC 값을 그대로 쓴다 */
+function zoomVarFor(z) { return z; }
+function viewForSave(b) { return b.view; }
 
-/* ---------------- 레이아웃 전환 ---------------- */
-const MPANES = [
-  { k: "camp", ico: "mega", name: "캠페인" },
-  { k: "stage", ico: "layers", name: "화면" },
-  { k: "tag", ico: "tag", name: "태깅" }
-];
-let mPane = "camp";
-
-function renderMobileTabs() {
-  const bar = $("#mTabs");
-  if (!bar) return;
-  bar.innerHTML = MPANES.map(p =>
-    '<button class="btn sm' + (mPane === p.k ? " on" : "") + '" data-mpane="' + p.k + '">' +
-      ico(p.ico, "xs") + p.name + "</button>").join("");
-  $("#deck").dataset.mpane = mPane;
-}
-function setMobilePane(k) {
-  mPane = k;
-  renderMobileTabs();
-  /* 숨어 있던 영역이 나타나면 크기를 다시 재야 스테이지 배율이 맞는다 */
-  if (k === "stage" && !stageZoom) renderStage();
-}
-/* ---------------- 화면 위치(배율·이동) ----------------
-   PC 에서 맞춰 둔 화면 위치를 폰 화면에 그대로 쓰면 지도가 화면 밖으로 밀려나
-   빈 캔버스만 보인다. 모바일에서는 폰 화면에 맞게 다시 잡되, 문서에 저장되는
-   값은 PC 것을 그대로 지켜 준다 — 폰으로 열었다 저장해도 PC 배치가 안 바뀐다. */
-const deskViews = {};
-let mFittedBoard = null;
-
-function keepDeskView() {
-  const b = B();
-  if (!deskViews[b.id]) deskViews[b.id] = Object.assign({}, b.view);
-}
-function restoreDeskViews() {
-  state.boards.forEach(b => {
-    if (deskViews[b.id]) { b.view = deskViews[b.id]; delete deskViews[b.id]; }
-  });
-}
-/* 저장할 때 쓸 화면 위치 — 모바일에서 맞춘 값 대신 PC 값을 돌려준다 */
-function viewForSave(b) { return deskViews[b.id] || b.view; }
-
-/* 지도를 다시 그린 뒤마다 부른다. 보드가 바뀌었으면 폰 화면에 맞춰 다시 잡는다. */
-function mobileAfterRender() {
-  if (!isMobileLayout()) { mFittedBoard = null; return; }
-  const b = B();
-  /* 보드 id 만 보면, 서버에서 문서를 받아 와 내용이 통째로 바뀌어도 같은 판으로
-     보여 다시 맞추지 않는다. 노드 수·첫/끝 노드까지 함께 본다. */
-  const key = b.id + "|" + b.nodes.length + "|" + ((b.nodes[0] || {}).id || "") +
-    "|" + ((b.nodes[b.nodes.length - 1] || {}).id || "");
-  if (mFittedBoard === key) return;
-  mFittedBoard = key;
-  keepDeskView();
-  requestAnimationFrame(() => { if (isMobileLayout()) { fitFlow(); applyTransform(); } });
-}
-
-/* 화면 크기가 바뀔 때마다 모바일 여부를 다시 판단한다 */
-function syncMobileLayout() {
-  const on = isMobileLayout();
-  document.body.classList.toggle("mobile", on);
-  const bar = $("#mTabs");
-  if (bar) bar.style.display = on ? "" : "none";
-  if (on) $("#deck").dataset.mpane = mPane; else delete $("#deck").dataset.mpane;
-  if (mobileOn === on) return;
-  mobileOn = on;
-  if (!on) { restoreDeskViews(); mFittedBoard = null; }   // PC 로 돌아가면 원래 화면 위치로
-  /* 보정 배율이 달라지므로 지도를 다시 그린다 */
-  zoomVar = null;
-  applyTransform();
-  renderFlow();
-  mobileAfterRender();
-}
 function initMobile() {
-  const deck = $("#deck");
-  if (!deck || $("#mTabs")) return;
-  const bar = document.createElement("div");
-  bar.className = "mtabs";
-  bar.id = "mTabs";
-  deck.parentNode.insertBefore(bar, deck);
-  bar.addEventListener("click", e => {
-    const b = e.target.closest("[data-mpane]");
-    if (b) setMobilePane(b.dataset.mpane);
-  });
-  renderMobileTabs();
-  syncMobileLayout();
-  addEventListener("resize", syncMobileLayout);
-  addEventListener("orientationchange", () => setTimeout(syncMobileLayout, 120));
+  const url = $("#pcGateUrl");
+  if (url) url.textContent = location.host + location.pathname;
 }
 
 /* ---------------- 터치 제스처 ----------------

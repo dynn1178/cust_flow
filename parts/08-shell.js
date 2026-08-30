@@ -4,8 +4,8 @@
    ======================================================================== */
 function applySizes() {
   const u = state.ui;
-  /* 모바일에서는 영역 크기를 CSS 가 정한다. 여기서 문서의 값을 좁은 화면에 맞춰
-     줄여 버리면, 폰으로 열었다 저장한 순간 PC 에서 맞춰 둔 배치가 사라진다. */
+  /* 좁은 화면에서는 본 화면 대신 "PC로 접속" 안내만 보인다(parts/17-mobile.html).
+     보이지도 않는 레이아웃을 좁은 화면 기준으로 줄여 문서에 써 넣지 않는다. */
   if (typeof isMobileLayout === "function" && isMobileLayout()) return;
   u.flowH = clamp(u.flowH, 130, Math.max(180, innerHeight - 260));
   u.leftW = clamp(u.leftW, 190, 520);
@@ -261,7 +261,6 @@ function renderAll() {
   if (!B().nodes.some(n => n.id === sel.node)) sel.node = (B().nodes[0] || {}).id || null;
   renderStage(); renderPanels(); invalidateViews();
   seedHistoryForAllBoards();
-  mobileAfterRender();          /* 모바일이면 폰 화면에 맞게 지도 위치를 다시 잡는다 */
 }
 
 async function boot() {
