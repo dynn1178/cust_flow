@@ -178,6 +178,7 @@ function renderStageFoot(n, L) {
   const d = docSize(n);
   let html = '<span class="mono" style="font-size:11px">' + d.w + " × " + d.h + "</span>";
   html += '<span class="tool-sep"></span><span>레이어 ' + (n.layers || []).length + "개</span>";
+  if ((n.layers || []).length) html += '<button class="btn sm" data-lact="list">' + ico("layers", "xs") + "레이어 목록</button>";
   if (L) {
     const camp = L.campId ? campView(n.camps.find(c => c.id === L.campId)) : null;
     html += '<span class="tool-sep"></span><span style="color:var(--ink-2)">선택: ' + LKIND(L) + "</span>";
@@ -187,12 +188,37 @@ function renderStageFoot(n, L) {
       '<button class="btn sm" data-lact="front">앞으로</button><button class="btn sm" data-lact="back">뒤로</button>' +
       '<button class="btn sm danger" data-lact="del">' + ico("trash", "xs") + "삭제</button>";
   } else {
-    html += '<div class="spacer"></div><span>도형을 그린 뒤 왼쪽 패널에서 캠페인을 연결하세요</span>';
+    html += '<div class="spacer"></div>';
   }
   $("#stageFoot").innerHTML = html;
   renderStageTools();
 }
 function LKIND(l) { return { rect: "사각형", ellipse: "원", arrow: "화살표", text: "텍스트", pen: "펜", image: "이미지" }[l.kind] || l.kind; }
+const LKIND_ICO = { rect: "square", ellipse: "circle", arrow: "arrow", text: "text", pen: "pen", image: "image" };
+/* 레이어 목록 팝업 — 항목을 누르면 그 레이어를 고르고, 스테이지를 그 위치로 스크롤해 보여준다 */
+function openLayerListMenu(n, anchorEl) {
+  if (!n.layers.length) return;
+  const list = n.layers.map((l, i) => {
+    const label = l.kind === "text" ? esc((l.text || "텍스트").slice(0, 22)) : LKIND(l);
+    const camp = l.campId ? campView(n.camps.find(c => c.id === l.campId)) : null;
+    return '<button class="mi' + (l.id === sel.layer ? " on" : "") + '" data-go="' + l.id + '">' +
+      ico(LKIND_ICO[l.kind] || "square", "xs") + (i + 1) + ". " + label +
+      (camp ? '<span class="cnt">' + esc(camp.name) + "</span>" : "") + "</button>";
+  }).join("");
+  openMenu(list, anchorEl, it => { if (it.dataset.go) jumpToLayer(it.dataset.go); });
+}
+function jumpToLayer(id) {
+  const n = curNode(); if (!n) return;
+  const l = n.layers.find(x => x.id === id); if (!l) return;
+  sel.layer = id;
+  renderLayers(); renderStageFoot(n, l); renderPanels();
+  const b = bbox(l), ext = docExtent(n), s = stageScale(n), box = $("#stageScroll");
+  box.scrollTo({
+    left: (b.x + b.w / 2 - ext.x1) * s - box.clientWidth / 2,
+    top: (b.y + b.h / 2 - ext.y1) * s - box.clientHeight / 2,
+    behavior: "smooth"
+  });
+}
 
 const STROKES = { 0: "없음", 2: "얇게", 3: "보통", 6: "굵게" };
 /* 색 스와치가 두 가지 대상을 가질 수 있는 레이어 — 도형은 선/채우기, 텍스트는 글자색/테두리색.
@@ -423,7 +449,9 @@ function initStage() {
 
   $("#stageFoot").addEventListener("click", e => {
     const b = e.target.closest("[data-lact]"); if (!b) return;
-    const n = curNode(), i = n.layers.findIndex(x => x.id === sel.layer);
+    const n = curNode(); if (!n) return;
+    if (b.dataset.lact === "list") return openLayerListMenu(n, b);
+    const i = n.layers.findIndex(x => x.id === sel.layer);
     if (i < 0) return;
     const l = n.layers[i];
     if (b.dataset.lact === "edittext") return editTextLayer(n, l);

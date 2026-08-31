@@ -54,7 +54,7 @@ function edgeGeom(e) {
   const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
   const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT);
   const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT);
-  return { p1: sidePoint(ra, s1), n1: SIDE_N[s1], p2: sidePoint(rb, s2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb };
+  return { p1: sidePoint(ra, s1), n1: SIDE_N[s1], p2: sidePoint(rb, s2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2 };
 }
 function smoothPath(pts) {
   if (pts.length < 2) return "";
@@ -101,9 +101,17 @@ function orthoPoints(g) {
 function pathFor(e) {
   const g = edgeGeom(e);
   if (!g) return null;
-  if (g.self) {                                     // 같은 노드로 돌아오는 연결
-    const r = g.ra, x = r.x + r.w, y = r.y + r.h * 0.3, y2 = r.y + r.h * 0.72;
-    return "M " + x + " " + y + " C " + (x + 86) + " " + (y - 38) + " " + (x + 86) + " " + (y2 + 38) + " " + x + " " + y2;
+  if (g.self) {                                     // 같은 노드로 돌아오는 연결 — 고리가 선택한 연결점(위/아래/좌/우) 쪽으로 튀어나오게 그린다
+    const r = g.ra, bulge = 86, flare = 38;
+    const tangent = side => (side === "n" || side === "s") ? { x: 1, y: 0 } : { x: 0, y: 1 };
+    const spread = side => ((side === "n" || side === "s") ? r.w : r.h) * 0.42;
+    const t1 = tangent(g.s1), t2 = tangent(g.s2), n1 = SIDE_N[g.s1], n2 = SIDE_N[g.s2];
+    const mid1 = sidePoint(r, g.s1), mid2 = sidePoint(r, g.s2);
+    const p1 = { x: mid1.x - t1.x * spread(g.s1) / 2, y: mid1.y - t1.y * spread(g.s1) / 2 };
+    const p2 = { x: mid2.x + t2.x * spread(g.s2) / 2, y: mid2.y + t2.y * spread(g.s2) / 2 };
+    const c1 = { x: p1.x + n1.x * bulge - t1.x * flare, y: p1.y + n1.y * bulge - t1.y * flare };
+    const c2 = { x: p2.x + n2.x * bulge + t2.x * flare, y: p2.y + n2.y * bulge + t2.y * flare };
+    return "M " + p1.x + " " + p1.y + " C " + c1.x + " " + c1.y + " " + c2.x + " " + c2.y + " " + p2.x + " " + p2.y;
   }
   if (e.route === "line") return "M " + [g.p1].concat(g.wps, [g.p2]).map(p => p.x + " " + p.y).join(" L ");
   if (e.route === "ortho") return roundedPath(orthoPoints(g), 12);
@@ -185,18 +193,32 @@ function moveEdgesOf(nodeId) {
   if (sel.edge) drawEdgeHandles();
 }
 
-/* 선택된 연결선의 경로 편집 손잡이 */
+/* 선택된 연결선의 경로 편집 손잡이 — 점이 하나도 없으면(=아직 자동 경로) 실제
+   그려진 곡선의 중점에 노란 점을 놓아 "위·아래로 끌면 그 높이로 고정" 임을
+   보여준다. 점을 만들고 나면(=높이를 고정하면) 같은 점을 계속 노란색으로 둔다. */
 function drawEdgeHandles() {
   const box = $("#edgeHandles");
   const e = sel.edge ? edgeById(sel.edge) : null;
   if (!e || e.from === e.to || !canEdit()) { if (box.innerHTML) box.innerHTML = ""; return; }
   const g = edgeGeom(e); if (!g) { box.innerHTML = ""; return; }
   const pts = [g.p1].concat(g.wps, [g.p2]);
+  const isHeightOnly = g.wps.length <= 1;                 // 점이 0개(자동) 또는 1개(높이 고정)일 때만 "높이 점"으로 다룬다
   let h = "";
-  g.wps.forEach((p, i) => { h += '<circle class="wp" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="6"></circle>'; });
+  g.wps.forEach((p, i) => {
+    h += '<circle class="wp' + (isHeightOnly ? " hgt" : "") + '" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (isHeightOnly ? 7 : 6) + '"><title>드래그해서 높이 조절</title></circle>';
+  });
   for (let i = 0; i < pts.length - 1; i++) {
-    const m = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
-    h += '<circle class="wpadd" data-add="' + i + '" cx="' + m.x + '" cy="' + m.y + '" r="5"></circle>';
+    let m;
+    const heightAdd = pts.length === 2;                   // 아직 점이 없는 구간 — 실제 곡선 위의 중점을 쓴다(직선 중점이 아니라)
+    if (heightAdd) {
+      const rec = EDGE_EL[e.id], L = rec && rec.wire && rec.wire.getTotalLength();
+      m = L ? rec.wire.getPointAtLength(L / 2) : { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
+    } else {
+      m = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
+    }
+    h += '<circle class="wpadd' + (heightAdd ? " hgt" : "") + '" data-add="' + i + '"' +
+      (heightAdd ? ' data-hgt="1" data-lockx="' + m.x + '"' : "") +
+      ' cx="' + m.x + '" cy="' + m.y + '" r="' + (heightAdd ? 7 : 5) + '"><title>드래그해서 높이 고정</title></circle>';
   }
   box.innerHTML = h;
 }
@@ -523,11 +545,19 @@ function initFlow() {
     if (editable && (wp || add) && sel.edge) {           /* 경로 꺾임점 드래그 · 추가 */
       e.preventDefault(); e.stopPropagation();
       const ed = edgeById(sel.edge);
-      let idx;
-      if (wp) idx = +wp.dataset.wp;
-      else { idx = +add.dataset.add; ed.points.splice(idx, 0, toWorld(e, r)); }
+      let idx, lockX = null;
+      /* 아직 손대지 않은 기본(자동) 경로의 노란 점 — 좌우로는 움직이지 않고
+         높이(위·아래)만 고정한다. 점이 이미 하나 있으면 그 점도 계속 같은
+         규칙을 따른다(점 하나짜리 경로 = "높이 고정" 용도로 취급). */
+      if (wp) { idx = +wp.dataset.wp; if (ed.points.length === 1) lockX = ed.points[idx].x; }
+      else {
+        idx = +add.dataset.add;
+        if (add.dataset.hgt) lockX = +add.dataset.lockx;
+        const init = toWorld(e, r);
+        ed.points.splice(idx, 0, lockX != null ? { x: lockX, y: Math.round(init.y) } : init);
+      }
       const paint = onFrame(p => {
-        ed.points[idx] = { x: Math.round(p.x), y: Math.round(p.y) };
+        ed.points[idx] = { x: lockX != null ? lockX : Math.round(p.x), y: Math.round(p.y) };
         geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
       });
       const mv = ev => paint(toWorld(ev, r));

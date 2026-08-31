@@ -190,6 +190,11 @@ select.field{cursor:pointer}
 #edgeHandles .wp{fill:var(--bg-3); stroke:var(--accent); stroke-width:2}
 #edgeHandles .wpadd{fill:var(--accent); opacity:.32; stroke:var(--bg-3); stroke-width:1.5}
 #edgeHandles .wpadd:hover{opacity:.95}
+/* 높이 고정 점 — 건드리기 전엔 옅은 노란 힌트, 위·아래로 끌어 높이를 고정하면
+   진한 노란 점으로 바뀐다(자동/고정 상태를 색으로 바로 구분) */
+#edgeHandles .wpadd.hgt{fill:#f2c94c; opacity:.5; stroke:#8a6d1a; stroke-width:1.5; cursor:ns-resize}
+#edgeHandles .wpadd.hgt:hover{opacity:.95}
+#edgeHandles .wp.hgt{fill:#f2c94c; stroke:#8a6d1a; stroke-width:2; cursor:ns-resize}
 #guideG .guide{stroke:var(--accent); stroke-width:1; stroke-dasharray:4 4; opacity:.85}
 /* 끌고 있는 동안에는 그림자·전환 효과를 끈다 — 카드마다 그림자를 다시
    그리느라 이동이 끊기지 않도록. 그림자는 .node가 아니라 .node-frame에 있다 */

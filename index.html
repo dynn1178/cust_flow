@@ -198,6 +198,11 @@ select.field{cursor:pointer}
 #edgeHandles .wp{fill:var(--bg-3); stroke:var(--accent); stroke-width:2}
 #edgeHandles .wpadd{fill:var(--accent); opacity:.32; stroke:var(--bg-3); stroke-width:1.5}
 #edgeHandles .wpadd:hover{opacity:.95}
+/* 높이 고정 점 — 건드리기 전엔 옅은 노란 힌트, 위·아래로 끌어 높이를 고정하면
+   진한 노란 점으로 바뀐다(자동/고정 상태를 색으로 바로 구분) */
+#edgeHandles .wpadd.hgt{fill:#f2c94c; opacity:.5; stroke:#8a6d1a; stroke-width:1.5; cursor:ns-resize}
+#edgeHandles .wpadd.hgt:hover{opacity:.95}
+#edgeHandles .wp.hgt{fill:#f2c94c; stroke:#8a6d1a; stroke-width:2; cursor:ns-resize}
 #guideG .guide{stroke:var(--accent); stroke-width:1; stroke-dasharray:4 4; opacity:.85}
 /* 끌고 있는 동안에는 그림자·전환 효과를 끈다 — 카드마다 그림자를 다시
    그리느라 이동이 끊기지 않도록. 그림자는 .node가 아니라 .node-frame에 있다 */
@@ -1764,7 +1769,7 @@ function edgeGeom(e) {
   const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
   const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT);
   const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT);
-  return { p1: sidePoint(ra, s1), n1: SIDE_N[s1], p2: sidePoint(rb, s2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb };
+  return { p1: sidePoint(ra, s1), n1: SIDE_N[s1], p2: sidePoint(rb, s2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2 };
 }
 function smoothPath(pts) {
   if (pts.length < 2) return "";
@@ -1811,9 +1816,17 @@ function orthoPoints(g) {
 function pathFor(e) {
   const g = edgeGeom(e);
   if (!g) return null;
-  if (g.self) {                                     // 같은 노드로 돌아오는 연결
-    const r = g.ra, x = r.x + r.w, y = r.y + r.h * 0.3, y2 = r.y + r.h * 0.72;
-    return "M " + x + " " + y + " C " + (x + 86) + " " + (y - 38) + " " + (x + 86) + " " + (y2 + 38) + " " + x + " " + y2;
+  if (g.self) {                                     // 같은 노드로 돌아오는 연결 — 고리가 선택한 연결점(위/아래/좌/우) 쪽으로 튀어나오게 그린다
+    const r = g.ra, bulge = 86, flare = 38;
+    const tangent = side => (side === "n" || side === "s") ? { x: 1, y: 0 } : { x: 0, y: 1 };
+    const spread = side => ((side === "n" || side === "s") ? r.w : r.h) * 0.42;
+    const t1 = tangent(g.s1), t2 = tangent(g.s2), n1 = SIDE_N[g.s1], n2 = SIDE_N[g.s2];
+    const mid1 = sidePoint(r, g.s1), mid2 = sidePoint(r, g.s2);
+    const p1 = { x: mid1.x - t1.x * spread(g.s1) / 2, y: mid1.y - t1.y * spread(g.s1) / 2 };
+    const p2 = { x: mid2.x + t2.x * spread(g.s2) / 2, y: mid2.y + t2.y * spread(g.s2) / 2 };
+    const c1 = { x: p1.x + n1.x * bulge - t1.x * flare, y: p1.y + n1.y * bulge - t1.y * flare };
+    const c2 = { x: p2.x + n2.x * bulge + t2.x * flare, y: p2.y + n2.y * bulge + t2.y * flare };
+    return "M " + p1.x + " " + p1.y + " C " + c1.x + " " + c1.y + " " + c2.x + " " + c2.y + " " + p2.x + " " + p2.y;
   }
   if (e.route === "line") return "M " + [g.p1].concat(g.wps, [g.p2]).map(p => p.x + " " + p.y).join(" L ");
   if (e.route === "ortho") return roundedPath(orthoPoints(g), 12);
@@ -1895,18 +1908,32 @@ function moveEdgesOf(nodeId) {
   if (sel.edge) drawEdgeHandles();
 }
 
-/* 선택된 연결선의 경로 편집 손잡이 */
+/* 선택된 연결선의 경로 편집 손잡이 — 점이 하나도 없으면(=아직 자동 경로) 실제
+   그려진 곡선의 중점에 노란 점을 놓아 "위·아래로 끌면 그 높이로 고정" 임을
+   보여준다. 점을 만들고 나면(=높이를 고정하면) 같은 점을 계속 노란색으로 둔다. */
 function drawEdgeHandles() {
   const box = $("#edgeHandles");
   const e = sel.edge ? edgeById(sel.edge) : null;
   if (!e || e.from === e.to || !canEdit()) { if (box.innerHTML) box.innerHTML = ""; return; }
   const g = edgeGeom(e); if (!g) { box.innerHTML = ""; return; }
   const pts = [g.p1].concat(g.wps, [g.p2]);
+  const isHeightOnly = g.wps.length <= 1;                 // 점이 0개(자동) 또는 1개(높이 고정)일 때만 "높이 점"으로 다룬다
   let h = "";
-  g.wps.forEach((p, i) => { h += '<circle class="wp" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="6"></circle>'; });
+  g.wps.forEach((p, i) => {
+    h += '<circle class="wp' + (isHeightOnly ? " hgt" : "") + '" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (isHeightOnly ? 7 : 6) + '"><title>드래그해서 높이 조절</title></circle>';
+  });
   for (let i = 0; i < pts.length - 1; i++) {
-    const m = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
-    h += '<circle class="wpadd" data-add="' + i + '" cx="' + m.x + '" cy="' + m.y + '" r="5"></circle>';
+    let m;
+    const heightAdd = pts.length === 2;                   // 아직 점이 없는 구간 — 실제 곡선 위의 중점을 쓴다(직선 중점이 아니라)
+    if (heightAdd) {
+      const rec = EDGE_EL[e.id], L = rec && rec.wire && rec.wire.getTotalLength();
+      m = L ? rec.wire.getPointAtLength(L / 2) : { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
+    } else {
+      m = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
+    }
+    h += '<circle class="wpadd' + (heightAdd ? " hgt" : "") + '" data-add="' + i + '"' +
+      (heightAdd ? ' data-hgt="1" data-lockx="' + m.x + '"' : "") +
+      ' cx="' + m.x + '" cy="' + m.y + '" r="' + (heightAdd ? 7 : 5) + '"><title>드래그해서 높이 고정</title></circle>';
   }
   box.innerHTML = h;
 }
@@ -2233,11 +2260,19 @@ function initFlow() {
     if (editable && (wp || add) && sel.edge) {           /* 경로 꺾임점 드래그 · 추가 */
       e.preventDefault(); e.stopPropagation();
       const ed = edgeById(sel.edge);
-      let idx;
-      if (wp) idx = +wp.dataset.wp;
-      else { idx = +add.dataset.add; ed.points.splice(idx, 0, toWorld(e, r)); }
+      let idx, lockX = null;
+      /* 아직 손대지 않은 기본(자동) 경로의 노란 점 — 좌우로는 움직이지 않고
+         높이(위·아래)만 고정한다. 점이 이미 하나 있으면 그 점도 계속 같은
+         규칙을 따른다(점 하나짜리 경로 = "높이 고정" 용도로 취급). */
+      if (wp) { idx = +wp.dataset.wp; if (ed.points.length === 1) lockX = ed.points[idx].x; }
+      else {
+        idx = +add.dataset.add;
+        if (add.dataset.hgt) lockX = +add.dataset.lockx;
+        const init = toWorld(e, r);
+        ed.points.splice(idx, 0, lockX != null ? { x: lockX, y: Math.round(init.y) } : init);
+      }
       const paint = onFrame(p => {
-        ed.points[idx] = { x: Math.round(p.x), y: Math.round(p.y) };
+        ed.points[idx] = { x: lockX != null ? lockX : Math.round(p.x), y: Math.round(p.y) };
         geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
       });
       const mv = ev => paint(toWorld(ev, r));
@@ -2752,6 +2787,7 @@ function renderStageFoot(n, L) {
   const d = docSize(n);
   let html = '<span class="mono" style="font-size:11px">' + d.w + " × " + d.h + "</span>";
   html += '<span class="tool-sep"></span><span>레이어 ' + (n.layers || []).length + "개</span>";
+  if ((n.layers || []).length) html += '<button class="btn sm" data-lact="list">' + ico("layers", "xs") + "레이어 목록</button>";
   if (L) {
     const camp = L.campId ? campView(n.camps.find(c => c.id === L.campId)) : null;
     html += '<span class="tool-sep"></span><span style="color:var(--ink-2)">선택: ' + LKIND(L) + "</span>";
@@ -2761,12 +2797,37 @@ function renderStageFoot(n, L) {
       '<button class="btn sm" data-lact="front">앞으로</button><button class="btn sm" data-lact="back">뒤로</button>' +
       '<button class="btn sm danger" data-lact="del">' + ico("trash", "xs") + "삭제</button>";
   } else {
-    html += '<div class="spacer"></div><span>도형을 그린 뒤 왼쪽 패널에서 캠페인을 연결하세요</span>';
+    html += '<div class="spacer"></div>';
   }
   $("#stageFoot").innerHTML = html;
   renderStageTools();
 }
 function LKIND(l) { return { rect: "사각형", ellipse: "원", arrow: "화살표", text: "텍스트", pen: "펜", image: "이미지" }[l.kind] || l.kind; }
+const LKIND_ICO = { rect: "square", ellipse: "circle", arrow: "arrow", text: "text", pen: "pen", image: "image" };
+/* 레이어 목록 팝업 — 항목을 누르면 그 레이어를 고르고, 스테이지를 그 위치로 스크롤해 보여준다 */
+function openLayerListMenu(n, anchorEl) {
+  if (!n.layers.length) return;
+  const list = n.layers.map((l, i) => {
+    const label = l.kind === "text" ? esc((l.text || "텍스트").slice(0, 22)) : LKIND(l);
+    const camp = l.campId ? campView(n.camps.find(c => c.id === l.campId)) : null;
+    return '<button class="mi' + (l.id === sel.layer ? " on" : "") + '" data-go="' + l.id + '">' +
+      ico(LKIND_ICO[l.kind] || "square", "xs") + (i + 1) + ". " + label +
+      (camp ? '<span class="cnt">' + esc(camp.name) + "</span>" : "") + "</button>";
+  }).join("");
+  openMenu(list, anchorEl, it => { if (it.dataset.go) jumpToLayer(it.dataset.go); });
+}
+function jumpToLayer(id) {
+  const n = curNode(); if (!n) return;
+  const l = n.layers.find(x => x.id === id); if (!l) return;
+  sel.layer = id;
+  renderLayers(); renderStageFoot(n, l); renderPanels();
+  const b = bbox(l), ext = docExtent(n), s = stageScale(n), box = $("#stageScroll");
+  box.scrollTo({
+    left: (b.x + b.w / 2 - ext.x1) * s - box.clientWidth / 2,
+    top: (b.y + b.h / 2 - ext.y1) * s - box.clientHeight / 2,
+    behavior: "smooth"
+  });
+}
 
 const STROKES = { 0: "없음", 2: "얇게", 3: "보통", 6: "굵게" };
 /* 색 스와치가 두 가지 대상을 가질 수 있는 레이어 — 도형은 선/채우기, 텍스트는 글자색/테두리색.
@@ -2997,7 +3058,9 @@ function initStage() {
 
   $("#stageFoot").addEventListener("click", e => {
     const b = e.target.closest("[data-lact]"); if (!b) return;
-    const n = curNode(), i = n.layers.findIndex(x => x.id === sel.layer);
+    const n = curNode(); if (!n) return;
+    if (b.dataset.lact === "list") return openLayerListMenu(n, b);
+    const i = n.layers.findIndex(x => x.id === sel.layer);
     if (i < 0) return;
     const l = n.layers[i];
     if (b.dataset.lact === "edittext") return editTextLayer(n, l);
