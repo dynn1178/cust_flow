@@ -333,8 +333,6 @@ function nodeHtml(n) {
   if (n.kind === "keyword") {
     return '<div class="node-frame">' +
         '<div class="kw-pill"><span class="kw-name" title="' + esc(n.name) + '">' + esc(n.name) + "</span></div>" +
-        '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
-        '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
       "</div>" +
       (bd ? '<div class="node-badges kw-badges">' + bd + "</div>" : "") +
       (body ? '<div class="node-main">' + body + "</div>" : "");
@@ -350,17 +348,13 @@ function nodeHtml(n) {
 
   /* 제목·이미지·배지를 하나의 테두리(.node-frame)로 묶는다 — 확대·축소해도
      이 틀 전체가 한 덩어리로 같이 움직이니 안에서 글자가 넘칠 걱정이 없다.
-     태그·캠페인 목록(body)은 지금처럼 그 바깥 아래에 그대로 노출한다.
-     연결선 포트도 프레임 안에 둬서, 목록 길이와 상관없이 항상 프레임(이미지)
-     세로 중앙에서 선이 시작하도록 한다. */
+     태그·캠페인 목록(body)은 지금처럼 그 바깥 아래에 그대로 노출한다. */
   return '<div class="node-frame">' +
       '<div class="node-title"><div class="node-name" title="' + esc(n.name) + '">' + esc(n.name) + "</div>" +
       (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
       "</div>" +
       '<div class="node-pic">' + thumb + warn + "</div>" +
       (bd ? '<div class="node-badges">' + bd + "</div>" : "") +
-      '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
-      '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
     "</div>" +
     (body ? '<div class="node-main">' + body + "</div>" : "");
 }
@@ -585,7 +579,6 @@ function initFlow() {
       return;
     }
     const wp = e.target.closest("[data-wp]"), add = e.target.closest("[data-add]");
-    const port = e.target.closest("[data-port]");
     const nodeEl = e.target.closest("[data-node]");
     const edgeHit = e.target.closest("[data-edge]");
     const editable = canEdit();
@@ -622,27 +615,6 @@ function initFlow() {
       const up = () => {
         surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
         markDirty(); geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
-      };
-      surf.setPointerCapture(e.pointerId);
-      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
-      return;
-    }
-
-    if (editable && port) {                              /* 포트 드래그 → 연결 */
-      e.preventDefault(); e.stopPropagation();
-      const from = port.dataset.port, ghost = $("#ghostWire");
-      const rf = nodeRect(nodeById(from));
-      const c0 = { x: rf.x + rf.w / 2, y: rf.y + rf.h / 2 };
-      ghost.style.display = "";
-      const paint = onFrame(p => ghost.setAttribute("d", "M " + c0.x + " " + c0.y + " L " + p.x + " " + p.y));
-      const mv = ev => paint(toWorld(ev, r));
-      const up = ev => {
-        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
-        ghost.style.display = "none";
-        if (ev.type !== "pointerup") return;              /* 취소된 경우 연결을 만들지 않는다 */
-        const tgt = document.elementFromPoint(ev.clientX, ev.clientY);
-        const tn = tgt && tgt.closest("[data-node]");
-        if (tn) addEdge(from, tn.dataset.node);
       };
       surf.setPointerCapture(e.pointerId);
       surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
