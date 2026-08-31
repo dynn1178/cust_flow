@@ -229,9 +229,16 @@ function drawEdgeHandles() {
       ' cx="' + m.x + '" cy="' + m.y + '" r="' + (heightAdd ? 7 : 5) + '"><title>드래그해서 높이 고정</title></circle>';
   }
   /* 파란 점 — 노란 점이 높이(위·아래)라면 이건 좌우, 정확히는 연결점이 붙는
-     변(위·아래·좌·우) 자체를 드래그로 바꾼다. 출발·도착 양쪽에 하나씩 둔다. */
-  h += '<circle class="wp-side" data-side="1" cx="' + g.p1.x + '" cy="' + g.p1.y + '" r="7"><title>드래그해서 출발 연결점(변) 바꾸기</title></circle>';
-  h += '<circle class="wp-side" data-side="2" cx="' + g.p2.x + '" cy="' + g.p2.y + '" r="7"><title>드래그해서 도착 연결점(변) 바꾸기</title></circle>';
+     변(위·아래·좌·우) 자체를 드래그로 바꾼다. 출발·도착 양쪽에 하나씩 둔다.
+     실제 연결점(p1/p2) 바로 위에 두면 카드 테두리·선택 영역·포트 점과 겹쳐
+     누르기 어려우니, 카드 밖으로 살짝 떨어뜨려 놓고 점선으로 이어 보여준다. */
+  const sideOff = 18;
+  const hp1 = { x: g.p1.x + g.n1.x * sideOff, y: g.p1.y + g.n1.y * sideOff };
+  const hp2 = { x: g.p2.x + g.n2.x * sideOff, y: g.p2.y + g.n2.y * sideOff };
+  h += '<line class="wp-side-link" x1="' + g.p1.x + '" y1="' + g.p1.y + '" x2="' + hp1.x + '" y2="' + hp1.y + '"></line>';
+  h += '<line class="wp-side-link" x1="' + g.p2.x + '" y1="' + g.p2.y + '" x2="' + hp2.x + '" y2="' + hp2.y + '"></line>';
+  h += '<circle class="wp-side" data-side="1" cx="' + hp1.x + '" cy="' + hp1.y + '" r="7"><title>드래그해서 출발 연결점(변) 바꾸기</title></circle>';
+  h += '<circle class="wp-side" data-side="2" cx="' + hp2.x + '" cy="' + hp2.y + '" r="7"><title>드래그해서 도착 연결점(변) 바꾸기</title></circle>';
   box.innerHTML = h;
 }
 
