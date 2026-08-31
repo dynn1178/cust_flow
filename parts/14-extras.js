@@ -526,11 +526,26 @@ async function exportBoardCanvas() {
     const d = pathFor(e); if (!d) return;
     try {
       const p = new Path2D(d);
+      const color = e.hue && e.hue !== "none" ? hueOfHex(e.hue) : (dark ? "#74747c" : "#7b849f");
       ctx.save(); ctx.translate(ox, oy);
-      ctx.strokeStyle = e.hue && e.hue !== "none" ? hueOfHex(e.hue) : (dark ? "#74747c" : "#7b849f");
+      ctx.strokeStyle = color;
       ctx.lineWidth = e.width || 2;
       if (e.style === "dashed") ctx.setLineDash([(e.width || 2) * 3.2, (e.width || 2) * 2.6]);
       ctx.stroke(p);
+      ctx.setLineDash([]);
+      /* 화살촉 — 화면(SVG)에서는 geomEdge/headPath가 그리는데, 여기 캔버스
+         내보내기는 선(stroke)만 그리고 화살촉은 아예 그리지 않고 있었다
+         (PNG·PDF에서 화살표가 사라지던 원인). 임시 <path>를 만들어 실제
+         그려진 경로 위의 점을 재서(getPointAtLength) 화면과 같은 방식으로 그린다. */
+      withSvgPath(d, path => {
+        const L = path.getTotalLength(); if (!L) return;
+        const size = (7 + (e.width || 2) * 1.5) * ((HEADSZ[e.head] || HEADSZ.m).m);
+        const headAtEnd = e.kind !== "none" && !(e.kind === "arrow" && e.reverse);
+        const headAtStart = e.kind === "both" || (e.kind === "arrow" && e.reverse);
+        ctx.fillStyle = color;
+        if (headAtEnd) drawArrowHead(ctx, path, L, Math.max(0, L - 14), size);
+        if (headAtStart) drawArrowHead(ctx, path, 0, Math.min(L, 14), size);
+      });
       ctx.restore();
     } catch (err) { /* 알 수 없는 경로 문자열은 건너뛴다 */ }
   });
@@ -563,6 +578,28 @@ async function exportBoardCanvas() {
     if (n.path) { ctx.font = "10px monospace"; ctx.fillStyle = dark ? "#74747c" : "#7b849f"; ctx.fillText(n.path, x + 14, y + q.h - 12); }
   });
   return { canvas: cv, w, h };
+}
+/* 캔버스 내보내기에서 경로 위의 실제 좌표(방향)를 재려고, 화면에 보이지
+   않는 임시 SVG에 잠깐 붙였다 뗀다 — getTotalLength/getPointAtLength는
+   문서에 붙어 있어야 정확히 계산되기 때문에, fn 안에서만 쓰고 바로 뗀다. */
+function withSvgPath(d, fn) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("style", "position:absolute;width:0;height:0;overflow:hidden");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", d);
+  svg.appendChild(path);
+  document.body.appendChild(svg);
+  try { return fn(path); } finally { document.body.removeChild(svg); }
+}
+function drawArrowHead(ctx, path, at, back, size) {
+  const pe = path.getPointAtLength(at), pb = path.getPointAtLength(back);
+  const a = Math.atan2(pe.y - pb.y, pe.x - pb.x);
+  ctx.beginPath();
+  ctx.moveTo(pe.x, pe.y);
+  ctx.lineTo(pe.x - size * Math.cos(a - 0.4), pe.y - size * Math.sin(a - 0.4));
+  ctx.lineTo(pe.x - size * Math.cos(a + 0.4), pe.y - size * Math.sin(a + 0.4));
+  ctx.closePath();
+  ctx.fill();
 }
 function hexToRgba(hex, a) {
   const m = /^#([0-9a-f]{6})$/i.exec(hex || "");

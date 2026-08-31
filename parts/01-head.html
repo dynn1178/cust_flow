@@ -354,6 +354,9 @@ select.field{cursor:pointer}
 .minimap .mm-view{fill:var(--accent-soft); stroke:var(--accent); stroke-width:1.5; vector-effect:non-scaling-stroke; pointer-events:none}
 #laneLayer{position:absolute; left:0; top:0; pointer-events:none; z-index:0}
 #flowSurface.lane-drawing{cursor:crosshair}
+#flowSurface.multi-selecting .node{cursor:cell}
+.marquee{position:absolute; border:1.5px dashed var(--accent); border-radius:4px;
+  background:color-mix(in srgb,var(--accent) 10%,transparent); pointer-events:none}
 .lane{position:absolute; border-radius:10px; background:color-mix(in srgb,var(--lc) 7%,transparent);
   border:1.5px dashed color-mix(in srgb,var(--lc) 45%,transparent)}
 .lane-preview{opacity:.85; box-shadow:inset 0 0 0 2px var(--lc)}

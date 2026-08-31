@@ -7,6 +7,7 @@ const NSZ = {};                       // 노드 실제 크기 캐시
 const EDGE_EL = {};                   // 엣지 id -> DOM 참조
 let flowMode = "select";
 let linkFrom = null;
+let selMulti = [];                    // 다중 선택 모드에서 골라 둔 노드 id 목록
 let laneMode = false;                 // 구간 그리기 모드 — 캔버스 배경을 드래그해 구간을 만든다
 let autoLayoutDir = "v";              // 마지막으로 쓴 정렬 방향(메뉴에 표시용) — v: 세로 정렬, h: 가로 정렬
 let edgePopPos = null;                // 연결선 설정 창을 옮긴 위치 — 다음에 열 때도 같은 자리에 띄운다
@@ -30,6 +31,19 @@ function nodeRect(n) {
   const midY = n.y + (s && s.frameH ? s.frameH : h) / 2;
   return { x: n.x, y: n.y, w: s ? s.w : nodeW(n), h, midY };
 }
+/* 연결선 전용 "기준" 크기 — 실제 렌더 크기(nodeRect)는 확대·축소에 따라
+   카드 너비가 늘었다 줄었다 하고(가독성 보정), 태그 목록 길이에 따라 높이도
+   들쭉날쭉해서, 이걸 그대로 연결선 계산에 쓰면 배율을 바꾸거나 태그를
+   추가/삭제할 때마다 화살표가 붙는 자리·곡선 모양이 계속 흔들렸다. 연결선은
+   항상 이 고정된 기준 크기만 보고 계산해서, 레이아웃이 어떻게 바뀌든 흐름이
+   그대로 유지되게 한다. */
+const NOM_PIC_H = { s: 99, m: 129, l: 165 };
+const NOM_KW_H = { s: 34, m: 38, l: 44 };
+function nodeNominalRect(n) {
+  const w = nodeW(n);
+  const h = n.kind === "keyword" ? (NOM_KW_H[n.size] || NOM_KW_H.m) : (NOM_PIC_H[n.size] || NOM_PIC_H.m) + 34;
+  return { x: n.x, y: n.y, w, h, midY: n.y + h / 2 };
+}
 
 /* ---------------- 연결선 기하 ---------------- */
 const SIDE_N = { n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, e: { x: 1, y: 0 }, w: { x: -1, y: 0 } };
@@ -43,28 +57,21 @@ function sidePoint(r, side, t) {
   if (side === "w") return { x: r.x, y: midY + r.h * (pct - 0.5) };
   return { x: r.x + r.w, y: midY + r.h * (pct - 0.5) };
 }
-/* nomW = 확대·축소와 무관한 카드의 기준 너비(nodeW). 카드 CSS 너비는
-   `calc(190px / max(zoom,.79))`처럼 배율에 따라 늘었다 줄었다 하는데(작게
-   보일 때도 글자가 읽히도록), 그 값을 그대로 가로세로 비율 판정에 쓰면
-   배율이 바뀔 때마다 "위/아래냐 좌/우냐" 판정 자체가 뒤집혀 화살표가
-   붙는 방향이 계속 바뀌었다. 판정에는 항상 고정된 기준 너비를 쓰고,
-   실제 좌표(중심점 등)에는 지금 화면에 보이는 실제 크기를 그대로 쓴다. */
-function autoSide(r, target, nomW) {
+function autoSide(r, target) {
   const cx = r.x + r.w / 2, cy = r.midY != null ? r.midY : r.y + r.h / 2;
   const dx = target.x - cx, dy = target.y - cy;
-  const w = nomW != null ? nomW : r.w;
-  if (Math.abs(dx) * r.h >= Math.abs(dy) * w) return dx >= 0 ? "e" : "w";
+  if (Math.abs(dx) * r.h >= Math.abs(dy) * r.w) return dx >= 0 ? "e" : "w";
   return dy >= 0 ? "s" : "n";
 }
 function edgeGeom(e) {
   const a = nodeById(e.from), b = nodeById(e.to);
   if (!a || !b) return null;
-  const ra = nodeRect(a), rb = nodeRect(b);
+  const ra = nodeNominalRect(a), rb = nodeNominalRect(b);
   const wps = (e.points || []).map(p => ({ x: p.x, y: p.y }));
   const firstT = wps[0] || { x: rb.x + rb.w / 2, y: rb.y + rb.h / 2 };
   const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
-  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT, nodeW(a));
-  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT, nodeW(b));
+  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT);
+  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT);
   const t1 = e.a1t, t2 = e.a2t;
   return { p1: sidePoint(ra, s1, t1), n1: SIDE_N[s1], p2: sidePoint(rb, s2, t2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2, t1, t2 };
 }
@@ -434,8 +441,9 @@ function measureNodes() {
 }
 function paintSelection() {
   $$("#nodeLayer .node").forEach(el => {
-    el.classList.toggle("sel", el.dataset.node === sel.node);
-    el.classList.toggle("link-src", el.dataset.node === linkFrom);
+    const id = el.dataset.node;
+    el.classList.toggle("sel", id === sel.node || selMulti.indexOf(id) >= 0);
+    el.classList.toggle("link-src", id === linkFrom);
   });
   updateFlowSelTools();
 }
@@ -556,6 +564,42 @@ function startPan(e, surf) {
   try { surf.setPointerCapture(e.pointerId); } catch (err) {}
   surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
 }
+/* 다중 선택 모드 — 빈 캔버스를 대각선으로 드래그해 사각형과 겹치는 카드를
+   한 번에 고른다. 살짝 눌렀다 떼기만 하면(거의 안 움직였으면) 그냥 선택 해제. */
+function startMultiSelectDrag(e, surf, r, additive) {
+  e.preventDefault();
+  const v = B().view;
+  const toW = (cx, cy) => ({ x: (cx - r.left - v.panX) / v.zoom, y: (cy - r.top - v.panY) / v.zoom });
+  const start = toW(e.clientX, e.clientY);
+  let cur = start;
+  const box = document.createElement("div");
+  box.className = "marquee";
+  $("#flowWorld").appendChild(box);
+  const paint = () => {
+    const x1 = Math.min(start.x, cur.x), y1 = Math.min(start.y, cur.y);
+    box.style.left = x1 + "px"; box.style.top = y1 + "px";
+    box.style.width = Math.abs(cur.x - start.x) + "px"; box.style.height = Math.abs(cur.y - start.y) + "px";
+  };
+  paint();
+  const mv = ev => { cur = toW(ev.clientX, ev.clientY); paint(); };
+  const up = () => {
+    surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
+    box.remove();
+    const x1 = Math.min(start.x, cur.x), y1 = Math.min(start.y, cur.y), x2 = Math.max(start.x, cur.x), y2 = Math.max(start.y, cur.y);
+    if (x2 - x1 < 4 && y2 - y1 < 4) {
+      if (!additive) { selMulti = []; paintSelection(); renderPanels(); }
+      return;
+    }
+    const hit = B().nodes.filter(n => {
+      const q = nodeRect(n);
+      return q.x < x2 && q.x + q.w > x1 && q.y < y2 && q.y + q.h > y1;
+    }).map(n => n.id);
+    selMulti = additive ? Array.from(new Set(selMulti.concat(hit))) : hit;
+    paintSelection(); renderPanels();
+  };
+  surf.setPointerCapture(e.pointerId);
+  surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
+}
 
 /* ---------------- 상호작용 ---------------- */
 function initFlow() {
@@ -636,6 +680,40 @@ function initFlow() {
         else { addEdge(linkFrom, id); linkFrom = null; paintSelection(); }
         return;
       }
+      if (editable && flowMode === "multi") {             /* 다중 선택 — 고른 것끼리 한 번에 옮긴다 */
+        e.preventDefault();
+        if (selMulti.indexOf(id) < 0) selMulti = e.shiftKey ? selMulti.concat(id) : [id];
+        if (sel.edge) { sel.edge = null; drawEdges(); }
+        paintSelection(); renderPanels();
+        const ids = selMulti.slice();
+        const starts = {}, els = {};
+        ids.forEach(gid => { const gn = nodeById(gid); if (gn) { starts[gid] = { x: gn.x, y: gn.y }; els[gid] = $('.node[data-node="' + gid + '"]'); } });
+        const sx = e.clientX, sy = e.clientY;
+        let moved = false;
+        ids.forEach(gid => { if (els[gid]) els[gid].classList.add("dragging"); });
+        busy(true);
+        const paint = onFrame(() => ids.forEach(gid => {
+          const gn = nodeById(gid), gel = els[gid];
+          if (gel) { gel.style.left = gn.x + "px"; gel.style.top = gn.y + "px"; }
+          moveEdgesOf(gid);
+        }));
+        const mv = ev => {
+          const dx = (ev.clientX - sx) / B().view.zoom, dy = (ev.clientY - sy) / B().view.zoom;
+          if (!moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+          moved = true;
+          ids.forEach(gid => { const gn = nodeById(gid), st = starts[gid]; if (gn && st) { gn.x = Math.round(st.x + dx); gn.y = Math.round(st.y + dy); } });
+          paint();
+        };
+        const up = () => {
+          surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
+          ids.forEach(gid => { if (els[gid]) els[gid].classList.remove("dragging"); });
+          busy(false);
+          if (moved) { markDirty(); }
+        };
+        surf.setPointerCapture(e.pointerId);
+        surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
+        return;
+      }
       if (sel.node !== id) selectNode(id);
       if (sel.edge) { sel.edge = null; drawEdges(); }
       if (!editable) { startPan(e, surf); return; }   /* 보기 전용 — 카드 위에서도 화면을 민다 */
@@ -662,6 +740,11 @@ function initFlow() {
       return;
     }
 
+    if (editable && flowMode === "multi") {               /* 빈 캔버스를 드래그 = 사각형으로 여러 개 고르기 */
+      startMultiSelectDrag(e, surf, r, e.shiftKey);
+      return;
+    }
+
     if (edgeHit && editable) { sel.edge = edgeHit.dataset.edge; drawEdges(); openEdgePop(sel.edge, e.clientX, e.clientY); return; }
 
     if (sel.edge) { sel.edge = null; drawEdges(); }       /* 배경 → 패닝 */
@@ -679,10 +762,16 @@ function initFlow() {
 
   $("#flowMode").addEventListener("click", e => {
     const b = e.target.closest("[data-mode]"); if (!b) return;
+    const wasMulti = flowMode === "multi";
     flowMode = b.dataset.mode; linkFrom = null;
+    /* 다중 선택 모드를 나가면 골라 둔 것 중 하나를 단일 선택으로 이어받고,
+       들어갈 때는 기존 단일 선택을 비워 둘 다 동시에 켜져 보이지 않게 한다. */
+    if (wasMulti && flowMode !== "multi") { sel.node = selMulti[0] || sel.node; selMulti = []; }
+    if (flowMode === "multi") sel.node = null;
     $$("#flowMode .btn").forEach(x => x.classList.toggle("on", x === b));
     surf.classList.toggle("linking", flowMode === "link");
-    paintSelection();
+    surf.classList.toggle("multi-selecting", flowMode === "multi");
+    paintSelection(); renderPanels();
   });
   $("#btnAddNode").addEventListener("click", () => addNode());
   $("#btnLanes").addEventListener("click", () => {
