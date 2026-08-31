@@ -18,7 +18,7 @@ function onFrame(fn) {                // 다음 프레임에 한 번만 실행
     id = requestAnimationFrame(() => { id = 0; fn.apply(null, last); });
   };
 }
-function nodeW(n) { return (NSIZE[n.size] || NSIZE.m).w; }
+function nodeW(n) { const t = n.kind === "keyword" ? NSIZE_KEYWORD : NSIZE; return (t[n.size] || t.m).w; }
 function nodeRect(n) {
   const s = NSZ[n.id];
   /* midY = 포트·연결선이 좌우로 붙는 세로 기준점. 태그·캠페인 목록은 카드
@@ -276,14 +276,6 @@ function nodeHtml(n) {
     bd = '<span class="bdg big" style="--c:' + (meta.c || "var(--ink-3)") + '">' + ico(meta.ico, "xs") + "<b>" + focusCount(n, f) + "</b></span>";
   }
 
-  const th = thumbSrc(n);
-  const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async" draggable="false">'
-                    : '<div class="ph">' + ico("image") + "<span>화면 미등록</span></div>") +
-    '<div class="thumb-acts edit-only">' +
-      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양·화면 바꾸기" tabindex="-1"><span>' +
-      ico("edit", "xs") + "설정</span></button>" +
-    "</div>";
-
   let body = "";
   if (f === "all") {
     body = n.camps.length ? '<div class="node-list">' + n.camps.slice(0, 4).map(campRow).join("") +
@@ -294,6 +286,27 @@ function nodeHtml(n) {
 
   const miss = completeness(n);
   const warn = miss.length ? '<span class="node-warn" title="' + esc(miss.join(" · ")) + '">' + ico("alert", "xs") + "</span>" : "";
+
+  /* 키워드형 — 화면 이미지 없이 이름만 작은 알약(pill) 모양으로 보여준다.
+     태그·캠페인은 다른 페이지와 똑같이 달 수 있어 배지·목록(body)은 그대로 쓴다. */
+  if (n.kind === "keyword") {
+    return '<div class="node-frame">' +
+        '<div class="kw-pill">' + ico("tag", "xs") + '<span class="kw-name">' + esc(n.name) + "</span></div>" + warn +
+        '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
+        '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
+      "</div>" +
+      (bd ? '<div class="node-badges kw-badges">' + bd + "</div>" : "") +
+      (body ? '<div class="node-main">' + body + "</div>" : "");
+  }
+
+  const th = thumbSrc(n);
+  const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async" draggable="false">'
+                    : '<div class="ph">' + ico("image") + "<span>화면 미등록</span></div>") +
+    '<div class="thumb-acts edit-only">' +
+      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양·화면 바꾸기" tabindex="-1"><span>' +
+      ico("edit", "xs") + "설정</span></button>" +
+    "</div>";
+
   /* 제목·이미지·배지를 하나의 테두리(.node-frame)로 묶는다 — 확대·축소해도
      이 틀 전체가 한 덩어리로 같이 움직이니 안에서 글자가 넘칠 걱정이 없다.
      태그·캠페인 목록(body)은 지금처럼 그 바깥 아래에 그대로 노출한다.
@@ -324,7 +337,7 @@ function renderNodes() {
     else delete have[n.id];
     const f = state.ui.focus || "all";
     const dim = (f === "camp" || f === "perf" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
-    el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") +
+    el.className = "node size-" + (n.size || "m") + (n.kind === "keyword" ? " kind-keyword" : "") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") +
       (dim ? " dim" : "") + (f === "perf" ? " heat" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     /* 성과 위주 보기 — 매출이 큰 화면일수록 진하게 칠해 여정 위에서 바로 보이게 한다 */
@@ -740,9 +753,9 @@ function editNode(id) {
       { k: "hue", label: "색", type: "swatch" },
       { k: "size", label: "카드 크기", type: "select", opts: NSIZE },
       { k: "sharp", label: "각진 모서리로", type: "check" },
-      { k: "shot", label: "화면 이미지", type: "action", icon: "camera", actionLabel: shotSrc(n) ? "화면 교체·삭제" : "화면 올리기" },
+      n.kind === "keyword" ? null : { k: "shot", label: "화면 이미지", type: "action", icon: "camera", actionLabel: shotSrc(n) ? "화면 교체·삭제" : "화면 올리기" },
       { k: "note", label: "메모", type: "textarea", ph: "이 화면에서 확인해야 할 것" }
-    ],
+    ].filter(Boolean),
     values: n,
     onSave: v => {
       Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });

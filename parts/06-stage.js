@@ -84,7 +84,11 @@ function layerMarkup(l, n, idx) {
     hit = '<line class="hit-line" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '"/>';
   } else if (l.kind === "text") {
     const outline = l.outline !== false;    /* 명시적으로 꺼야만 사라지는 기본 켜짐(흰 외곽선/그림자) */
-    s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '"' +
+    const bw = l.stroke || 0, bc = l.borderColor || "#111827";
+    const border = bw > 0
+      ? '<text class="ltext ltext-border" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="none" stroke="' + bc + '" stroke-width="' + bw + '" stroke-linejoin="round">' + esc(l.text || "텍스트") + "</text>"
+      : "";
+    s = border + '<text class="ltext ltext-fill" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '"' +
       (outline ? ' stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke"' : "") +
       ">" + esc(l.text || "텍스트") + "</text>";
   }
@@ -92,8 +96,11 @@ function layerMarkup(l, n, idx) {
     s = '<polyline class="shape" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" fill="none" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
     hit = '<polyline class="hit-line" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" stroke-linecap="round" stroke-linejoin="round"/>';
   }
-  else if (l.kind === "image")
-    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none" draggable="false"/>';
+  else if (l.kind === "image") {
+    const bw = l.stroke || 0;
+    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none" draggable="false"/>' +
+      (bw > 0 ? '<rect x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" fill="none" stroke="' + (l.color || "#111827") + '" stroke-width="' + bw + '" pointer-events="none"/>' : "");
+  }
 
   let pin = "";
   if (l.campId) {
@@ -113,7 +120,7 @@ function layerMarkup(l, n, idx) {
    실제 DOM에 그려진 뒤 getBBox()로 재는 편이 항상 정확하다. */
 function measureBbox(svg, l) {
   if (l.kind === "text") {
-    const el = svg.querySelector('[data-layer="' + l.id + '"] text');
+    const el = svg.querySelector('[data-layer="' + l.id + '"] .ltext-fill');
     if (el) { try { const r = el.getBBox(); return { x: r.x, y: r.y, w: r.width, h: r.height }; } catch (e) {} }
   }
   return bbox(l);
@@ -183,8 +190,43 @@ function renderStageFoot(n, L) {
     html += '<div class="spacer"></div><span>도형을 그린 뒤 왼쪽 패널에서 캠페인을 연결하세요</span>';
   }
   $("#stageFoot").innerHTML = html;
+  renderStageTools();
 }
 function LKIND(l) { return { rect: "사각형", ellipse: "원", arrow: "화살표", text: "텍스트", pen: "펜", image: "이미지" }[l.kind] || l.kind; }
+
+const STROKES = { 0: "없음", 2: "얇게", 3: "보통", 6: "굵게" };
+/* 색 스와치가 두 가지 대상을 가질 수 있는 레이어 — 도형은 선/채우기, 텍스트는 글자색/테두리색.
+   그 밖(이미지·펜·화살표)은 항상 primary(색 하나)만 쓴다. */
+function fillTarget(l) { return !!l && (l.kind === "rect" || l.kind === "ellipse"); }
+function borderTarget(l) { return !!l && l.kind === "text"; }
+/* 스테이지 위쪽 색·굵기 툴바 — 선택된 레이어 종류에 맞춰 다시 그린다.
+   레이어 선택이 바뀌거나(renderStageFoot) 색/굵기를 바꾼 직후 호출한다. */
+function renderStageTools() {
+  const modeSeg = $("#colorMode"); if (!modeSeg) return;
+  const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
+  const hasTab = fillTarget(L) || borderTarget(L);
+  if (!hasTab) colorMode = "primary";
+  modeSeg.style.display = hasTab ? "" : "none";
+  if (hasTab) {
+    const labels = fillTarget(L) ? ["선", "채우기"] : ["글자", "테두리"];
+    modeSeg.innerHTML = ["primary", "secondary"].map((k, i) =>
+      '<button class="btn sm' + (colorMode === k ? " on" : "") + '" data-mode="' + k + '">' + labels[i] + "</button>").join("");
+  }
+
+  const secondary = colorMode === "secondary" && hasTab;
+  let cur;
+  if (!L) cur = drawColor;
+  else if (secondary) cur = fillTarget(L) ? (L.fill || "none") : (L.stroke > 0 ? (L.borderColor || "#111827") : "none");
+  else cur = L.color || drawColor;
+
+  $("#swatches").innerHTML =
+    (secondary ? '<button class="sw sw-none' + (cur === "none" ? " on" : "") + '" data-c="none" title="없음"></button>' : "") +
+    SWATCH.map(c => '<button class="sw' + (c === cur ? " on" : "") + '" data-c="' + c + '" style="background:' + c + '" title="' + c + '"></button>').join("");
+
+  const curStroke = L && "stroke" in L ? (L.stroke || 0) : drawStroke;
+  $("#strokeSeg").innerHTML = Object.entries(STROKES).map(([w, name]) =>
+    '<button class="btn sm' + (+w === curStroke ? " on" : "") + '" data-sw="' + w + '" title="' + name + '">' + name + "</button>").join("");
+}
 function editTextLayer(n, l) {
   if (!canEdit()) return;
   openForm({
@@ -251,9 +293,13 @@ async function setShot(file, node, quiet) {
 async function addImageLayer(file) {
   const n = curNode(); if (!n || !file) return;
   try {
-    const im = await readImage(file, 640, 0.82, true);
-    const d = docSize(n), r = Math.min(1, (d.w * 0.55) / im.w);
-    n.layers.push({ id: uid("l"), kind: "image", src: im.src, x: Math.round(d.w * 0.1), y: Math.round(d.h * 0.1), w: Math.round(im.w * r), h: Math.round(im.h * r), campId: null });
+    const im = await readImage(file, 1200, 0.85, true);
+    const d = docSize(n);
+    /* 예전에는 항상 페이지 폭의 55%로 줄여 넣었다 — 실제 이미지보다 훨씬 작게
+       보이는 원인이었다. 이제는 페이지 안에 다 들어가면 원래(디코딩된) 크기
+       그대로 넣고, 넘칠 때만 딱 맞을 만큼만 줄인다. */
+    const r = Math.min(1, (d.w * 0.85) / im.w, (d.h * 0.85) / im.h);
+    n.layers.push({ id: uid("l"), kind: "image", src: im.src, x: Math.round(d.w * 0.1), y: Math.round(d.h * 0.1), w: Math.round(im.w * r), h: Math.round(im.h * r), color: null, stroke: 0, campId: null });
     sel.layer = n.layers[n.layers.length - 1].id;
     markDirty(); renderFlow(); renderStage(); renderPanels();
   } catch (e) { toast("이미지를 읽지 못했습니다", "bad"); }
@@ -315,7 +361,7 @@ function initStage() {
           fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }, { k: "outline", label: "그림자 효과(흰 테두리)", type: "check" }],
           values: { text: "", size: "18", outline: true },
           onSave: v => {
-            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, outline: !!v.outline, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, campId: null });
+            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, outline: !!v.outline, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, stroke: 0, borderColor: "#111827", campId: null });
             sel.layer = n.layers[n.layers.length - 1].id;
             setTool("select"); markDirty(); renderFlow(); renderStage(); renderPanels();
           }
@@ -396,24 +442,37 @@ function initStage() {
   $("#layerTools").addEventListener("click", e => {
     const b = e.target.closest("[data-tool]"); if (b) setTool(b.dataset.tool);
   });
-  $("#swatches").innerHTML = SWATCH.map(c => '<button class="sw' + (c === drawColor ? " on" : "") + '" data-c="' + c + '" style="background:' + c + '" title="' + c + '"></button>').join("");
+  renderStageTools();
+  $("#colorMode").addEventListener("click", e => {
+    const b = e.target.closest("[data-mode]"); if (!b) return;
+    colorMode = b.dataset.mode;
+    renderStageTools();
+  });
   $("#swatches").addEventListener("click", e => {
     const b = e.target.closest("[data-c]"); if (!b) return;
-    drawColor = b.dataset.c;
-    $$(".sw").forEach(x => x.classList.toggle("on", x === b));
+    const c = b.dataset.c;
     const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
-    if (L) { L.color = drawColor; markDirty(); renderLayers(); }
+    const secondary = colorMode === "secondary" && (fillTarget(L) || borderTarget(L));
+    if (secondary && fillTarget(L)) { L.fill = c; markDirty(); renderLayers(); renderStageTools(); return; }
+    if (secondary && borderTarget(L)) {
+      if (c === "none") { L.stroke = 0; }
+      else { L.borderColor = c; if (!(L.stroke > 0)) L.stroke = drawStroke || 2; }
+      markDirty(); renderLayers(); renderStageTools(); return;
+    }
+    if (c === "none") return;               /* '없음'은 채우기·테두리 모드에서만 의미가 있다 */
+    drawColor = c;
+    if (L) L.color = c;
+    markDirty(); if (L) renderLayers();
+    renderStageTools();
   });
 
-  const STROKES = { 2: "얇게", 3: "보통", 6: "굵게" };
-  $("#strokeSeg").innerHTML = Object.entries(STROKES).map(([w, name]) =>
-    '<button class="btn sm' + (+w === drawStroke ? " on" : "") + '" data-sw="' + w + '" title="' + name + '">' + name + "</button>").join("");
   $("#strokeSeg").addEventListener("click", e => {
     const b = e.target.closest("[data-sw]"); if (!b) return;
-    drawStroke = +b.dataset.sw;
-    $$("#strokeSeg .btn").forEach(x => x.classList.toggle("on", x === b));
+    const sw = +b.dataset.sw;
+    drawStroke = sw || drawStroke;
     const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
-    if (L && "stroke" in L) { L.stroke = drawStroke; markDirty(); renderLayers(); }
+    if (L && "stroke" in L) { L.stroke = sw; markDirty(); renderLayers(); }
+    renderStageTools();
   });
 
   $("#btnShot").addEventListener("click", () => openShotModal(curNode()));

@@ -32,8 +32,9 @@ const CHAN = {
 };
 const CSTATUS = { live: "운영중", draft: "기획중", test: "테스트", ended: "종료" };
 const CSTATUS_C = { live: "var(--ok)", draft: "var(--ink-3)", test: "var(--warn)", ended: "var(--bad)" };
-const KIND = { entry: "진입", page: "페이지", modal: "모달·시트", decision: "분기", exit: "이탈·종료" };
-const SWATCH = ["#e0483f", "#f2913c", "#12a97a", "#2f6fed", "#8b5cf6", "#111827", "#ffffff"];
+const KIND = { entry: "진입", page: "페이지", modal: "모달·시트", decision: "분기", exit: "이탈·종료", keyword: "키워드" };
+const SWATCH = ["#e0483f", "#f43f5e", "#ec4899", "#c026d3", "#8b5cf6", "#6366f1", "#2f6fed", "#0ea5e9", "#06b6d4",
+  "#14b8a6", "#12a97a", "#65a30d", "#f2c94c", "#f2913c", "#d97706", "#92400e", "#111827", "#6b7280", "#d1d5db", "#ffffff"];
 /* 노드·연결선 공통 색 팔레트 */
 const HUE = {
   none:   { name: "기본", c: "var(--ink-3)" },
@@ -45,6 +46,8 @@ const HUE = {
   slate:  { name: "회색", c: "#64748b" }
 };
 const NSIZE = { s: { name: "작게", w: 150 }, m: { name: "보통", w: 190 }, l: { name: "크게", w: 240 } };
+/* 키워드형(이미지 없는 라벨) 노드는 사진 영역이 없어 같은 3단계라도 훨씬 작게 잡는다 */
+const NSIZE_KEYWORD = { s: { name: "작게", w: 96 }, m: { name: "보통", w: 124 }, l: { name: "크게", w: 152 } };
 const ROUTE = { curve: "곡선", ortho: "직각", line: "직선" };
 const HEADSZ = { s: { name: "작게", m: 0.72 }, m: { name: "보통", m: 1 }, l: { name: "크게", m: 1.5 }, xl: { name: "아주 크게", m: 2.1 } };
 /* 카드에서 무엇을 크게 볼지 — 페이지 이름은 그대로 두고 아래 항목만 바뀐다 */
@@ -61,7 +64,7 @@ const FOCUS = {
 /* 데이터 완성도 — 화면 이미지·태그가 없는 페이지를 놓치지 않도록 */
 function completeness(n) {
   const missing = [];
-  if (!thumbSrc(n)) missing.push("화면 이미지 없음");
+  if (n.kind !== "keyword" && !thumbSrc(n)) missing.push("화면 이미지 없음");
   if (!n.tags.length) missing.push("태그 없음");
   return missing;
 }
@@ -196,6 +199,7 @@ const STAGE_FIT = {
 let layerTool = "select";
 let drawColor = SWATCH[0];
 let drawStroke = 3;
+let colorMode = "primary";       // 색 스와치가 지금 무엇을 바꾸는지: primary(선/글자색) · secondary(채우기/테두리색)
 let dirty = false;
 let savedRefs = [];              // 마지막 저장 시점에 쓰이던 이미지 파일 목록
 const DRAFT_KEY = "draft:" + location.pathname;

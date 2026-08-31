@@ -78,10 +78,11 @@
 .stage-empty{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
 .stage-tools{display:flex; align-items:center; gap:5px; flex-wrap:wrap}
 .tool-sep{width:1px; height:20px; background:var(--stroke); margin:0 2px}
-.swatches{display:flex; gap:3px; align-items:center}
+.swatches{display:flex; gap:3px; align-items:center; flex-wrap:wrap; max-width:190px}
 .sw{width:17px; height:17px; border-radius:5px; border:2px solid transparent; cursor:pointer; padding:0;
   box-shadow:0 0 0 1px var(--stroke)}
 .sw.on{border-color:var(--ink); box-shadow:0 0 0 1px var(--bg-3) inset}
+.sw.sw-none{background-image:conic-gradient(#ccc 90deg,#fff 90deg 180deg,#ccc 180deg 270deg,#fff 270deg); background-size:8px 8px}
 .stage-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-3)}
 .dropzone{position:absolute; inset:8px; border-radius:var(--r-md); border:2px dashed var(--accent);
   background:var(--accent-soft); display:none; place-items:center; font-weight:600; color:var(--accent); z-index:40}

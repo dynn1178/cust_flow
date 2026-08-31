@@ -255,6 +255,21 @@ select.field{cursor:pointer}
 .node-pic .pick:hover span{border-color:var(--accent); color:var(--accent)}
 .node.size-s .node-pic .pick span{font-size:11.5px; padding:5px 10px}
 
+/* 키워드형 — 화면 이미지 없이 이름만 다는 작은 알약(pill) 카드. 사진 영역이
+   없는 만큼 카드 자체도 같은 3단계 크기에서 훨씬 작게 잡는다(NSIZE_KEYWORD). */
+.node.kind-keyword.size-s{width:max(96px,min(130px,calc(96px / max(var(--zoom,1),.75))))}
+.node.kind-keyword.size-m{width:max(124px,min(160px,calc(124px / max(var(--zoom,1),.79))))}
+.node.kind-keyword.size-l{width:max(152px,min(190px,calc(152px / max(var(--zoom,1),.83))))}
+.node.kind-keyword .node-frame{border-radius:999px; padding:8px 14px; display:flex; align-items:center; justify-content:center}
+.kw-pill{display:flex; align-items:center; gap:6px; min-width:0}
+.kw-pill .ico{width:13px; height:13px; opacity:.55; flex:none; stroke-width:2.2}
+.kw-name{font-size:max(12.5px,min(18px,calc(12.5px / max(var(--zoom,1),.6)))); font-weight:700; letter-spacing:-.02em;
+  color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.node.kind-keyword.size-l .kw-name{font-size:max(14.5px,min(21px,calc(14.5px / max(var(--zoom,1),.6))))}
+.node.kind-keyword .node-warn{position:static; margin-left:2px; width:16px; height:16px; flex:none}
+.node.kind-keyword .node-warn .ico{width:10px; height:10px}
+.kw-badges{padding:6px 4px 0}
+
 .node-main{padding:8px 4px 2px; display:flex; flex-direction:column; gap:7px}
 .node-badges{display:flex; flex-wrap:wrap; gap:4px; justify-content:center; padding:0 8px 9px}
 .bdg{display:inline-flex; align-items:center; gap:4px; min-height:23px; padding:3px 7px; border-radius:7px;

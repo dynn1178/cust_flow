@@ -263,6 +263,21 @@ select.field{cursor:pointer}
 .node-pic .pick:hover span{border-color:var(--accent); color:var(--accent)}
 .node.size-s .node-pic .pick span{font-size:11.5px; padding:5px 10px}
 
+/* 키워드형 — 화면 이미지 없이 이름만 다는 작은 알약(pill) 카드. 사진 영역이
+   없는 만큼 카드 자체도 같은 3단계 크기에서 훨씬 작게 잡는다(NSIZE_KEYWORD). */
+.node.kind-keyword.size-s{width:max(96px,min(130px,calc(96px / max(var(--zoom,1),.75))))}
+.node.kind-keyword.size-m{width:max(124px,min(160px,calc(124px / max(var(--zoom,1),.79))))}
+.node.kind-keyword.size-l{width:max(152px,min(190px,calc(152px / max(var(--zoom,1),.83))))}
+.node.kind-keyword .node-frame{border-radius:999px; padding:8px 14px; display:flex; align-items:center; justify-content:center}
+.kw-pill{display:flex; align-items:center; gap:6px; min-width:0}
+.kw-pill .ico{width:13px; height:13px; opacity:.55; flex:none; stroke-width:2.2}
+.kw-name{font-size:max(12.5px,min(18px,calc(12.5px / max(var(--zoom,1),.6)))); font-weight:700; letter-spacing:-.02em;
+  color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.node.kind-keyword.size-l .kw-name{font-size:max(14.5px,min(21px,calc(14.5px / max(var(--zoom,1),.6))))}
+.node.kind-keyword .node-warn{position:static; margin-left:2px; width:16px; height:16px; flex:none}
+.node.kind-keyword .node-warn .ico{width:10px; height:10px}
+.kw-badges{padding:6px 4px 0}
+
 .node-main{padding:8px 4px 2px; display:flex; flex-direction:column; gap:7px}
 .node-badges{display:flex; flex-wrap:wrap; gap:4px; justify-content:center; padding:0 8px 9px}
 .bdg{display:inline-flex; align-items:center; gap:4px; min-height:23px; padding:3px 7px; border-radius:7px;
@@ -424,10 +439,11 @@ select.field{cursor:pointer}
 .stage-empty{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
 .stage-tools{display:flex; align-items:center; gap:5px; flex-wrap:wrap}
 .tool-sep{width:1px; height:20px; background:var(--stroke); margin:0 2px}
-.swatches{display:flex; gap:3px; align-items:center}
+.swatches{display:flex; gap:3px; align-items:center; flex-wrap:wrap; max-width:190px}
 .sw{width:17px; height:17px; border-radius:5px; border:2px solid transparent; cursor:pointer; padding:0;
   box-shadow:0 0 0 1px var(--stroke)}
 .sw.on{border-color:var(--ink); box-shadow:0 0 0 1px var(--bg-3) inset}
+.sw.sw-none{background-image:conic-gradient(#ccc 90deg,#fff 90deg 180deg,#ccc 180deg 270deg,#fff 270deg); background-size:8px 8px}
 .stage-foot{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11.5px; color:var(--ink-3)}
 .dropzone{position:absolute; inset:8px; border-radius:var(--r-md); border:2px dashed var(--accent);
   background:var(--accent-soft); display:none; place-items:center; font-weight:600; color:var(--accent); z-index:40}
@@ -899,6 +915,7 @@ tr:hover .rowacts{opacity:1}
               <button class="btn sm" data-tool="text" title="텍스트"><svg class="ico xs"><use href="#i-text"/></svg></button>
               <button class="btn sm" data-tool="pen" title="펜"><svg class="ico xs"><use href="#i-pen"/></svg></button>
             </div>
+            <div class="seg edit-only" id="colorMode"></div>
             <div class="swatches edit-only" id="swatches"></div>
             <div class="seg edit-only" id="strokeSeg"></div>
             <div class="tool-sep edit-only"></div>
@@ -1090,8 +1107,9 @@ const CHAN = {
 };
 const CSTATUS = { live: "운영중", draft: "기획중", test: "테스트", ended: "종료" };
 const CSTATUS_C = { live: "var(--ok)", draft: "var(--ink-3)", test: "var(--warn)", ended: "var(--bad)" };
-const KIND = { entry: "진입", page: "페이지", modal: "모달·시트", decision: "분기", exit: "이탈·종료" };
-const SWATCH = ["#e0483f", "#f2913c", "#12a97a", "#2f6fed", "#8b5cf6", "#111827", "#ffffff"];
+const KIND = { entry: "진입", page: "페이지", modal: "모달·시트", decision: "분기", exit: "이탈·종료", keyword: "키워드" };
+const SWATCH = ["#e0483f", "#f43f5e", "#ec4899", "#c026d3", "#8b5cf6", "#6366f1", "#2f6fed", "#0ea5e9", "#06b6d4",
+  "#14b8a6", "#12a97a", "#65a30d", "#f2c94c", "#f2913c", "#d97706", "#92400e", "#111827", "#6b7280", "#d1d5db", "#ffffff"];
 /* 노드·연결선 공통 색 팔레트 */
 const HUE = {
   none:   { name: "기본", c: "var(--ink-3)" },
@@ -1103,6 +1121,8 @@ const HUE = {
   slate:  { name: "회색", c: "#64748b" }
 };
 const NSIZE = { s: { name: "작게", w: 150 }, m: { name: "보통", w: 190 }, l: { name: "크게", w: 240 } };
+/* 키워드형(이미지 없는 라벨) 노드는 사진 영역이 없어 같은 3단계라도 훨씬 작게 잡는다 */
+const NSIZE_KEYWORD = { s: { name: "작게", w: 96 }, m: { name: "보통", w: 124 }, l: { name: "크게", w: 152 } };
 const ROUTE = { curve: "곡선", ortho: "직각", line: "직선" };
 const HEADSZ = { s: { name: "작게", m: 0.72 }, m: { name: "보통", m: 1 }, l: { name: "크게", m: 1.5 }, xl: { name: "아주 크게", m: 2.1 } };
 /* 카드에서 무엇을 크게 볼지 — 페이지 이름은 그대로 두고 아래 항목만 바뀐다 */
@@ -1119,7 +1139,7 @@ const FOCUS = {
 /* 데이터 완성도 — 화면 이미지·태그가 없는 페이지를 놓치지 않도록 */
 function completeness(n) {
   const missing = [];
-  if (!thumbSrc(n)) missing.push("화면 이미지 없음");
+  if (n.kind !== "keyword" && !thumbSrc(n)) missing.push("화면 이미지 없음");
   if (!n.tags.length) missing.push("태그 없음");
   return missing;
 }
@@ -1254,6 +1274,7 @@ const STAGE_FIT = {
 let layerTool = "select";
 let drawColor = SWATCH[0];
 let drawStroke = 3;
+let colorMode = "primary";       // 색 스와치가 지금 무엇을 바꾸는지: primary(선/글자색) · secondary(채우기/테두리색)
 let dirty = false;
 let savedRefs = [];              // 마지막 저장 시점에 쓰이던 이미지 파일 목록
 const DRAFT_KEY = "draft:" + location.pathname;
@@ -1694,7 +1715,7 @@ function onFrame(fn) {                // 다음 프레임에 한 번만 실행
     id = requestAnimationFrame(() => { id = 0; fn.apply(null, last); });
   };
 }
-function nodeW(n) { return (NSIZE[n.size] || NSIZE.m).w; }
+function nodeW(n) { const t = n.kind === "keyword" ? NSIZE_KEYWORD : NSIZE; return (t[n.size] || t.m).w; }
 function nodeRect(n) {
   const s = NSZ[n.id];
   /* midY = 포트·연결선이 좌우로 붙는 세로 기준점. 태그·캠페인 목록은 카드
@@ -1952,14 +1973,6 @@ function nodeHtml(n) {
     bd = '<span class="bdg big" style="--c:' + (meta.c || "var(--ink-3)") + '">' + ico(meta.ico, "xs") + "<b>" + focusCount(n, f) + "</b></span>";
   }
 
-  const th = thumbSrc(n);
-  const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async" draggable="false">'
-                    : '<div class="ph">' + ico("image") + "<span>화면 미등록</span></div>") +
-    '<div class="thumb-acts edit-only">' +
-      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양·화면 바꾸기" tabindex="-1"><span>' +
-      ico("edit", "xs") + "설정</span></button>" +
-    "</div>";
-
   let body = "";
   if (f === "all") {
     body = n.camps.length ? '<div class="node-list">' + n.camps.slice(0, 4).map(campRow).join("") +
@@ -1970,6 +1983,27 @@ function nodeHtml(n) {
 
   const miss = completeness(n);
   const warn = miss.length ? '<span class="node-warn" title="' + esc(miss.join(" · ")) + '">' + ico("alert", "xs") + "</span>" : "";
+
+  /* 키워드형 — 화면 이미지 없이 이름만 작은 알약(pill) 모양으로 보여준다.
+     태그·캠페인은 다른 페이지와 똑같이 달 수 있어 배지·목록(body)은 그대로 쓴다. */
+  if (n.kind === "keyword") {
+    return '<div class="node-frame">' +
+        '<div class="kw-pill">' + ico("tag", "xs") + '<span class="kw-name">' + esc(n.name) + "</span></div>" + warn +
+        '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
+        '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
+      "</div>" +
+      (bd ? '<div class="node-badges kw-badges">' + bd + "</div>" : "") +
+      (body ? '<div class="node-main">' + body + "</div>" : "");
+  }
+
+  const th = thumbSrc(n);
+  const thumb = (th ? '<img src="' + th + '" alt="" loading="lazy" decoding="async" draggable="false">'
+                    : '<div class="ph">' + ico("image") + "<span>화면 미등록</span></div>") +
+    '<div class="thumb-acts edit-only">' +
+      '<button class="pick" data-nedit="' + n.id + '" title="페이지 이름·색·크기·모양·화면 바꾸기" tabindex="-1"><span>' +
+      ico("edit", "xs") + "설정</span></button>" +
+    "</div>";
+
   /* 제목·이미지·배지를 하나의 테두리(.node-frame)로 묶는다 — 확대·축소해도
      이 틀 전체가 한 덩어리로 같이 움직이니 안에서 글자가 넘칠 걱정이 없다.
      태그·캠페인 목록(body)은 지금처럼 그 바깥 아래에 그대로 노출한다.
@@ -2000,7 +2034,7 @@ function renderNodes() {
     else delete have[n.id];
     const f = state.ui.focus || "all";
     const dim = (f === "camp" || f === "perf" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
-    el.className = "node size-" + (n.size || "m") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") +
+    el.className = "node size-" + (n.size || "m") + (n.kind === "keyword" ? " kind-keyword" : "") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") +
       (dim ? " dim" : "") + (f === "perf" ? " heat" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     /* 성과 위주 보기 — 매출이 큰 화면일수록 진하게 칠해 여정 위에서 바로 보이게 한다 */
@@ -2416,9 +2450,9 @@ function editNode(id) {
       { k: "hue", label: "색", type: "swatch" },
       { k: "size", label: "카드 크기", type: "select", opts: NSIZE },
       { k: "sharp", label: "각진 모서리로", type: "check" },
-      { k: "shot", label: "화면 이미지", type: "action", icon: "camera", actionLabel: shotSrc(n) ? "화면 교체·삭제" : "화면 올리기" },
+      n.kind === "keyword" ? null : { k: "shot", label: "화면 이미지", type: "action", icon: "camera", actionLabel: shotSrc(n) ? "화면 교체·삭제" : "화면 올리기" },
       { k: "note", label: "메모", type: "textarea", ph: "이 화면에서 확인해야 할 것" }
-    ],
+    ].filter(Boolean),
     values: n,
     onSave: v => {
       Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
@@ -2611,7 +2645,11 @@ function layerMarkup(l, n, idx) {
     hit = '<line class="hit-line" x1="' + l.x + '" y1="' + l.y + '" x2="' + x2 + '" y2="' + y2 + '"/>';
   } else if (l.kind === "text") {
     const outline = l.outline !== false;    /* 명시적으로 꺼야만 사라지는 기본 켜짐(흰 외곽선/그림자) */
-    s = '<text class="ltext" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '"' +
+    const bw = l.stroke || 0, bc = l.borderColor || "#111827";
+    const border = bw > 0
+      ? '<text class="ltext ltext-border" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="none" stroke="' + bc + '" stroke-width="' + bw + '" stroke-linejoin="round">' + esc(l.text || "텍스트") + "</text>"
+      : "";
+    s = border + '<text class="ltext ltext-fill" x="' + l.x + '" y="' + l.y + '" font-size="' + (l.size || 18) + '" fill="' + c + '"' +
       (outline ? ' stroke="rgba(255,255,255,.85)" stroke-width="' + ((l.size || 18) * 0.22) + '" paint-order="stroke"' : "") +
       ">" + esc(l.text || "텍스트") + "</text>";
   }
@@ -2619,8 +2657,11 @@ function layerMarkup(l, n, idx) {
     s = '<polyline class="shape" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" fill="none" stroke="' + c + '" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round"/>';
     hit = '<polyline class="hit-line" points="' + l.points.map(p => p[0] + "," + p[1]).join(" ") + '" stroke-linecap="round" stroke-linejoin="round"/>';
   }
-  else if (l.kind === "image")
-    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none" draggable="false"/>';
+  else if (l.kind === "image") {
+    const bw = l.stroke || 0;
+    s = '<image href="' + l.src + '" x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" preserveAspectRatio="none" draggable="false"/>' +
+      (bw > 0 ? '<rect x="' + l.x + '" y="' + l.y + '" width="' + Math.abs(l.w) + '" height="' + Math.abs(l.h) + '" fill="none" stroke="' + (l.color || "#111827") + '" stroke-width="' + bw + '" pointer-events="none"/>' : "");
+  }
 
   let pin = "";
   if (l.campId) {
@@ -2640,7 +2681,7 @@ function layerMarkup(l, n, idx) {
    실제 DOM에 그려진 뒤 getBBox()로 재는 편이 항상 정확하다. */
 function measureBbox(svg, l) {
   if (l.kind === "text") {
-    const el = svg.querySelector('[data-layer="' + l.id + '"] text');
+    const el = svg.querySelector('[data-layer="' + l.id + '"] .ltext-fill');
     if (el) { try { const r = el.getBBox(); return { x: r.x, y: r.y, w: r.width, h: r.height }; } catch (e) {} }
   }
   return bbox(l);
@@ -2710,8 +2751,43 @@ function renderStageFoot(n, L) {
     html += '<div class="spacer"></div><span>도형을 그린 뒤 왼쪽 패널에서 캠페인을 연결하세요</span>';
   }
   $("#stageFoot").innerHTML = html;
+  renderStageTools();
 }
 function LKIND(l) { return { rect: "사각형", ellipse: "원", arrow: "화살표", text: "텍스트", pen: "펜", image: "이미지" }[l.kind] || l.kind; }
+
+const STROKES = { 0: "없음", 2: "얇게", 3: "보통", 6: "굵게" };
+/* 색 스와치가 두 가지 대상을 가질 수 있는 레이어 — 도형은 선/채우기, 텍스트는 글자색/테두리색.
+   그 밖(이미지·펜·화살표)은 항상 primary(색 하나)만 쓴다. */
+function fillTarget(l) { return !!l && (l.kind === "rect" || l.kind === "ellipse"); }
+function borderTarget(l) { return !!l && l.kind === "text"; }
+/* 스테이지 위쪽 색·굵기 툴바 — 선택된 레이어 종류에 맞춰 다시 그린다.
+   레이어 선택이 바뀌거나(renderStageFoot) 색/굵기를 바꾼 직후 호출한다. */
+function renderStageTools() {
+  const modeSeg = $("#colorMode"); if (!modeSeg) return;
+  const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
+  const hasTab = fillTarget(L) || borderTarget(L);
+  if (!hasTab) colorMode = "primary";
+  modeSeg.style.display = hasTab ? "" : "none";
+  if (hasTab) {
+    const labels = fillTarget(L) ? ["선", "채우기"] : ["글자", "테두리"];
+    modeSeg.innerHTML = ["primary", "secondary"].map((k, i) =>
+      '<button class="btn sm' + (colorMode === k ? " on" : "") + '" data-mode="' + k + '">' + labels[i] + "</button>").join("");
+  }
+
+  const secondary = colorMode === "secondary" && hasTab;
+  let cur;
+  if (!L) cur = drawColor;
+  else if (secondary) cur = fillTarget(L) ? (L.fill || "none") : (L.stroke > 0 ? (L.borderColor || "#111827") : "none");
+  else cur = L.color || drawColor;
+
+  $("#swatches").innerHTML =
+    (secondary ? '<button class="sw sw-none' + (cur === "none" ? " on" : "") + '" data-c="none" title="없음"></button>' : "") +
+    SWATCH.map(c => '<button class="sw' + (c === cur ? " on" : "") + '" data-c="' + c + '" style="background:' + c + '" title="' + c + '"></button>').join("");
+
+  const curStroke = L && "stroke" in L ? (L.stroke || 0) : drawStroke;
+  $("#strokeSeg").innerHTML = Object.entries(STROKES).map(([w, name]) =>
+    '<button class="btn sm' + (+w === curStroke ? " on" : "") + '" data-sw="' + w + '" title="' + name + '">' + name + "</button>").join("");
+}
 function editTextLayer(n, l) {
   if (!canEdit()) return;
   openForm({
@@ -2778,9 +2854,13 @@ async function setShot(file, node, quiet) {
 async function addImageLayer(file) {
   const n = curNode(); if (!n || !file) return;
   try {
-    const im = await readImage(file, 640, 0.82, true);
-    const d = docSize(n), r = Math.min(1, (d.w * 0.55) / im.w);
-    n.layers.push({ id: uid("l"), kind: "image", src: im.src, x: Math.round(d.w * 0.1), y: Math.round(d.h * 0.1), w: Math.round(im.w * r), h: Math.round(im.h * r), campId: null });
+    const im = await readImage(file, 1200, 0.85, true);
+    const d = docSize(n);
+    /* 예전에는 항상 페이지 폭의 55%로 줄여 넣었다 — 실제 이미지보다 훨씬 작게
+       보이는 원인이었다. 이제는 페이지 안에 다 들어가면 원래(디코딩된) 크기
+       그대로 넣고, 넘칠 때만 딱 맞을 만큼만 줄인다. */
+    const r = Math.min(1, (d.w * 0.85) / im.w, (d.h * 0.85) / im.h);
+    n.layers.push({ id: uid("l"), kind: "image", src: im.src, x: Math.round(d.w * 0.1), y: Math.round(d.h * 0.1), w: Math.round(im.w * r), h: Math.round(im.h * r), color: null, stroke: 0, campId: null });
     sel.layer = n.layers[n.layers.length - 1].id;
     markDirty(); renderFlow(); renderStage(); renderPanels();
   } catch (e) { toast("이미지를 읽지 못했습니다", "bad"); }
@@ -2842,7 +2922,7 @@ function initStage() {
           fields: [{ k: "text", label: "내용" }, { k: "size", label: "글자 크기(px)", ph: "18" }, { k: "outline", label: "그림자 효과(흰 테두리)", type: "check" }],
           values: { text: "", size: "18", outline: true },
           onSave: v => {
-            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, outline: !!v.outline, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, campId: null });
+            n.layers.push({ id: uid("l"), kind: "text", text: v.text || "텍스트", size: Number(v.size) || 18, outline: !!v.outline, x: Math.round(p.x), y: Math.round(p.y), color: drawColor, stroke: 0, borderColor: "#111827", campId: null });
             sel.layer = n.layers[n.layers.length - 1].id;
             setTool("select"); markDirty(); renderFlow(); renderStage(); renderPanels();
           }
@@ -2923,24 +3003,37 @@ function initStage() {
   $("#layerTools").addEventListener("click", e => {
     const b = e.target.closest("[data-tool]"); if (b) setTool(b.dataset.tool);
   });
-  $("#swatches").innerHTML = SWATCH.map(c => '<button class="sw' + (c === drawColor ? " on" : "") + '" data-c="' + c + '" style="background:' + c + '" title="' + c + '"></button>').join("");
+  renderStageTools();
+  $("#colorMode").addEventListener("click", e => {
+    const b = e.target.closest("[data-mode]"); if (!b) return;
+    colorMode = b.dataset.mode;
+    renderStageTools();
+  });
   $("#swatches").addEventListener("click", e => {
     const b = e.target.closest("[data-c]"); if (!b) return;
-    drawColor = b.dataset.c;
-    $$(".sw").forEach(x => x.classList.toggle("on", x === b));
+    const c = b.dataset.c;
     const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
-    if (L) { L.color = drawColor; markDirty(); renderLayers(); }
+    const secondary = colorMode === "secondary" && (fillTarget(L) || borderTarget(L));
+    if (secondary && fillTarget(L)) { L.fill = c; markDirty(); renderLayers(); renderStageTools(); return; }
+    if (secondary && borderTarget(L)) {
+      if (c === "none") { L.stroke = 0; }
+      else { L.borderColor = c; if (!(L.stroke > 0)) L.stroke = drawStroke || 2; }
+      markDirty(); renderLayers(); renderStageTools(); return;
+    }
+    if (c === "none") return;               /* '없음'은 채우기·테두리 모드에서만 의미가 있다 */
+    drawColor = c;
+    if (L) L.color = c;
+    markDirty(); if (L) renderLayers();
+    renderStageTools();
   });
 
-  const STROKES = { 2: "얇게", 3: "보통", 6: "굵게" };
-  $("#strokeSeg").innerHTML = Object.entries(STROKES).map(([w, name]) =>
-    '<button class="btn sm' + (+w === drawStroke ? " on" : "") + '" data-sw="' + w + '" title="' + name + '">' + name + "</button>").join("");
   $("#strokeSeg").addEventListener("click", e => {
     const b = e.target.closest("[data-sw]"); if (!b) return;
-    drawStroke = +b.dataset.sw;
-    $$("#strokeSeg .btn").forEach(x => x.classList.toggle("on", x === b));
+    const sw = +b.dataset.sw;
+    drawStroke = sw || drawStroke;
     const n = curNode(), L = n && n.layers.find(x => x.id === sel.layer);
-    if (L && "stroke" in L) { L.stroke = drawStroke; markDirty(); renderLayers(); }
+    if (L && "stroke" in L) { L.stroke = sw; markDirty(); renderLayers(); }
+    renderStageTools();
   });
 
   $("#btnShot").addEventListener("click", () => openShotModal(curNode()));
