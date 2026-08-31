@@ -371,7 +371,8 @@ function renderNodes() {
     else delete have[n.id];
     const f = state.ui.focus || "all";
     const dim = (f === "camp" || f === "perf" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
-    el.className = "node size-" + (n.size || "m") + (n.kind === "keyword" ? " kind-keyword" : "") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") +
+    el.className = "node size-" + (n.size || "m") + (n.kind === "keyword" ? " kind-keyword" : "") + (n.sharp ? " sharp" : "") +
+      (n.hue && n.hue !== "none" ? " hued emph-" + (n.emph || "border") : "") +
       (dim ? " dim" : "") + (f === "perf" ? " heat" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     /* 성과 위주 보기 — 매출이 큰 화면일수록 진하게 칠해 여정 위에서 바로 보이게 한다 */
@@ -820,7 +821,7 @@ function addNode() {
     x: Math.round((surf.width / 2 - v.panX) / v.zoom - 95),
     y: Math.round((surf.height / 2 - v.panY) / v.zoom - 75),
     shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H,
-    hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+    hue: "none", emph: "border", size: "m", sharp: false, tags: [], camps: [], layers: []
   };
   B().nodes.push(n); markDirty(); renderFlow(); selectNode(n.id); editNode(n.id);
 }
@@ -833,14 +834,15 @@ function editNode(id) {
       { k: "kind", label: "유형", type: "select", opts: KIND },
       { k: "path", label: "경로 · 화면 ID", mono: true, ph: "/product/:id" },
       { k: "hue", label: "색", type: "swatch" },
+      { k: "emph", label: "강조 효과", type: "select", opts: EMPH },
       { k: "size", label: "카드 크기", type: "select", opts: NSIZE },
       { k: "sharp", label: "각진 모서리로", type: "check" },
       n.kind === "keyword" ? null : { k: "shot", label: "화면 이미지", type: "action", icon: "camera", actionLabel: shotSrc(n) ? "화면 교체·삭제" : "화면 올리기" },
       { k: "note", label: "메모", type: "textarea", ph: "이 화면에서 확인해야 할 것" }
     ].filter(Boolean),
-    values: n,
+    values: Object.assign({ emph: "border" }, n),
     onSave: v => {
-      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
+      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, emph: v.emph, size: v.size, sharp: !!v.sharp });
       markDirty(); renderFlow(); renderPanels();
     },
     onAction: (k, getValues) => {
@@ -848,7 +850,7 @@ function editNode(id) {
       /* 사진을 올리는 동안 다른 칸에 입력해 둔 내용을 잃지 않도록, 이 창을
          닫기 전에 지금까지 입력한 값을 먼저 반영해 둔다. */
       const v = getValues();
-      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
+      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, emph: v.emph, size: v.size, sharp: !!v.sharp });
       markDirty(); renderFlow(); renderPanels();
       closeModal();
       openShotModal(n, () => editNode(n.id));

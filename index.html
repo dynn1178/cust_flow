@@ -245,6 +245,13 @@ select.field{cursor:pointer}
   box-shadow:var(--shadow-sm); overflow:hidden; transition:border-color .15s,box-shadow .15s}
 .node.sharp .node-frame{border-radius:5px}
 .node.hued .node-frame{border-color:color-mix(in srgb,var(--nc) 55%,var(--stroke))}
+/* 강조 효과 — 색 하나만으로는 부족하다는 요청으로 굵기·채우기·상단바·그림자를 더했다.
+   emph-border(기본)는 위 .node.hued 규칙만으로 충분해 별도 규칙이 없다. */
+.node.hued.emph-thick .node-frame{border-width:3px; border-color:var(--nc)}
+.node.hued.emph-fill .node-frame{background:color-mix(in srgb,var(--nc) 14%,var(--glass-3)); border-color:color-mix(in srgb,var(--nc) 45%,var(--stroke))}
+.node.hued.emph-bar .node-frame{border-top-width:5px; border-top-color:var(--nc)}
+.node.hued.emph-glow .node-frame{border-color:color-mix(in srgb,var(--nc) 40%,var(--stroke));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--nc) 35%,transparent),0 6px 18px -2px color-mix(in srgb,var(--nc) 50%,transparent),var(--shadow-sm)}
 .node.sel .node-frame{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
 /* 연결그리기 모드에서 클릭해 둔 출발 페이지 — 도착 페이지를 클릭하기 전까지
    계속 살아있는 표시라, 옅은 강조로는 놓치기 쉽다. 굵은 테두리 + 은은하게
@@ -1136,15 +1143,30 @@ const CSTATUS_C = { live: "var(--ok)", draft: "var(--ink-3)", test: "var(--warn)
 const KIND = { entry: "진입", page: "페이지", modal: "모달·시트", decision: "분기", exit: "이탈·종료", keyword: "키워드" };
 const SWATCH = ["#e0483f", "#f43f5e", "#ec4899", "#c026d3", "#8b5cf6", "#6366f1", "#2f6fed", "#0ea5e9", "#06b6d4",
   "#14b8a6", "#12a97a", "#65a30d", "#f2c94c", "#f2913c", "#d97706", "#92400e", "#111827", "#6b7280", "#d1d5db", "#ffffff"];
-/* 노드·연결선 공통 색 팔레트 */
+/* 노드·연결선 공통 색 팔레트 — 예전 7색은 키·값 그대로 두고 사이사이를 채웠다(기존 데이터 색 유지) */
 const HUE = {
   none:   { name: "기본", c: "var(--ink-3)" },
-  blue:   { name: "파랑", c: "#3b76f0" },
-  violet: { name: "보라", c: "#8b5cf6" },
-  green:  { name: "초록", c: "#12a97a" },
-  amber:  { name: "주황", c: "#e08a1e" },
   red:    { name: "빨강", c: "#e0483f" },
+  amber:  { name: "주황", c: "#e08a1e" },
+  yellow: { name: "노랑", c: "#ca8a04" },
+  lime:   { name: "라임", c: "#65a30d" },
+  green:  { name: "초록", c: "#12a97a" },
+  teal:   { name: "청록", c: "#0d9488" },
+  sky:    { name: "하늘", c: "#0ea5e9" },
+  blue:   { name: "파랑", c: "#3b76f0" },
+  indigo: { name: "남색", c: "#4f46e5" },
+  violet: { name: "보라", c: "#8b5cf6" },
+  pink:   { name: "분홍", c: "#ec4899" },
+  brown:  { name: "갈색", c: "#92400e" },
   slate:  { name: "회색", c: "#64748b" }
+};
+/* 페이지 카드 강조 효과 — 색만으로는 부족하다는 요청으로 굵기·채우기·상단바·그림자까지 늘렸다 */
+const EMPH = {
+  border: { name: "테두리" },
+  thick:  { name: "굵은 테두리" },
+  fill:   { name: "배경 채우기" },
+  bar:    { name: "상단 컬러바" },
+  glow:   { name: "그림자 강조" }
 };
 const NSIZE = { s: { name: "작게", w: 150 }, m: { name: "보통", w: 190 }, l: { name: "크게", w: 240 } };
 /* 키워드형(이미지 없는 라벨) 노드는 사진 영역이 없어 같은 3단계라도 훨씬 작게 잡는다 */
@@ -2094,7 +2116,8 @@ function renderNodes() {
     else delete have[n.id];
     const f = state.ui.focus || "all";
     const dim = (f === "camp" || f === "perf" || f === "incomplete" || PLAT[f]) && focusCount(n, f) === 0;
-    el.className = "node size-" + (n.size || "m") + (n.kind === "keyword" ? " kind-keyword" : "") + (n.sharp ? " sharp" : "") + (n.hue && n.hue !== "none" ? " hued" : "") +
+    el.className = "node size-" + (n.size || "m") + (n.kind === "keyword" ? " kind-keyword" : "") + (n.sharp ? " sharp" : "") +
+      (n.hue && n.hue !== "none" ? " hued emph-" + (n.emph || "border") : "") +
       (dim ? " dim" : "") + (f === "perf" ? " heat" : "");
     el.style.setProperty("--nc", hueOf(n.hue));
     /* 성과 위주 보기 — 매출이 큰 화면일수록 진하게 칠해 여정 위에서 바로 보이게 한다 */
@@ -2543,7 +2566,7 @@ function addNode() {
     x: Math.round((surf.width / 2 - v.panX) / v.zoom - 95),
     y: Math.round((surf.height / 2 - v.panY) / v.zoom - 75),
     shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H,
-    hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+    hue: "none", emph: "border", size: "m", sharp: false, tags: [], camps: [], layers: []
   };
   B().nodes.push(n); markDirty(); renderFlow(); selectNode(n.id); editNode(n.id);
 }
@@ -2556,14 +2579,15 @@ function editNode(id) {
       { k: "kind", label: "유형", type: "select", opts: KIND },
       { k: "path", label: "경로 · 화면 ID", mono: true, ph: "/product/:id" },
       { k: "hue", label: "색", type: "swatch" },
+      { k: "emph", label: "강조 효과", type: "select", opts: EMPH },
       { k: "size", label: "카드 크기", type: "select", opts: NSIZE },
       { k: "sharp", label: "각진 모서리로", type: "check" },
       n.kind === "keyword" ? null : { k: "shot", label: "화면 이미지", type: "action", icon: "camera", actionLabel: shotSrc(n) ? "화면 교체·삭제" : "화면 올리기" },
       { k: "note", label: "메모", type: "textarea", ph: "이 화면에서 확인해야 할 것" }
     ].filter(Boolean),
-    values: n,
+    values: Object.assign({ emph: "border" }, n),
     onSave: v => {
-      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
+      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, emph: v.emph, size: v.size, sharp: !!v.sharp });
       markDirty(); renderFlow(); renderPanels();
     },
     onAction: (k, getValues) => {
@@ -2571,7 +2595,7 @@ function editNode(id) {
       /* 사진을 올리는 동안 다른 칸에 입력해 둔 내용을 잃지 않도록, 이 창을
          닫기 전에 지금까지 입력한 값을 먼저 반영해 둔다. */
       const v = getValues();
-      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, size: v.size, sharp: !!v.sharp });
+      Object.assign(n, { name: v.name || "이름 없음", kind: v.kind, path: v.path, note: v.note, hue: v.hue, emph: v.emph, size: v.size, sharp: !!v.sharp });
       markDirty(); renderFlow(); renderPanels();
       closeModal();
       openShotModal(n, () => editNode(n.id));

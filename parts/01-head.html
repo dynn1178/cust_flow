@@ -237,6 +237,13 @@ select.field{cursor:pointer}
   box-shadow:var(--shadow-sm); overflow:hidden; transition:border-color .15s,box-shadow .15s}
 .node.sharp .node-frame{border-radius:5px}
 .node.hued .node-frame{border-color:color-mix(in srgb,var(--nc) 55%,var(--stroke))}
+/* 강조 효과 — 색 하나만으로는 부족하다는 요청으로 굵기·채우기·상단바·그림자를 더했다.
+   emph-border(기본)는 위 .node.hued 규칙만으로 충분해 별도 규칙이 없다. */
+.node.hued.emph-thick .node-frame{border-width:3px; border-color:var(--nc)}
+.node.hued.emph-fill .node-frame{background:color-mix(in srgb,var(--nc) 14%,var(--glass-3)); border-color:color-mix(in srgb,var(--nc) 45%,var(--stroke))}
+.node.hued.emph-bar .node-frame{border-top-width:5px; border-top-color:var(--nc)}
+.node.hued.emph-glow .node-frame{border-color:color-mix(in srgb,var(--nc) 40%,var(--stroke));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--nc) 35%,transparent),0 6px 18px -2px color-mix(in srgb,var(--nc) 50%,transparent),var(--shadow-sm)}
 .node.sel .node-frame{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft),var(--shadow)}
 /* 연결그리기 모드에서 클릭해 둔 출발 페이지 — 도착 페이지를 클릭하기 전까지
    계속 살아있는 표시라, 옅은 강조로는 놓치기 쉽다. 굵은 테두리 + 은은하게

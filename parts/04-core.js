@@ -35,15 +35,30 @@ const CSTATUS_C = { live: "var(--ok)", draft: "var(--ink-3)", test: "var(--warn)
 const KIND = { entry: "진입", page: "페이지", modal: "모달·시트", decision: "분기", exit: "이탈·종료", keyword: "키워드" };
 const SWATCH = ["#e0483f", "#f43f5e", "#ec4899", "#c026d3", "#8b5cf6", "#6366f1", "#2f6fed", "#0ea5e9", "#06b6d4",
   "#14b8a6", "#12a97a", "#65a30d", "#f2c94c", "#f2913c", "#d97706", "#92400e", "#111827", "#6b7280", "#d1d5db", "#ffffff"];
-/* 노드·연결선 공통 색 팔레트 */
+/* 노드·연결선 공통 색 팔레트 — 예전 7색은 키·값 그대로 두고 사이사이를 채웠다(기존 데이터 색 유지) */
 const HUE = {
   none:   { name: "기본", c: "var(--ink-3)" },
-  blue:   { name: "파랑", c: "#3b76f0" },
-  violet: { name: "보라", c: "#8b5cf6" },
-  green:  { name: "초록", c: "#12a97a" },
-  amber:  { name: "주황", c: "#e08a1e" },
   red:    { name: "빨강", c: "#e0483f" },
+  amber:  { name: "주황", c: "#e08a1e" },
+  yellow: { name: "노랑", c: "#ca8a04" },
+  lime:   { name: "라임", c: "#65a30d" },
+  green:  { name: "초록", c: "#12a97a" },
+  teal:   { name: "청록", c: "#0d9488" },
+  sky:    { name: "하늘", c: "#0ea5e9" },
+  blue:   { name: "파랑", c: "#3b76f0" },
+  indigo: { name: "남색", c: "#4f46e5" },
+  violet: { name: "보라", c: "#8b5cf6" },
+  pink:   { name: "분홍", c: "#ec4899" },
+  brown:  { name: "갈색", c: "#92400e" },
   slate:  { name: "회색", c: "#64748b" }
+};
+/* 페이지 카드 강조 효과 — 색만으로는 부족하다는 요청으로 굵기·채우기·상단바·그림자까지 늘렸다 */
+const EMPH = {
+  border: { name: "테두리" },
+  thick:  { name: "굵은 테두리" },
+  fill:   { name: "배경 채우기" },
+  bar:    { name: "상단 컬러바" },
+  glow:   { name: "그림자 강조" }
 };
 const NSIZE = { s: { name: "작게", w: 150 }, m: { name: "보통", w: 190 }, l: { name: "크게", w: 240 } };
 /* 키워드형(이미지 없는 라벨) 노드는 사진 영역이 없어 같은 3단계라도 훨씬 작게 잡는다 */
