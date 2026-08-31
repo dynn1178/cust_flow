@@ -55,6 +55,16 @@ function scheduleHistory() {
 function applyBoardSnapshot(b, json) {
   const snap = JSON.parse(json);
   applyingHistory = true;
+  /* shotData·thumb는 용량 때문에 이력에 담지 않는다(위 주석) — 그렇다고
+     되돌리기·다시 실행이 그걸 지워 버리면 안 된다. 아직 서버에 저장하지
+     않은 화면 이미지는 이 두 필드에만 있으므로, 지금 갖고 있는 값을 같은
+     id의 새 노드에 그대로 옮겨 붙여 잃어버리지 않게 한다. */
+  const prevById = {};
+  b.nodes.forEach(n => { prevById[n.id] = n; });
+  snap.nodes.forEach(n => {
+    const prev = prevById[n.id];
+    if (prev) { n.shotData = prev.shotData; n.thumb = prev.thumb; n.shotDirty = prev.shotDirty; }
+  });
   b.nodes = snap.nodes; b.edges = snap.edges; b.lanes = snap.lanes || [];
   if (b === B()) {
     sel = { node: snap.selNode && b.nodes.some(n => n.id === snap.selNode) ? snap.selNode : (b.nodes[0] || {}).id || null, edge: null, layer: null };
