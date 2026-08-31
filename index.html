@@ -190,7 +190,9 @@ select.field{cursor:pointer}
 #flowSurface.linking{cursor:crosshair}
 #flowWorld{position:absolute; top:0; left:0; transform-origin:0 0; width:0; height:0}
 #edgeLayer{position:absolute; overflow:visible; left:0; top:0; width:1px; height:1px; pointer-events:none}
-#edgeHandlesLayer{position:absolute; overflow:visible; left:0; top:0; width:1px; height:1px; pointer-events:none}
+/* 카드(.node)와 겹칠 때 항상 이 레이어가 클릭을 먼저 받도록 z-index를 명시한다
+   — DOM 순서(카드보다 뒤)만 믿지 않고 쌓임 순서를 확실히 고정한다 */
+#edgeHandlesLayer{position:absolute; overflow:visible; left:0; top:0; width:1px; height:1px; pointer-events:none; z-index:15}
 #edgeLayer .hit{stroke:transparent; stroke-width:18; fill:none; pointer-events:stroke; cursor:pointer}
 #edgeLayer path.wire{fill:none; stroke-linecap:round; transition:stroke .12s}
 #edgeLayer text{font:600 10.5px var(--f-ui); fill:var(--ink-2); paint-order:stroke;
@@ -212,8 +214,10 @@ select.field{cursor:pointer}
 /* 파란 점 — 출발·도착 연결점이 붙는 변(위/아래/좌/우)을 드래그로 바꾼다.
    카드 테두리·포트 점과 겹치지 않도록 카드 밖으로 떨어뜨려 놓고 점선으로 잇는다 */
 #edgeHandles .wp-side-link{stroke:#2f6fed; stroke-width:1; stroke-dasharray:2 3; opacity:.55; pointer-events:none}
-#edgeHandles .wp-side{fill:#2f6fed; stroke:#fff; stroke-width:1.5; cursor:move}
-#edgeHandles .wp-side:hover{filter:brightness(1.15)}
+#edgeHandles .wp-side{cursor:move}
+#edgeHandles .wp-side-hit{fill:transparent}
+#edgeHandles .wp-side-dot{fill:#2f6fed; stroke:#fff; stroke-width:1.5; pointer-events:none}
+#edgeHandles .wp-side:hover .wp-side-dot{filter:brightness(1.15)}
 #guideG .guide{stroke:var(--accent); stroke-width:1; stroke-dasharray:4 4; opacity:.85}
 /* 끌고 있는 동안에는 그림자·전환 효과를 끈다 — 카드마다 그림자를 다시
    그리느라 이동이 끊기지 않도록. 그림자는 .node가 아니라 .node-frame에 있다 */
@@ -1980,8 +1984,14 @@ function drawEdgeHandles() {
   const hp2 = { x: g.p2.x + g.n2.x * sideOff, y: g.p2.y + g.n2.y * sideOff };
   h += '<line class="wp-side-link" x1="' + g.p1.x + '" y1="' + g.p1.y + '" x2="' + hp1.x + '" y2="' + hp1.y + '"></line>';
   h += '<line class="wp-side-link" x1="' + g.p2.x + '" y1="' + g.p2.y + '" x2="' + hp2.x + '" y2="' + hp2.y + '"></line>';
-  h += '<circle class="wp-side" data-side="1" cx="' + hp1.x + '" cy="' + hp1.y + '" r="7"><title>드래그해서 출발 연결점(변) 바꾸기</title></circle>';
-  h += '<circle class="wp-side" data-side="2" cx="' + hp2.x + '" cy="' + hp2.y + '" r="7"><title>드래그해서 도착 연결점(변) 바꾸기</title></circle>';
+  /* 실제로 누르기 쉽도록, 보이는 점(반지름 7)보다 훨씬 넓은 투명 히트 영역(14)을
+     같은 <g> 안에 함께 둔다 — 어느 쪽을 눌러도 data-side로 잡힌다. */
+  h += '<g class="wp-side" data-side="1" transform="translate(' + hp1.x + "," + hp1.y + ')">' +
+    '<circle class="wp-side-hit" r="14"></circle><circle class="wp-side-dot" r="7"></circle>' +
+    '<title>드래그해서 출발 연결점(변) 바꾸기</title></g>';
+  h += '<g class="wp-side" data-side="2" transform="translate(' + hp2.x + "," + hp2.y + ')">' +
+    '<circle class="wp-side-hit" r="14"></circle><circle class="wp-side-dot" r="7"></circle>' +
+    '<title>드래그해서 도착 연결점(변) 바꾸기</title></g>';
   box.innerHTML = h;
 }
 
@@ -2527,7 +2537,8 @@ function openEdgePop(id, cx, cy) {
     markDirty(); drawEdges();
   });
   const away = ev => {
-    if (!ev.target.closest(".popover") && !ev.target.closest("[data-edge]") && !ev.target.closest("[data-wp]") && !ev.target.closest("[data-add]")) {
+    if (!ev.target.closest(".popover") && !ev.target.closest("[data-edge]") && !ev.target.closest("[data-wp]") &&
+        !ev.target.closest("[data-add]") && !ev.target.closest("[data-side]") && !ev.target.closest("[data-wpreset]")) {
       root.innerHTML = ""; sel.edge = null; drawEdges();
       document.removeEventListener("pointerdown", away);
     }

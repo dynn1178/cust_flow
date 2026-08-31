@@ -237,8 +237,14 @@ function drawEdgeHandles() {
   const hp2 = { x: g.p2.x + g.n2.x * sideOff, y: g.p2.y + g.n2.y * sideOff };
   h += '<line class="wp-side-link" x1="' + g.p1.x + '" y1="' + g.p1.y + '" x2="' + hp1.x + '" y2="' + hp1.y + '"></line>';
   h += '<line class="wp-side-link" x1="' + g.p2.x + '" y1="' + g.p2.y + '" x2="' + hp2.x + '" y2="' + hp2.y + '"></line>';
-  h += '<circle class="wp-side" data-side="1" cx="' + hp1.x + '" cy="' + hp1.y + '" r="7"><title>드래그해서 출발 연결점(변) 바꾸기</title></circle>';
-  h += '<circle class="wp-side" data-side="2" cx="' + hp2.x + '" cy="' + hp2.y + '" r="7"><title>드래그해서 도착 연결점(변) 바꾸기</title></circle>';
+  /* 실제로 누르기 쉽도록, 보이는 점(반지름 7)보다 훨씬 넓은 투명 히트 영역(14)을
+     같은 <g> 안에 함께 둔다 — 어느 쪽을 눌러도 data-side로 잡힌다. */
+  h += '<g class="wp-side" data-side="1" transform="translate(' + hp1.x + "," + hp1.y + ')">' +
+    '<circle class="wp-side-hit" r="14"></circle><circle class="wp-side-dot" r="7"></circle>' +
+    '<title>드래그해서 출발 연결점(변) 바꾸기</title></g>';
+  h += '<g class="wp-side" data-side="2" transform="translate(' + hp2.x + "," + hp2.y + ')">' +
+    '<circle class="wp-side-hit" r="14"></circle><circle class="wp-side-dot" r="7"></circle>' +
+    '<title>드래그해서 도착 연결점(변) 바꾸기</title></g>';
   box.innerHTML = h;
 }
 
@@ -784,7 +790,8 @@ function openEdgePop(id, cx, cy) {
     markDirty(); drawEdges();
   });
   const away = ev => {
-    if (!ev.target.closest(".popover") && !ev.target.closest("[data-edge]") && !ev.target.closest("[data-wp]") && !ev.target.closest("[data-add]")) {
+    if (!ev.target.closest(".popover") && !ev.target.closest("[data-edge]") && !ev.target.closest("[data-wp]") &&
+        !ev.target.closest("[data-add]") && !ev.target.closest("[data-side]") && !ev.target.closest("[data-wpreset]")) {
       root.innerHTML = ""; sel.edge = null; drawEdges();
       document.removeEventListener("pointerdown", away);
     }
