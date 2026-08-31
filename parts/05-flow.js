@@ -102,13 +102,15 @@ function pathFor(e) {
   const g = edgeGeom(e);
   if (!g) return null;
   if (g.self) {                                     // 같은 노드로 돌아오는 연결 — 고리가 선택한 연결점(위/아래/좌/우) 쪽으로 튀어나오게 그린다
-    const r = g.ra, bulge = 86, flare = 38;
+    const r = g.ra;
     const tangent = side => (side === "n" || side === "s") ? { x: 1, y: 0 } : { x: 0, y: 1 };
     const spread = side => ((side === "n" || side === "s") ? r.w : r.h) * 0.42;
     const t1 = tangent(g.s1), t2 = tangent(g.s2), n1 = SIDE_N[g.s1], n2 = SIDE_N[g.s2];
     const mid1 = sidePoint(r, g.s1), mid2 = sidePoint(r, g.s2);
     const p1 = { x: mid1.x - t1.x * spread(g.s1) / 2, y: mid1.y - t1.y * spread(g.s1) / 2 };
     const p2 = { x: mid2.x + t2.x * spread(g.s2) / 2, y: mid2.y + t2.y * spread(g.s2) / 2 };
+    if (e.route === "ortho") return roundedPath(orthoPoints({ p1, n1, p2, n2, wps: g.wps }), 12);
+    const bulge = 86, flare = 38;                    // 그 밖(직선 포함, 예전 데이터도)은 모두 기본 곡선 고리
     const c1 = { x: p1.x + n1.x * bulge - t1.x * flare, y: p1.y + n1.y * bulge - t1.y * flare };
     const c2 = { x: p2.x + n2.x * bulge + t2.x * flare, y: p2.y + n2.y * bulge + t2.y * flare };
     return "M " + p1.x + " " + p1.y + " C " + c1.x + " " + c1.y + " " + c2.x + " " + c2.y + " " + p2.x + " " + p2.y;
@@ -205,7 +207,13 @@ function drawEdgeHandles() {
   const isHeightOnly = g.wps.length <= 1;                 // 점이 0개(자동) 또는 1개(높이 고정)일 때만 "높이 점"으로 다룬다
   let h = "";
   g.wps.forEach((p, i) => {
-    h += '<circle class="wp' + (isHeightOnly ? " hgt" : "") + '" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (isHeightOnly ? 7 : 6) + '"><title>드래그해서 높이 조절</title></circle>';
+    h += '<circle class="wp' + (isHeightOnly ? " hgt" : "") + '" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (isHeightOnly ? 7 : 6) + '"><title>드래그해서 높이 조절 · 더블클릭하면 자동으로</title></circle>';
+    /* 높이를 고정한 뒤엔 처음 쓰는 사람도 바로 알아볼 수 있게, 더블클릭 대신
+       누르기만 하면 되는 × 되돌리기 버튼을 점 옆에 항상 띄워 둔다. */
+    if (g.wps.length === 1) {
+      h += '<g class="wp-reset" data-wpreset="' + i + '" transform="translate(' + (p.x + 13) + "," + (p.y - 13) + ')">' +
+        '<circle r="8"></circle><path d="M-3 -3 L3 3 M3 -3 L-3 3"></path><title>자동 높이로 되돌리기</title></g>';
+    }
   });
   for (let i = 0; i < pts.length - 1; i++) {
     let m;
@@ -220,6 +228,10 @@ function drawEdgeHandles() {
       (heightAdd ? ' data-hgt="1" data-lockx="' + m.x + '"' : "") +
       ' cx="' + m.x + '" cy="' + m.y + '" r="' + (heightAdd ? 7 : 5) + '"><title>드래그해서 높이 고정</title></circle>';
   }
+  /* 파란 점 — 노란 점이 높이(위·아래)라면 이건 좌우, 정확히는 연결점이 붙는
+     변(위·아래·좌·우) 자체를 드래그로 바꾼다. 출발·도착 양쪽에 하나씩 둔다. */
+  h += '<circle class="wp-side" data-side="1" cx="' + g.p1.x + '" cy="' + g.p1.y + '" r="7"><title>드래그해서 출발 연결점(변) 바꾸기</title></circle>';
+  h += '<circle class="wp-side" data-side="2" cx="' + g.p2.x + '" cy="' + g.p2.y + '" r="7"><title>드래그해서 도착 연결점(변) 바꾸기</title></circle>';
   box.innerHTML = h;
 }
 
@@ -522,6 +534,8 @@ function initFlow() {
   const surf = $("#flowSurface");
   const busy = on => $("#flowPane").classList.toggle("busy", on);
   const toWorld = (ev, r) => ({ x: (ev.clientX - r.left - B().view.panX) / B().view.zoom, y: (ev.clientY - r.top - B().view.panY) / B().view.zoom });
+  let lastWpTap = { key: null, t: 0 };   /* 노란 점 더블클릭 감지용 — pointerdown에 preventDefault를 걸면
+                                             브라우저가 click/dblclick 합성 자체를 하지 않아 직접 잰다 */
 
   surf.addEventListener("wheel", e => {
     e.preventDefault();
@@ -536,6 +550,32 @@ function initFlow() {
     if (mobileFlowPointer(e, surf)) return;
     if (laneMode && canEdit() && !e.target.closest(".lane-label") && !e.target.closest(".lane-edge")) { startLaneDraw(e, surf, surf.getBoundingClientRect()); return; }
     const r = surf.getBoundingClientRect();
+    const wpReset = e.target.closest("[data-wpreset]");
+    if (canEdit() && wpReset && sel.edge) {              /* 높이 고정 점 옆의 × — 눌러서 바로 자동으로 되돌린다 */
+      e.preventDefault(); e.stopPropagation();
+      edgeById(sel.edge).points.splice(+wpReset.dataset.wpreset, 1);
+      markDirty(); drawEdges();
+      return;
+    }
+    const sidePt = e.target.closest("[data-side]");
+    if (canEdit() && sidePt && sel.edge) {                /* 파란 점 — 드래그해서 연결점이 붙는 변(위·아래·좌·우)을 바꾼다 */
+      e.preventDefault(); e.stopPropagation();
+      const ed = edgeById(sel.edge), which = sidePt.dataset.side;
+      const rect = nodeRect(nodeById(which === "1" ? ed.from : ed.to));
+      const paint = onFrame(p => {
+        const side = autoSide(rect, p);
+        if (which === "1") ed.a1 = side; else ed.a2 = side;
+        geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
+      });
+      const mv = ev => paint(toWorld(ev, r));
+      const up = () => {
+        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
+        markDirty(); geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
+      };
+      surf.setPointerCapture(e.pointerId);
+      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
+      return;
+    }
     const wp = e.target.closest("[data-wp]"), add = e.target.closest("[data-add]");
     const port = e.target.closest("[data-port]");
     const nodeEl = e.target.closest("[data-node]");
@@ -549,7 +589,17 @@ function initFlow() {
       /* 아직 손대지 않은 기본(자동) 경로의 노란 점 — 좌우로는 움직이지 않고
          높이(위·아래)만 고정한다. 점이 이미 하나 있으면 그 점도 계속 같은
          규칙을 따른다(점 하나짜리 경로 = "높이 고정" 용도로 취급). */
-      if (wp) { idx = +wp.dataset.wp; if (ed.points.length === 1) lockX = ed.points[idx].x; }
+      if (wp) {
+        idx = +wp.dataset.wp;
+        if (ed.points.length === 1) lockX = ed.points[idx].x;
+        const key = sel.edge + ":" + idx, now = Date.now();
+        if (lastWpTap.key === key && now - lastWpTap.t < 400) {   /* 짧게 두 번 = 더블클릭 → 점 삭제(자동으로) */
+          lastWpTap = { key: null, t: 0 };
+          ed.points.splice(idx, 1); markDirty(); drawEdges();
+          return;
+        }
+        lastWpTap = { key, t: now };
+      }
       else {
         idx = +add.dataset.add;
         if (add.dataset.hgt) lockX = +add.dataset.lockx;
@@ -633,8 +683,9 @@ function initFlow() {
 
   surf.addEventListener("dblclick", e => {
     if (!canEdit()) return;
-    const wp = e.target.closest("[data-wp]");
-    if (wp && sel.edge) { edgeById(sel.edge).points.splice(+wp.dataset.wp, 1); markDirty(); drawEdges(); return; }
+    /* 점(.wp/.wpadd) 위 더블클릭은 pointerdown 쪽 수동 판정으로 처리한다 —
+       그 핸들러가 pointerdown에 preventDefault를 걸어 브라우저가 만드는
+       click/dblclick 합성 이벤트 자체가 여기까지 오지 않기 때문. */
     const n = e.target.closest("[data-node]");
     if (n) editNode(n.dataset.node);
   });
@@ -713,7 +764,8 @@ function openEdgePop(id, cx, cy) {
   root.innerHTML =
     '<div class="popover glass wide">' +
       '<div class="frow"><span class="lbl">연결 라벨</span><input class="field" id="epLabel" value="' + esc(e.label) + '" placeholder="예: 장바구니 담기"></div>' +
-      '<div class="frow"><span class="lbl">경로</span>' + seg("rt", ROUTE, e.route || "curve") + "</div>" +
+      '<div class="frow"><span class="lbl">경로</span>' + seg("rt", e.from === e.to ?
+        Object.fromEntries(Object.entries(ROUTE).filter(([k]) => k !== "line")) : ROUTE, e.route || "curve") + "</div>" +
       '<div class="frow"><span class="lbl">선 · 굵기</span><div class="rowseg">' + seg("st", { solid: "실선", dashed: "점선" }, e.style) +
         seg("wd", { 1: "가늘게", 2: "보통", 3: "굵게" }, String(e.width || 2)) + "</div></div>" +
       '<div class="frow"><span class="lbl">화살표</span>' + seg("kd", { arrow: "단방향", both: "양방향", none: "없음" }, e.kind) + "</div>" +

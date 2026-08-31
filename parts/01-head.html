@@ -195,6 +195,14 @@ select.field{cursor:pointer}
 #edgeHandles .wpadd.hgt{fill:#f2c94c; opacity:.5; stroke:#8a6d1a; stroke-width:1.5; cursor:ns-resize}
 #edgeHandles .wpadd.hgt:hover{opacity:.95}
 #edgeHandles .wp.hgt{fill:#f2c94c; stroke:#8a6d1a; stroke-width:2; cursor:ns-resize}
+/* 높이를 고정한 노란 점 옆의 × — 더블클릭을 몰라도 눌러서 바로 자동으로 되돌릴 수 있게 항상 보여준다 */
+#edgeHandles .wp-reset circle{fill:var(--bg-3); stroke:var(--stroke-2); stroke-width:1.5; cursor:pointer}
+#edgeHandles .wp-reset path{stroke:var(--ink-3); stroke-width:1.6; stroke-linecap:round; pointer-events:none}
+#edgeHandles .wp-reset:hover circle{fill:var(--bad); stroke:var(--bad)}
+#edgeHandles .wp-reset:hover path{stroke:#fff}
+/* 파란 점 — 출발·도착 연결점이 붙는 변(위/아래/좌/우)을 드래그로 바꾼다 */
+#edgeHandles .wp-side{fill:#2f6fed; stroke:#fff; stroke-width:1.5; cursor:move}
+#edgeHandles .wp-side:hover{filter:brightness(1.15)}
 #guideG .guide{stroke:var(--accent); stroke-width:1; stroke-dasharray:4 4; opacity:.85}
 /* 끌고 있는 동안에는 그림자·전환 효과를 끈다 — 카드마다 그림자를 다시
    그리느라 이동이 끊기지 않도록. 그림자는 .node가 아니라 .node-frame에 있다 */
