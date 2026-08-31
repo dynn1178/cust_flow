@@ -153,10 +153,21 @@ function pathFor(e) {
   if (e.route === "ortho") return roundedPath(orthoPoints(g), 12);
   if (!g.wps.length) {                              // 기본 곡선 — 연결점 방향으로 부드럽게 빠져나간다
     const dist = Math.hypot(g.p2.x - g.p1.x, g.p2.y - g.p1.y);
-    const c = clamp(dist * 0.42, 40, 190);
+    /* 태그·캠페인 목록은 프레임 아래로 늘어져 있는데(연결점 계산엔 안 잡힘),
+       선이 위/아래(s)나 좌/우(e·w)로 나가면서 바로 꺾이면 그 목록 위를
+       가로질러 지나가 뒤에 가려 보이지 않았다. 목록이 있는 쪽으로 나가는
+       구간은, 그 목록 높이만큼은 다 지나고 나서 꺾이도록 출발 거리를 늘린다
+       (위(n)로 나갈 땐 목록과 반대 방향이라 그대로 둔다). */
+    const listExtra = (id, side) => {
+      if (side === "n") return 0;
+      const s = NSZ[id];
+      return s && s.frameH ? Math.max(0, s.h - s.frameH) : 0;
+    };
+    const c1 = clamp(Math.max(dist * 0.42, listExtra(e.from, g.s1) + 34), 40, 220);
+    const c2 = clamp(Math.max(dist * 0.42, listExtra(e.to, g.s2) + 34), 40, 220);
     return "M " + g.p1.x + " " + g.p1.y +
-      " C " + (g.p1.x + g.n1.x * c) + " " + (g.p1.y + g.n1.y * c) +
-      " " + (g.p2.x + g.n2.x * c) + " " + (g.p2.y + g.n2.y * c) +
+      " C " + (g.p1.x + g.n1.x * c1) + " " + (g.p1.y + g.n1.y * c1) +
+      " " + (g.p2.x + g.n2.x * c2) + " " + (g.p2.y + g.n2.y * c2) +
       " " + g.p2.x + " " + g.p2.y;
   }
   if (g.wps.length === 1) {                          // 높이 고정 점(노란 점) — 가장 흔한 경우, 손으로 짠 2구간 곡선
