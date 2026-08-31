@@ -44,6 +44,17 @@ function nodeNominalRect(n) {
   const h = n.kind === "keyword" ? (NOM_KW_H[n.size] || NOM_KW_H.m) : (NOM_PIC_H[n.size] || NOM_PIC_H.m) + 34;
   return { x: n.x, y: n.y, w, h, midY: n.y + h / 2 };
 }
+/* 화살표가 실제로 닿는 자리 전용 — 기준 크기(nom)를 쓰되, 확대·축소 배율이
+   낮아 카드가 기준보다 실제로 더 크게 보일 때는(가독성 보정) 그만큼은
+   따라가게 해서 화살촉이 카드 안쪽에 가려지지 않게 한다. 100% 이상
+   배율에서는 실제 크기가 기준과 같아 완전히 고정된다 — "어느 변에 붙을지"
+   판정(autoSide)에는 이 값 대신 항상 nom을 그대로 쓴다. */
+function nodeVisibleRect(n, nom) {
+  const s = NSZ[n.id];
+  const w = s ? Math.max(nom.w, s.w) : nom.w;
+  const h = s && s.frameH ? Math.max(nom.h, s.frameH) : nom.h;
+  return { x: n.x, y: n.y, w, h, midY: n.y + h / 2 };
+}
 
 /* ---------------- 연결선 기하 ---------------- */
 const SIDE_N = { n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, e: { x: 1, y: 0 }, w: { x: -1, y: 0 } };
@@ -66,12 +77,15 @@ function autoSide(r, target) {
 function edgeGeom(e) {
   const a = nodeById(e.from), b = nodeById(e.to);
   if (!a || !b) return null;
-  const ra = nodeNominalRect(a), rb = nodeNominalRect(b);
+  const raNom = nodeNominalRect(a), rbNom = nodeNominalRect(b);
+  const ra = nodeVisibleRect(a, raNom), rb = nodeVisibleRect(b, rbNom);
   const wps = (e.points || []).map(p => ({ x: p.x, y: p.y }));
   const firstT = wps[0] || { x: rb.x + rb.w / 2, y: rb.y + rb.h / 2 };
   const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
-  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT);
-  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT);
+  /* 어느 변에 붙을지는 항상 기준 크기(raNom/rbNom)로만 판정 — 카드가
+     커져도 이 판정 자체는 흔들리지 않는다. */
+  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(raNom, firstT);
+  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rbNom, lastT);
   const t1 = e.a1t, t2 = e.a2t;
   return { p1: sidePoint(ra, s1, t1), n1: SIDE_N[s1], p2: sidePoint(rb, s2, t2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2, t1, t2 };
 }
