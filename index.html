@@ -1814,7 +1814,11 @@ function nodeVisibleRect(n, nom) {
   const s = NSZ[n.id];
   const w = s ? Math.max(nom.w, s.w) : nom.w;
   const h = s && s.frameH ? Math.max(nom.h, s.frameH) : nom.h;
-  return { x: n.x, y: n.y, w, h, midY: n.y + h / 2 };
+  /* fullH = 태그·캠페인 목록까지 합친 카드 전체 높이(NSZ.h는 원래 이걸 잰다) —
+     "아래(s)" 연결점 전용이다. midY(좌우 연결점 세로 중앙)는 그대로 프레임
+     기준을 쓴다 — 목록 길이가 들쭉날쭉해도 좌우 연결점은 흔들리면 안 된다. */
+  const fullH = s && s.h ? Math.max(nom.h, s.h) : h;
+  return { x: n.x, y: n.y, w, h, fullH, midY: n.y + h / 2 };
 }
 
 /* ---------------- 연결선 기하 ---------------- */
@@ -1825,7 +1829,7 @@ function sidePoint(r, side, t) {
   const midY = r.midY != null ? r.midY : r.y + r.h / 2;
   const pct = (t == null ? 50 : clamp(t, 0, 100)) / 100;
   if (side === "n") return { x: r.x + r.w * pct, y: r.y };
-  if (side === "s") return { x: r.x + r.w * pct, y: r.y + r.h };
+  if (side === "s") return { x: r.x + r.w * pct, y: r.y + (r.fullH != null ? r.fullH : r.h) };
   if (side === "w") return { x: r.x, y: midY + r.h * (pct - 0.5) };
   return { x: r.x + r.w, y: midY + r.h * (pct - 0.5) };
 }
@@ -1914,13 +1918,12 @@ function pathFor(e) {
   if (e.route === "ortho") return roundedPath(orthoPoints(g), 12);
   if (!g.wps.length) {                              // 기본 곡선 — 연결점 방향으로 부드럽게 빠져나간다
     const dist = Math.hypot(g.p2.x - g.p1.x, g.p2.y - g.p1.y);
-    /* 태그·캠페인 목록은 프레임 아래로 늘어져 있는데(연결점 계산엔 안 잡힘),
-       선이 위/아래(s)나 좌/우(e·w)로 나가면서 바로 꺾이면 그 목록 위를
-       가로질러 지나가 뒤에 가려 보이지 않았다. 목록이 있는 쪽으로 나가는
-       구간은, 그 목록 높이만큼은 다 지나고 나서 꺾이도록 출발 거리를 늘린다
-       (위(n)로 나갈 땐 목록과 반대 방향이라 그대로 둔다). */
+    /* 태그·캠페인 목록은 프레임 아래로 늘어져 있다. "아래(s)" 연결점은 이제
+       목록까지 합친 진짜 카드 바닥에 붙어서(nodeVisibleRect의 fullH) 더 이상
+       목록을 가로지르지 않는다 — 여기서는 좌/우(e·w)로 나간 뒤 아래로 굽어
+       들어가면서 자기 카드의 목록 위를 스치는 경우만 다룬다. */
     const listExtra = (id, side) => {
-      if (side === "n") return 0;
+      if (side !== "e" && side !== "w") return 0;
       const s = NSZ[id];
       return s && s.frameH ? Math.max(0, s.h - s.frameH) : 0;
     };
