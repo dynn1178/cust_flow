@@ -291,7 +291,7 @@ function nodeHtml(n) {
      태그·캠페인은 다른 페이지와 똑같이 달 수 있어 배지·목록(body)은 그대로 쓴다. */
   if (n.kind === "keyword") {
     return '<div class="node-frame">' +
-        '<div class="kw-pill">' + ico("tag", "xs") + '<span class="kw-name">' + esc(n.name) + "</span></div>" + warn +
+        '<div class="kw-pill"><span class="kw-name" title="' + esc(n.name) + '">' + esc(n.name) + "</span></div>" + warn +
         '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
         '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
       "</div>" +
@@ -313,7 +313,7 @@ function nodeHtml(n) {
      연결선 포트도 프레임 안에 둬서, 목록 길이와 상관없이 항상 프레임(이미지)
      세로 중앙에서 선이 시작하도록 한다. */
   return '<div class="node-frame">' +
-      '<div class="node-title"><div class="node-name">' + esc(n.name) + "</div>" +
+      '<div class="node-title"><div class="node-name" title="' + esc(n.name) + '">' + esc(n.name) + "</div>" +
       (n.path ? '<div class="node-path">' + esc(n.path) + "</div>" : "") +
       "</div>" +
       '<div class="node-pic">' + thumb + warn + "</div>" +
