@@ -111,6 +111,11 @@ body.viewer .staff-only{display:none !important}
 .seg .btn{border:0; background:transparent; box-shadow:none; height:26px}
 .seg .btn.on{background:var(--accent); color:var(--accent-ink); box-shadow:var(--shadow-sm)}
 .rowseg{display:flex; gap:6px; flex-wrap:wrap}
+.posrow{display:flex; align-items:center; gap:8px}
+.posrow input[type=range]{flex:1; accent-color:var(--accent)}
+.posrow input[type=range]:disabled{opacity:.4}
+.posrow input[type=number]{width:48px; padding:5px 4px; text-align:center; flex:none}
+.posrow .btn.icon{flex:none}
 .chip{
   display:inline-flex; align-items:center; gap:5px; height:21px; padding:0 8px; border-radius:99px;
   font-size:11px; font-weight:600; white-space:nowrap;
@@ -211,13 +216,6 @@ select.field{cursor:pointer}
 #edgeHandles .wp-reset path{stroke:var(--ink-3); stroke-width:1.6; stroke-linecap:round; pointer-events:none}
 #edgeHandles .wp-reset:hover circle{fill:var(--bad); stroke:var(--bad)}
 #edgeHandles .wp-reset:hover path{stroke:#fff}
-/* 파란 점 — 출발·도착 연결점이 붙는 변(위/아래/좌/우)을 드래그로 바꾼다.
-   카드 테두리·포트 점과 겹치지 않도록 카드 밖으로 떨어뜨려 놓고 점선으로 잇는다 */
-#edgeHandles .wp-side-link{stroke:#2f6fed; stroke-width:1; stroke-dasharray:2 3; opacity:.55; pointer-events:none}
-#edgeHandles .wp-side{cursor:move}
-#edgeHandles .wp-side-hit{fill:transparent}
-#edgeHandles .wp-side-dot{fill:#2f6fed; stroke:#fff; stroke-width:1.5; pointer-events:none}
-#edgeHandles .wp-side:hover .wp-side-dot{filter:brightness(1.15)}
 #guideG .guide{stroke:var(--accent); stroke-width:1; stroke-dasharray:4 4; opacity:.85}
 /* 끌고 있는 동안에는 그림자·전환 효과를 끈다 — 카드마다 그림자를 다시
    그리느라 이동이 끊기지 않도록. 그림자는 .node가 아니라 .node-frame에 있다 */
@@ -1779,12 +1777,15 @@ function nodeRect(n) {
 
 /* ---------------- 연결선 기하 ---------------- */
 const SIDE_N = { n: { x: 0, y: -1 }, s: { x: 0, y: 1 }, e: { x: 1, y: 0 }, w: { x: -1, y: 0 } };
-function sidePoint(r, side) {
+/* t(0~100) = 그 변을 따라 어디에 붙을지(왼→오 · 위→아래). 안 주면(=undefined)
+   예전처럼 항상 정가운데(50)에 붙는다 — 저장된 예전 연결선도 그대로 보인다. */
+function sidePoint(r, side, t) {
   const midY = r.midY != null ? r.midY : r.y + r.h / 2;
-  if (side === "n") return { x: r.x + r.w / 2, y: r.y };
-  if (side === "s") return { x: r.x + r.w / 2, y: r.y + r.h };
-  if (side === "w") return { x: r.x, y: midY };
-  return { x: r.x + r.w, y: midY };
+  const pct = (t == null ? 50 : clamp(t, 0, 100)) / 100;
+  if (side === "n") return { x: r.x + r.w * pct, y: r.y };
+  if (side === "s") return { x: r.x + r.w * pct, y: r.y + r.h };
+  if (side === "w") return { x: r.x, y: midY + r.h * (pct - 0.5) };
+  return { x: r.x + r.w, y: midY + r.h * (pct - 0.5) };
 }
 function autoSide(r, target) {
   const cx = r.x + r.w / 2, cy = r.midY != null ? r.midY : r.y + r.h / 2;
@@ -1801,7 +1802,8 @@ function edgeGeom(e) {
   const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
   const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT);
   const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT);
-  return { p1: sidePoint(ra, s1), n1: SIDE_N[s1], p2: sidePoint(rb, s2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2 };
+  const t1 = e.a1t, t2 = e.a2t;
+  return { p1: sidePoint(ra, s1, t1), n1: SIDE_N[s1], p2: sidePoint(rb, s2, t2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2, t1, t2 };
 }
 function smoothPath(pts) {
   if (pts.length < 2) return "";
@@ -1853,7 +1855,7 @@ function pathFor(e) {
     const tangent = side => (side === "n" || side === "s") ? { x: 1, y: 0 } : { x: 0, y: 1 };
     const spread = side => ((side === "n" || side === "s") ? r.w : r.h) * 0.42;
     const t1 = tangent(g.s1), t2 = tangent(g.s2), n1 = SIDE_N[g.s1], n2 = SIDE_N[g.s2];
-    const mid1 = sidePoint(r, g.s1), mid2 = sidePoint(r, g.s2);
+    const mid1 = sidePoint(r, g.s1, g.t1), mid2 = sidePoint(r, g.s2, g.t2);
     const p1 = { x: mid1.x - t1.x * spread(g.s1) / 2, y: mid1.y - t1.y * spread(g.s1) / 2 };
     const p2 = { x: mid2.x + t2.x * spread(g.s2) / 2, y: mid2.y + t2.y * spread(g.s2) / 2 };
     if (e.route === "ortho") return roundedPath(orthoPoints({ p1, n1, p2, n2, wps: g.wps }), 12);
@@ -1975,23 +1977,6 @@ function drawEdgeHandles() {
       (heightAdd ? ' data-hgt="1" data-lockx="' + m.x + '"' : "") +
       ' cx="' + m.x + '" cy="' + m.y + '" r="' + (heightAdd ? 7 : 5) + '"><title>드래그해서 높이 고정</title></circle>';
   }
-  /* 파란 점 — 노란 점이 높이(위·아래)라면 이건 좌우, 정확히는 연결점이 붙는
-     변(위·아래·좌·우) 자체를 드래그로 바꾼다. 출발·도착 양쪽에 하나씩 둔다.
-     실제 연결점(p1/p2) 바로 위에 두면 카드 테두리·선택 영역·포트 점과 겹쳐
-     누르기 어려우니, 카드 밖으로 살짝 떨어뜨려 놓고 점선으로 이어 보여준다. */
-  const sideOff = 18;
-  const hp1 = { x: g.p1.x + g.n1.x * sideOff, y: g.p1.y + g.n1.y * sideOff };
-  const hp2 = { x: g.p2.x + g.n2.x * sideOff, y: g.p2.y + g.n2.y * sideOff };
-  h += '<line class="wp-side-link" x1="' + g.p1.x + '" y1="' + g.p1.y + '" x2="' + hp1.x + '" y2="' + hp1.y + '"></line>';
-  h += '<line class="wp-side-link" x1="' + g.p2.x + '" y1="' + g.p2.y + '" x2="' + hp2.x + '" y2="' + hp2.y + '"></line>';
-  /* 실제로 누르기 쉽도록, 보이는 점(반지름 7)보다 훨씬 넓은 투명 히트 영역(14)을
-     같은 <g> 안에 함께 둔다 — 어느 쪽을 눌러도 data-side로 잡힌다. */
-  h += '<g class="wp-side" data-side="1" transform="translate(' + hp1.x + "," + hp1.y + ')">' +
-    '<circle class="wp-side-hit" r="14"></circle><circle class="wp-side-dot" r="7"></circle>' +
-    '<title>드래그해서 출발 연결점(변) 바꾸기</title></g>';
-  h += '<g class="wp-side" data-side="2" transform="translate(' + hp2.x + "," + hp2.y + ')">' +
-    '<circle class="wp-side-hit" r="14"></circle><circle class="wp-side-dot" r="7"></circle>' +
-    '<title>드래그해서 도착 연결점(변) 바꾸기</title></g>';
   box.innerHTML = h;
 }
 
@@ -2312,25 +2297,6 @@ function initFlow() {
       markDirty(); drawEdges();
       return;
     }
-    const sidePt = e.target.closest("[data-side]");
-    if (canEdit() && sidePt && sel.edge) {                /* 파란 점 — 드래그해서 연결점이 붙는 변(위·아래·좌·우)을 바꾼다 */
-      e.preventDefault(); e.stopPropagation();
-      const ed = edgeById(sel.edge), which = sidePt.dataset.side;
-      const rect = nodeRect(nodeById(which === "1" ? ed.from : ed.to));
-      const paint = onFrame(p => {
-        const side = autoSide(rect, p);
-        if (which === "1") ed.a1 = side; else ed.a2 = side;
-        geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
-      });
-      const mv = ev => paint(toWorld(ev, r));
-      const up = () => {
-        surf.removeEventListener("pointermove", mv); surf.removeEventListener("pointerup", up); surf.removeEventListener("pointercancel", up);
-        markDirty(); geomEdge(ed, EDGE_EL[ed.id]); drawEdgeHandles();
-      };
-      surf.setPointerCapture(e.pointerId);
-      surf.addEventListener("pointermove", mv); surf.addEventListener("pointerup", up); surf.addEventListener("pointercancel", up);
-      return;
-    }
     const wp = e.target.closest("[data-wp]"), add = e.target.closest("[data-add]");
     const nodeEl = e.target.closest("[data-node]");
     const edgeHit = e.target.closest("[data-edge]");
@@ -2493,6 +2459,17 @@ function openEdgePop(id, cx, cy) {
   const e = edgeById(id); if (!e) return;
   const seg = (key, opts, cur) => '<div class="seg wrap">' + Object.entries(opts).map(([k, v]) =>
     '<button class="btn sm' + (cur === k ? " on" : "") + '" data-' + key + '="' + k + '">' + esc(typeof v === "string" ? v : v.name) + "</button>").join("") + "</div>";
+  /* 연결점이 붙는 변을 고른 뒤, 그 변을 따라 0(왼쪽·위)~100(오른쪽·아래) 중
+     어디에 붙을지 슬라이더로 정한다. 변이 "자동"이면 의미가 없어 비활성화한다. */
+  const posRow = key => {
+    const disabled = !e[key] || e[key] === "auto";
+    const val = e[key + "t"] != null ? clamp(e[key + "t"], 0, 100) : 50;
+    return '<div class="frow"><span class="lbl">붙는 위치(0~100)</span><div class="posrow">' +
+      '<input type="range" min="0" max="100" step="1" value="' + val + '" data-posr="' + key + '"' + (disabled ? " disabled" : "") + '>' +
+      '<input type="number" min="0" max="100" class="field mono" value="' + val + '" data-posi="' + key + '"' + (disabled ? " disabled" : "") + '>' +
+      '<button type="button" class="btn icon sm" data-posreset="' + key + '" title="가운데(50)로 되돌리기">' + ico("loop", "xs") + "</button>" +
+    "</div></div>";
+  };
   const root = $("#popRoot");
   root.innerHTML =
     '<div class="popover glass wide">' +
@@ -2507,7 +2484,9 @@ function openEdgePop(id, cx, cy) {
         Object.entries(HUE).map(([k, h]) => '<button class="hue' + ((e.hue || "none") === k ? " on" : "") + '" data-hu="' + k + '" title="' + h.name + '" style="--h:' + h.c + '"></button>').join("") +
       "</div></div>" +
       '<div class="frow"><span class="lbl">연결점 — 출발</span>' + seg("a1", ANCHOR, e.a1 || "auto") + "</div>" +
+      posRow("a1") +
       '<div class="frow"><span class="lbl">연결점 — 도착</span>' + seg("a2", ANCHOR, e.a2 || "auto") + "</div>" +
+      posRow("a2") +
       '<p class="hint">선 위의 작은 점을 끌면 경로가 꺾입니다. 꺾임점을 더블클릭하면 지워집니다.</p>' +
       '<div class="rowseg">' +
         '<button class="btn sm" data-reset style="flex:1">' + ico("loop", "xs") + "경로 초기화</button>" +
@@ -2518,6 +2497,20 @@ function openEdgePop(id, cx, cy) {
   pop.style.left = clamp(cx - 150, 8, Math.max(8, innerWidth - 320)) + "px";
   pop.style.top = clamp(cy + 12, 8, Math.max(8, innerHeight - pop.offsetHeight - 12)) + "px";
   $("#epLabel", pop).addEventListener("input", ev => { e.label = ev.target.value; markDirty(); drawEdges(); });
+  /* 연결점이 "자동"이면 붙는 위치를 정해도 의미가 없어 슬라이더를 비활성화한다 —
+     변을 고르거나 초기화할 때마다 다시 맞춰준다. */
+  const syncPos = key => {
+    const disabled = !e[key] || e[key] === "auto";
+    $('[data-posr="' + key + '"]', pop).disabled = disabled;
+    $('[data-posi="' + key + '"]', pop).disabled = disabled;
+  };
+  const setPos = (key, v) => {
+    v = clamp(Math.round(v), 0, 100);
+    e[key + "t"] = v;
+    $('[data-posr="' + key + '"]', pop).value = v;
+    $('[data-posi="' + key + '"]', pop).value = v;
+    markDirty(); drawEdges();
+  };
   pop.addEventListener("click", ev => {
     const setSeg = (k, prop, num) => {
       const b = ev.target.closest("[data-" + k + "]"); if (!b) return;
@@ -2528,17 +2521,37 @@ function openEdgePop(id, cx, cy) {
       B().edges = B().edges.filter(x => x.id !== id);
       root.innerHTML = ""; sel.edge = null; markDirty(); drawEdges(); return;
     }
-    if (ev.target.closest("[data-reset]")) { e.points = []; e.a1 = "auto"; e.a2 = "auto"; markDirty(); drawEdges(); return; }
+    if (ev.target.closest("[data-reset]")) {
+      e.points = []; e.a1 = "auto"; e.a2 = "auto"; e.a1t = 50; e.a2t = 50;
+      markDirty(); drawEdges();
+      $$("[data-a1]", pop).forEach(x => x.classList.toggle("on", x.dataset.a1 === "auto"));
+      $$("[data-a2]", pop).forEach(x => x.classList.toggle("on", x.dataset.a2 === "auto"));
+      $('[data-posr="a1"]', pop).value = 50; $('[data-posi="a1"]', pop).value = 50;
+      $('[data-posr="a2"]', pop).value = 50; $('[data-posi="a2"]', pop).value = 50;
+      syncPos("a1"); syncPos("a2");
+      return;
+    }
     if (ev.target.closest("[data-close]")) { root.innerHTML = ""; sel.edge = null; drawEdges(); return; }
+    const posReset = ev.target.closest("[data-posreset]");
+    if (posReset) { setPos(posReset.dataset.posreset, 50); return; }
     const hu = ev.target.closest("[data-hu]");
     if (hu) { e.hue = hu.dataset.hu; $$("[data-hu]", pop).forEach(x => x.classList.toggle("on", x === hu)); }
     setSeg("rt", "route"); setSeg("st", "style"); setSeg("kd", "kind"); setSeg("wd", "width", true); setSeg("hd", "head");
     setSeg("a1", "a1"); setSeg("a2", "a2");
+    syncPos("a1"); syncPos("a2");
     markDirty(); drawEdges();
+  });
+  pop.addEventListener("input", ev => {
+    const r = ev.target.closest("[data-posr]"), n = ev.target.closest("[data-posi]");
+    if (r) setPos(r.dataset.posr, +r.value);
+    else if (n) setPos(n.dataset.posi, +n.value || 0);
+  });
+  pop.addEventListener("dblclick", ev => {
+    const r = ev.target.closest("[data-posr]"); if (r) setPos(r.dataset.posr, 50);
   });
   const away = ev => {
     if (!ev.target.closest(".popover") && !ev.target.closest("[data-edge]") && !ev.target.closest("[data-wp]") &&
-        !ev.target.closest("[data-add]") && !ev.target.closest("[data-side]") && !ev.target.closest("[data-wpreset]")) {
+        !ev.target.closest("[data-add]") && !ev.target.closest("[data-wpreset]")) {
       root.innerHTML = ""; sel.edge = null; drawEdges();
       document.removeEventListener("pointerdown", away);
     }
