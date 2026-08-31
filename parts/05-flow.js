@@ -106,16 +106,17 @@ function orthoPoints(g) {
 function pathFor(e) {
   const g = edgeGeom(e);
   if (!g) return null;
-  if (g.self) {                                     // 같은 노드로 돌아오는 연결 — 고리가 선택한 연결점(위/아래/좌/우) 쪽으로 튀어나오게 그린다
-    const r = g.ra;
-    const tangent = side => (side === "n" || side === "s") ? { x: 1, y: 0 } : { x: 0, y: 1 };
-    const spread = side => ((side === "n" || side === "s") ? r.w : r.h) * 0.42;
-    const t1 = tangent(g.s1), t2 = tangent(g.s2), n1 = SIDE_N[g.s1], n2 = SIDE_N[g.s2];
-    const mid1 = sidePoint(r, g.s1, g.t1), mid2 = sidePoint(r, g.s2, g.t2);
-    const p1 = { x: mid1.x - t1.x * spread(g.s1) / 2, y: mid1.y - t1.y * spread(g.s1) / 2 };
-    const p2 = { x: mid2.x + t2.x * spread(g.s2) / 2, y: mid2.y + t2.y * spread(g.s2) / 2 };
+  if (g.self) {                                     // 같은 노드로 돌아오는 연결 — 고리가 선택한 연결점(위/아래/좌/우, 그 변 위 위치) 쪽으로 튀어나오게 그린다
+    const r = g.ra, n1 = SIDE_N[g.s1], n2 = SIDE_N[g.s2];
+    /* 예전엔 여기서 두 점을 억지로 벌려(spread) 놓았는데, 지금은 "붙는 위치"
+       슬라이더로 이미 원하는 만큼 떨어뜨릴 수 있어 그 위에 또 벌리면 카드
+       밖으로 튀어나가 버렸다(화살표가 카드와 동떨어져 보이던 원인) — 이제는
+       고른 위치(sidePoint) 그대로 쓴다. */
+    const p1 = sidePoint(r, g.s1, g.t1), p2 = sidePoint(r, g.s2, g.t2);
     if (e.route === "ortho") return roundedPath(orthoPoints({ p1, n1, p2, n2, wps: g.wps }), 12);
-    const bulge = 86, flare = 38;                    // 그 밖(직선 포함, 예전 데이터도)은 모두 기본 곡선 고리
+    if (g.wps.length) return smoothPath([p1].concat(g.wps, [p2]));   // 노란 점으로 높이를 고정했을 때
+    const tangent = side => (side === "n" || side === "s") ? { x: 1, y: 0 } : { x: 0, y: 1 };
+    const t1 = tangent(g.s1), t2 = tangent(g.s2), bulge = 86, flare = 38;   // 그 밖(직선 포함, 예전 데이터도)은 모두 기본 곡선 고리
     const c1 = { x: p1.x + n1.x * bulge - t1.x * flare, y: p1.y + n1.y * bulge - t1.y * flare };
     const c2 = { x: p2.x + n2.x * bulge + t2.x * flare, y: p2.y + n2.y * bulge + t2.y * flare };
     return "M " + p1.x + " " + p1.y + " C " + c1.x + " " + c1.y + " " + c2.x + " " + c2.y + " " + p2.x + " " + p2.y;
@@ -180,8 +181,12 @@ function geomEdge(e, rec) {
   }
   const L = rec.wire.getTotalLength();
   const size = (7 + (e.width || 2) * 1.5) * ((HEADSZ[e.head] || HEADSZ.m).m);
-  rec.head.setAttribute("d", e.kind === "none" ? "" : headPath(rec, L, Math.max(0, L - 14), size));
-  rec.tail.setAttribute("d", e.kind === "both" ? headPath(rec, 0, Math.min(L, 14), size) : "");
+  /* "반대" — 단방향 화살표의 머리를 도착이 아니라 출발 쪽에 그린다.
+     양방향·없음은 방향이 의미 없어 그대로 둔다. */
+  const headAtEnd = e.kind !== "none" && !(e.kind === "arrow" && e.reverse);
+  const headAtStart = e.kind === "both" || (e.kind === "arrow" && e.reverse);
+  rec.head.setAttribute("d", headAtEnd ? headPath(rec, L, Math.max(0, L - 14), size) : "");
+  rec.tail.setAttribute("d", headAtStart ? headPath(rec, 0, Math.min(L, 14), size) : "");
   if (e.label) {
     const pt = rec.wire.getPointAtLength(L * 0.5);
     rec.text.setAttribute("x", pt.x);
@@ -206,7 +211,7 @@ function moveEdgesOf(nodeId) {
 function drawEdgeHandles() {
   const box = $("#edgeHandles");
   const e = sel.edge ? edgeById(sel.edge) : null;
-  if (!e || e.from === e.to || !canEdit()) { if (box.innerHTML) box.innerHTML = ""; return; }
+  if (!e || !canEdit()) { if (box.innerHTML) box.innerHTML = ""; return; }
   const g = edgeGeom(e); if (!g) { box.innerHTML = ""; return; }
   const pts = [g.p1].concat(g.wps, [g.p2]);
   const isHeightOnly = g.wps.length <= 1;                 // 점이 0개(자동) 또는 1개(높이 고정)일 때만 "높이 점"으로 다룬다
@@ -735,7 +740,10 @@ function openEdgePop(id, cx, cy) {
         Object.fromEntries(Object.entries(ROUTE).filter(([k]) => k !== "line")) : ROUTE, e.route || "curve") + "</div>" +
       '<div class="frow"><span class="lbl">선 · 굵기</span><div class="rowseg">' + seg("st", { solid: "실선", dashed: "점선" }, e.style) +
         seg("wd", { 1: "가늘게", 2: "보통", 3: "굵게" }, String(e.width || 2)) + "</div></div>" +
-      '<div class="frow"><span class="lbl">화살표</span>' + seg("kd", { arrow: "단방향", both: "양방향", none: "없음" }, e.kind) + "</div>" +
+      '<div class="frow"><span class="lbl">화살표</span><div class="rowseg" style="align-items:center">' +
+        seg("kd", { arrow: "단방향", both: "양방향", none: "없음" }, e.kind) +
+        '<label class="chkbtn"><input type="checkbox" data-rev' + (e.reverse ? " checked" : "") + '> 반대</label>' +
+      "</div></div>" +
       '<div class="frow"><span class="lbl">화살촉 크기</span>' + seg("hd", HEADSZ, e.head || "m") + "</div>" +
       '<div class="frow"><span class="lbl">색</span><div class="hues">' +
         Object.entries(HUE).map(([k, h]) => '<button class="hue' + ((e.hue || "none") === k ? " on" : "") + '" data-hu="' + k + '" title="' + h.name + '" style="--h:' + h.c + '"></button>').join("") +
@@ -828,6 +836,10 @@ function openEdgePop(id, cx, cy) {
   });
   pop.addEventListener("dblclick", ev => {
     const r = ev.target.closest("[data-posr]"); if (r) setPos(r.dataset.posr, 50);
+  });
+  pop.addEventListener("change", ev => {
+    const rev = ev.target.closest("[data-rev]");
+    if (rev) { e.reverse = rev.checked; markDirty(); drawEdges(); }
   });
   const away = ev => {
     if (!ev.target.closest(".popover") && !ev.target.closest("[data-edge]") && !ev.target.closest("[data-wp]") &&
