@@ -291,7 +291,7 @@ function nodeHtml(n) {
      태그·캠페인은 다른 페이지와 똑같이 달 수 있어 배지·목록(body)은 그대로 쓴다. */
   if (n.kind === "keyword") {
     return '<div class="node-frame">' +
-        '<div class="kw-pill"><span class="kw-name" title="' + esc(n.name) + '">' + esc(n.name) + "</span></div>" + warn +
+        '<div class="kw-pill"><span class="kw-name" title="' + esc(n.name) + '">' + esc(n.name) + "</span></div>" +
         '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
         '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
       "</div>" +

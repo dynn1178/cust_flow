@@ -289,8 +289,6 @@ select.field{cursor:pointer}
 .kw-name{font-size:max(12.5px,min(18px,calc(12.5px / max(var(--zoom,1),.6)))); font-weight:700; letter-spacing:-.02em;
   color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .node.kind-keyword.size-l .kw-name{font-size:max(14.5px,min(21px,calc(14.5px / max(var(--zoom,1),.6))))}
-.node.kind-keyword .node-warn{position:static; margin-left:2px; width:16px; height:16px; flex:none}
-.node.kind-keyword .node-warn .ico{width:10px; height:10px}
 .kw-badges{padding:6px 4px 0}
 
 .node-main{padding:8px 4px 2px; display:flex; flex-direction:column; gap:7px}
@@ -2003,7 +2001,7 @@ function nodeHtml(n) {
      태그·캠페인은 다른 페이지와 똑같이 달 수 있어 배지·목록(body)은 그대로 쓴다. */
   if (n.kind === "keyword") {
     return '<div class="node-frame">' +
-        '<div class="kw-pill"><span class="kw-name" title="' + esc(n.name) + '">' + esc(n.name) + "</span></div>" + warn +
+        '<div class="kw-pill"><span class="kw-name" title="' + esc(n.name) + '">' + esc(n.name) + "</span></div>" +
         '<span class="port n edit-only" data-port="' + n.id + '"></span><span class="port e edit-only" data-port="' + n.id + '"></span>' +
         '<span class="port s edit-only" data-port="' + n.id + '"></span><span class="port w edit-only" data-port="' + n.id + '"></span>' +
       "</div>" +
