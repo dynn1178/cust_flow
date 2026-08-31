@@ -308,7 +308,11 @@ select.field{cursor:pointer}
 .node.kind-keyword.size-l .kw-name{font-size:max(14.5px,min(21px,calc(14.5px / max(var(--zoom,1),.6))))}
 .kw-badges{padding:6px 4px 0}
 
-.node-main{padding:8px 4px 2px; display:flex; flex-direction:column; gap:7px}
+/* 프레임(.node-frame)과 달리 배경이 없어서, 카드 밑을 지나가는 연결선이
+   태그·캠페인 목록 글자 위로 그대로 비쳐 보였다. 프레임과 같은 톤의 배경을
+   깔아 그 아래를 지나는 선이 가려지게 한다. */
+.node-main{padding:8px 4px 2px; display:flex; flex-direction:column; gap:7px;
+  background:var(--glass-3); border-radius:var(--r-md); box-shadow:var(--shadow-sm)}
 .node-badges{display:flex; flex-wrap:wrap; gap:4px; justify-content:center; padding:0 8px 9px}
 .bdg{display:inline-flex; align-items:center; gap:4px; min-height:23px; padding:3px 7px; border-radius:7px;
   font-size:11px; font-weight:600; font-family:var(--f-mono);
