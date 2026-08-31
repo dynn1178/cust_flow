@@ -43,10 +43,17 @@ function sidePoint(r, side, t) {
   if (side === "w") return { x: r.x, y: midY + r.h * (pct - 0.5) };
   return { x: r.x + r.w, y: midY + r.h * (pct - 0.5) };
 }
-function autoSide(r, target) {
+/* nomW = 확대·축소와 무관한 카드의 기준 너비(nodeW). 카드 CSS 너비는
+   `calc(190px / max(zoom,.79))`처럼 배율에 따라 늘었다 줄었다 하는데(작게
+   보일 때도 글자가 읽히도록), 그 값을 그대로 가로세로 비율 판정에 쓰면
+   배율이 바뀔 때마다 "위/아래냐 좌/우냐" 판정 자체가 뒤집혀 화살표가
+   붙는 방향이 계속 바뀌었다. 판정에는 항상 고정된 기준 너비를 쓰고,
+   실제 좌표(중심점 등)에는 지금 화면에 보이는 실제 크기를 그대로 쓴다. */
+function autoSide(r, target, nomW) {
   const cx = r.x + r.w / 2, cy = r.midY != null ? r.midY : r.y + r.h / 2;
   const dx = target.x - cx, dy = target.y - cy;
-  if (Math.abs(dx) * r.h >= Math.abs(dy) * r.w) return dx >= 0 ? "e" : "w";
+  const w = nomW != null ? nomW : r.w;
+  if (Math.abs(dx) * r.h >= Math.abs(dy) * w) return dx >= 0 ? "e" : "w";
   return dy >= 0 ? "s" : "n";
 }
 function edgeGeom(e) {
@@ -56,8 +63,8 @@ function edgeGeom(e) {
   const wps = (e.points || []).map(p => ({ x: p.x, y: p.y }));
   const firstT = wps[0] || { x: rb.x + rb.w / 2, y: rb.y + rb.h / 2 };
   const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
-  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT);
-  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT);
+  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(ra, firstT, nodeW(a));
+  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rb, lastT, nodeW(b));
   const t1 = e.a1t, t2 = e.a2t;
   return { p1: sidePoint(ra, s1, t1), n1: SIDE_N[s1], p2: sidePoint(rb, s2, t2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2, t1, t2 };
 }
@@ -131,7 +138,27 @@ function pathFor(e) {
       " " + (g.p2.x + g.n2.x * c) + " " + (g.p2.y + g.n2.y * c) +
       " " + g.p2.x + " " + g.p2.y;
   }
-  const stub = 26;
+  if (g.wps.length === 1) {                          // 높이 고정 점(노란 점) — 가장 흔한 경우, 손으로 짠 2구간 곡선
+    /* 예전엔 [p1, p1에서 짧게 튀어나온 점, 점, p2에서 짧게 튀어나온 점, p2]를
+       한 번에 스플라인(smoothPath)으로 이었는데, 카드 바로 앞의 이 "짧은
+       구간"과 그 다음 "점까지의 먼 구간" 사이 접선을 자동으로 추정하다 보니
+       점을 카드에서 멀리 옮길수록 카드를 빠져나가자마자 반대로 한 번 꺾였다가
+       다시 꺾이는 군더더기 곡선이 생겼다(스크린샷의 "지나치게 휘어짐").
+       접선을 자동 추정에 맡기지 않고 직접 정해서, 카드에서는 항상 수직으로
+       빠져나가고 점 앞뒤에서는 전체 방향(출발→도착)을 따라 매끄럽게 지나가게 한다. */
+    const wp = g.wps[0];
+    const d1 = Math.hypot(wp.x - g.p1.x, wp.y - g.p1.y), d2 = Math.hypot(g.p2.x - wp.x, g.p2.y - wp.y);
+    const k1 = clamp(d1 * 0.5, 30, 140), k2 = clamp(d2 * 0.5, 30, 140);
+    const dx = g.p2.x - g.p1.x, dy = g.p2.y - g.p1.y, dlen = Math.hypot(dx, dy) || 1, ux = dx / dlen, uy = dy / dlen;
+    const c1 = { x: g.p1.x + g.n1.x * k1, y: g.p1.y + g.n1.y * k1 };
+    const c2 = { x: wp.x - ux * k1 * 0.6, y: wp.y - uy * k1 * 0.6 };
+    const c3 = { x: wp.x + ux * k2 * 0.6, y: wp.y + uy * k2 * 0.6 };
+    const c4 = { x: g.p2.x + g.n2.x * k2, y: g.p2.y + g.n2.y * k2 };
+    return "M " + g.p1.x + " " + g.p1.y +
+      " C " + c1.x + " " + c1.y + " " + c2.x + " " + c2.y + " " + wp.x + " " + wp.y +
+      " C " + c3.x + " " + c3.y + " " + c4.x + " " + c4.y + " " + g.p2.x + " " + g.p2.y;
+  }
+  const stub = 26;                                    // 점이 여러 개인(수동으로 더 꺾은) 경우 — 예전 방식 유지
   return smoothPath([g.p1, { x: g.p1.x + g.n1.x * stub, y: g.p1.y + g.n1.y * stub }]
     .concat(g.wps, [{ x: g.p2.x + g.n2.x * stub, y: g.p2.y + g.n2.y * stub }, g.p2]));
 }
