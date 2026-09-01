@@ -153,7 +153,7 @@ async function serverLoad() {
   state = data;
   savedRefs = [];
   const b = state.boards[state.bi] || state.boards[0];
-  sel = { node: b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+  sel = { node: b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null, edge: null, layer: null };
   mounted = { id: null, key: null, w: 0, h: 0 };
   $("#nodeLayer").innerHTML = "";
   Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
@@ -165,10 +165,7 @@ async function serverLoad() {
 async function signImages(data) {                 // 비공개 버킷 → 7일짜리 서명 주소
   const c = supaCfg();
   const paths = [];
-  data.boards.forEach(b => b.nodes.forEach(n => {
-    if (n.shot && n.shot.path) paths.push(n.shot.path);
-    (n.pages || []).forEach(p => { if (p.shot && p.shot.path) paths.push(p.shot.path); });
-  }));
+  data.boards.forEach(b => b.nodes.forEach(n => { if (n.shot && n.shot.path) paths.push(n.shot.path); }));
   if (!paths.length) return;
   try {
     const res = await sapi("/storage/v1/object/sign/" + c.bucket, {
@@ -180,7 +177,6 @@ async function signImages(data) {                 // 비공개 버킷 → 7일�
     (res || []).forEach(r => { if (r.signedURL) map[r.path || r.signedURL] = c.url + "/storage/v1" + r.signedURL; });
     data.boards.forEach(b => b.nodes.forEach(n => {
       if (n.shot && n.shot.path && map[n.shot.path]) n.shot.url = map[n.shot.path];
-      (n.pages || []).forEach(p => { if (p.shot && p.shot.path && map[p.shot.path]) p.shot.url = map[p.shot.path]; });
     }));
   } catch (e) { /* 서명 실패 시 썸네일만 보인다 */ }
 }
@@ -208,13 +204,7 @@ async function serverSave() {
         body: u.blob
       });
       snap.data.boards.forEach(b => b.nodes.forEach(n => {
-        if (n.id !== u.node.id) return;
-        if (u.page) {
-          const p = (n.pages || []).find(x => x.id === u.page.id);
-          if (p) p.shot = { path, w: u.page.shotW, h: u.page.shotH };
-        } else {
-          n.shot = { path, w: u.node.shotW, h: u.node.shotH };
-        }
+        if (n.id === u.node.id) n.shot = { path, w: u.node.shotW, h: u.node.shotH };
       }));
     }
     snap.uploads.length = 0;

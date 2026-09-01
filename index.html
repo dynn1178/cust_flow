@@ -474,19 +474,7 @@ select.field{cursor:pointer}
 .stage-wrap.webmode #stageScroll{overflow:hidden; display:block; padding:0}
 .stage-wrap.webmode #stageDoc{width:100%; height:100%; box-shadow:none; border-radius:0; background:#fff}
 .stage-wrap.webmode #stageDoc .noshot{position:absolute; inset:0; border-radius:0}
-.stage-webbar{display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--stroke-2)}
-.stage-webbar #webUrlIn{flex:1; min-width:220px}
 #webAdd.editing{background:var(--warn); border-color:var(--warn); color:#fff}
-.stage-webpages{display:flex; align-items:center; gap:5px; flex-wrap:wrap; width:100%}
-.webchip{display:inline-flex; align-items:center; gap:5px; max-width:220px; font-size:11.5px; font-weight:500;
-  padding:3px 9px; border-radius:99px; border:1px solid var(--stroke-2); background:var(--glass-2); cursor:pointer}
-.webchip:hover{background:var(--accent-soft); border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
-.webchip.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
-.webchip b{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:150px}
-.webchip .path{color:var(--ink-3); font-family:var(--f-mono); font-size:10.5px}
-.webchip .x{opacity:.5; margin-left:2px}
-.webchip .x:hover{opacity:1; color:var(--bad)}
-.webchip .wthumb{width:16px; height:16px; border-radius:4px; object-fit:cover; flex:none}
 #layerSvg{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
 #layerSvg .lyr{cursor:pointer}
 #layerSvg .lyr.sel .shape{stroke-dasharray:none; filter:drop-shadow(0 0 0 transparent)}
@@ -504,6 +492,7 @@ select.field{cursor:pointer}
 #layerSvg .lyr-editbtn svg{stroke:var(--ink); fill:none; stroke-width:2}
 .stage-empty{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none}
 .stage-tools{display:flex; align-items:center; gap:5px; flex-wrap:wrap}
+.stage-tools.grow{flex:1; min-width:0}
 .tool-sep{width:1px; height:20px; background:var(--stroke); margin:0 2px}
 .swatches{display:flex; gap:3px; align-items:center; flex-wrap:wrap; max-width:200px}
 .sw{width:17px; height:17px; border-radius:5px; border:2px solid transparent; cursor:pointer; padding:0;
@@ -980,13 +969,18 @@ tr:hover .rowacts{opacity:1}
 
       <section class="pane center glass" id="paneStage">
         <div class="pane-head">
-          <h2><svg class="ico"><use href="#i-layers"/></svg><span id="stageTitle">페이지를 선택하세요</span></h2>
-          <div class="spacer"></div>
+          <h2 class="imgonly"><svg class="ico"><use href="#i-layers"/></svg><span id="stageTitle">페이지를 선택하세요</span></h2>
+          <div class="spacer imgonly"></div>
           <div class="stage-tools" id="stageTools">
             <div class="seg edit-only" id="stageMode">
               <button class="btn sm on" data-mode="shot" title="이미지 모드"><svg class="ico xs"><use href="#i-image"/></svg>이미지</button>
               <button class="btn sm" data-mode="web" title="웹 모드"><svg class="ico xs"><use href="#i-link"/></svg>웹</button>
             </div>
+            <div class="tool-sep webonly" style="display:none"></div>
+            <input class="field mono webonly" id="webNameIn" placeholder="페이지 이름" style="display:none; width:120px">
+            <input class="field mono webonly" id="webUrlIn" placeholder="https://www.example.com/product/main.yb" style="display:none; flex:1; min-width:160px">
+            <button class="btn sm webonly" id="webGo" style="display:none">이동</button>
+            <button class="btn sm primary edit-only webonly" id="webAdd" style="display:none"><svg class="ico xs"><use href="#i-plus"/></svg>추가하기</button>
             <div class="tool-sep edit-only imgonly"></div>
             <div class="seg edit-only imgonly" id="layerTools">
               <button class="btn sm on" data-tool="select" title="선택"><svg class="ico xs"><use href="#i-cursor"/></svg></button>
@@ -1008,12 +1002,6 @@ tr:hover .rowacts{opacity:1}
             <button class="btn icon sm imgonly" id="sIn"><svg class="ico xs"><use href="#i-zin"/></svg></button>
             <button class="btn sm on imgonly" id="sFit" title="화면 맞춤 방식 선택"><svg class="ico xs"><use href="#i-fit"/></svg><span id="sFitName">가로 맞춤</span><svg class="ico xs"><use href="#i-chev"/></svg></button>
           </div>
-        </div>
-        <div class="stage-webbar" id="stageWebbar" style="display:none">
-          <input class="field mono" id="webUrlIn" placeholder="https://www.example.com/product/main.yb">
-          <button class="btn sm" id="webGo">이동</button>
-          <button class="btn sm primary edit-only" id="webAdd"><svg class="ico xs"><use href="#i-plus"/></svg>추가하기</button>
-          <div class="stage-webpages" id="stageWebPages"></div>
         </div>
         <div class="stage-wrap" id="stageWrap">
           <div id="stageScroll"><div id="stageDoc"></div></div>
@@ -1254,7 +1242,7 @@ function seed() {
   const N = (id, kind, name, path, x, y, note, style) => Object.assign({
     id, kind, name, path, x, y, note: note || "", shot: null, shotData: null, thumb: null,
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
-    viewMode: "shot", webUrl: "", pages: []
+    viewMode: "shot", webUrl: ""
   }, style || {});
   const T = (platform, event, trigger, selector, status, props, note, extra) => {
     const ex = extra || {}, ts = ex.testSamples || {};
@@ -1366,7 +1354,7 @@ function seed() {
 
 /* ---------------- 상태 ---------------- */
 let state = seed();
-let sel = { node: "n2", edge: null, layer: null, page: null };
+let sel = { node: "n2", edge: null, layer: null };
 let stageZoom = 1;               // 기본값 100% · null = 맞춤 모드 (stageFitMode 방식대로 자동 계산)
 let stageFitMode = "width";      // 맞춤 모드일 때 계산 방식: width(가로 맞춤, 기본) · height(세로 맞춤) · contain(전체 화면 맞춤)
 const STAGE_FIT = {
@@ -1489,23 +1477,6 @@ function buildSnapshot() {
       else if (n.shot && n.shot.ref) c.shot = { ref: n.shot.ref, w: n.shot.w, h: n.shot.h };
       else c.shot = null;
       if (c.shot && c.shot.ref) used.push(c.shot.ref);
-      /* 페이지 컨텐츠(웹 모드에서 모은 화면)도 같은 방식으로 분리한다 */
-      c.pages = (n.pages || []).map(p => {
-        const cp = Object.assign({}, p);
-        delete cp.shotData; delete cp.shotDirty;
-        const praw = p.shotDirty && p.shotData ? p.shotData : null;
-        if (praw) {
-          const blob = dataUrlToBlob(praw);
-          const ref = "img/" + n.id + "-" + p.id + "-" + Date.now().toString(36) + "." + extOf(blob.type);
-          uploads.push({ ref, blob, node: n, page: p, board: b });
-          cp.shot = { ref, w: p.shotW, h: p.shotH };
-        } else if (p.shot && p.shot.path) cp.shot = { path: p.shot.path, w: p.shot.w, h: p.shot.h };
-        else if (p.shot && p.shot.url) cp.shot = { url: p.shot.url, w: p.shot.w, h: p.shot.h };
-        else if (p.shot && p.shot.ref) cp.shot = { ref: p.shot.ref, w: p.shot.w, h: p.shot.h };
-        else cp.shot = null;
-        if (cp.shot && cp.shot.ref) used.push(cp.shot.ref);
-        return cp;
-      });
       return c;
     });
     /* 모바일에서 맞춘 화면 위치가 아니라 PC 에서 쓰던 값을 저장한다 */
@@ -2821,7 +2792,7 @@ function addNode() {
     y: Math.round((surf.height / 2 - v.panY) / v.zoom - 75),
     shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H,
     hue: "none", emph: "border", size: "m", sharp: false, tags: [], camps: [], layers: [],
-    viewMode: "shot", webUrl: "", pages: []
+    viewMode: "shot", webUrl: ""
   };
   B().nodes.push(n); markDirty(); renderFlow(); selectNode(n.id); editNode(n.id);
 }
@@ -3095,7 +3066,6 @@ function renderStage() {
     doc.innerHTML = ""; doc.style.width = doc.style.height = "0";
     mounted = { id: null, key: null, w: 0, h: 0 };
     empty.style.display = "grid"; $("#stageTitle").textContent = "페이지를 선택하세요"; $("#stageFoot").innerHTML = "";
-    $("#stageWebbar").style.display = "none";
     wrap.classList.remove("webmode");
     return;
   }
@@ -3103,12 +3073,13 @@ function renderStage() {
   $("#stageTitle").textContent = n.name;
   const webMode = n.viewMode === "web";
   wrap.classList.toggle("webmode", webMode);
+  $("#stageTools").classList.toggle("grow", webMode);
   $$("#stageMode .btn").forEach(b => b.classList.toggle("on", b.dataset.mode === (webMode ? "web" : "shot")));
   $$(".imgonly").forEach(el => { el.style.display = webMode ? "none" : ""; });
-  $("#stageWebbar").style.display = webMode ? "flex" : "none";
+  $$(".webonly").forEach(el => { el.style.display = webMode ? "" : "none"; });
 
   if (webMode) {
-    renderWebbar(n);
+    renderWebToolbar(n);
     const key = "web:" + (n.webUrl || "");
     if (mounted.id !== n.id || mounted.key !== key) {
       doc.style.width = ""; doc.style.height = "";        // 웹 모드는 CSS(.webmode)가 100% 채움을 맡는다
@@ -3170,35 +3141,26 @@ function liveIframeUrl() {
     return href && href !== "about:blank" ? href : null;
   } catch (e) { return null; }
 }
-function renderWebbar(n) {
-  const inp = $("#webUrlIn");
-  if (document.activeElement !== inp) inp.value = n.webUrl || "";
-  const editing = sel.page && (n.pages || []).find(p => p.id === sel.page);
+/* 아직 이름을 지어 주지 않은 페이지("새 페이지" 등 기본값)에는 주소에서 뽑은
+   값을 임시 이름으로 채워 준다 — 나중에 사람이 알아볼 이름으로 고치라는 뜻 */
+const DEFAULT_NODE_NAMES = ["새 페이지", "이름 없음", ""];
+function nameFromUrl(url) {
+  const p = urlPath(url);
+  return p && p !== "/" ? p : url;
+}
+function renderWebToolbar(n) {
+  const nameInp = $("#webNameIn"), urlInp = $("#webUrlIn");
+  if (document.activeElement !== nameInp) nameInp.value = n.name || "";
+  if (document.activeElement !== urlInp) urlInp.value = n.webUrl || "";
+  const hasContent = !!(shotSrc(n) || (n.path && n.path.trim()));
   const addBtn = $("#webAdd");
-  addBtn.innerHTML = editing ? (ico("edit", "xs") + "수정하기") : (ico("plus", "xs") + "추가하기");
-  addBtn.classList.toggle("editing", !!editing);
-  $("#stageWebPages").innerHTML = (n.pages || []).map(p => {
-    const th = thumbSrc(p);
-    return '<span class="webchip' + (p.id === sel.page ? " on" : "") + '" data-page="' + p.id + '" title="' + esc(p.url) + '">' +
-      (th ? '<img class="wthumb" src="' + th + '">' : ico("link", "xs")) +
-      "<b>" + esc(p.title || p.path || p.url) + "</b>" +
-      (p.path ? '<span class="path mono">' + esc(p.path) + "</span>" : "") +
-      (canEdit() ? '<span class="x" data-page-del="' + p.id + '">' + ico("close", "xs") + "</span>" : "") +
-    "</span>";
-  }).join("") || '<span class="hint" style="font-size:11px">추가하기를 누르면 지금 이 페이지가 새 페이지 컨텐츠로 등록됩니다</span>';
+  addBtn.innerHTML = hasContent ? (ico("edit", "xs") + "수정하기") : (ico("plus", "xs") + "추가하기");
+  addBtn.classList.toggle("editing", hasContent);
 }
 function loadWebUrl(n, raw) {
   const u = normalizeUrl(raw);
   if (!u) return;
   n.webUrl = u; markDirty(); renderStage();
-}
-async function fetchPageMeta(url) {
-  const token = await ensureToken().catch(() => null);
-  const h = token ? { Authorization: "Bearer " + token } : {};
-  const r = await fetch("/api/pagemeta?url=" + encodeURIComponent(url), { headers: h });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || "페이지 정보를 가져오지 못했습니다");
-  return j;
 }
 /* 클립보드에 이미지가 있으면(스크린샷 도구 등으로 방금 복사해 둔 것) 자동으로
    가져와 쓴다 — 없거나 권한이 없으면 조용히 건너뛴다(이미지 없이도 등록은 된다) */
@@ -3213,42 +3175,24 @@ async function captureClipboardImage() {
   } catch (e) { /* 권한 거부 · 클립보드에 이미지 없음 등 — 조용히 건너뛴다 */ }
   return null;
 }
-/* 추가하기/수정하기 — 페이지 컨텐츠가 선택돼 있으면(sel.page) 그 항목을 지금
-   상태로 덮어쓰고, 아니면 새로 만든다. 어느 쪽이든 끝나면 선택을 풀어서 다음
-   "추가하기"가 새 항목을 만들도록 한다(이미 있는 걸 계속 덮어쓰지 않도록) */
+/* 추가하기/수정하기 — 지금 보고 있는 페이지 카드(curNode) 자체를 채운다.
+   이미 화면·경로가 등록돼 있으면(=이미 만들어진 카드) 그 값을 지금 웹 정보로
+   덮어쓰고, 비어 있으면(새 카드) 지금 웹 정보로 처음 채운다 — 버튼 하나가
+   상황에 따라 "추가"와 "수정"을 겸한다. */
 async function addOrUpdateWebPage(n) {
   const url = liveIframeUrl() || n.webUrl;
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
-  n.pages = n.pages || [];
-  const editing = sel.page && n.pages.find(p => p.id === sel.page);
+  const hadContent = !!(shotSrc(n) || (n.path && n.path.trim()));
 
-  /* 클립보드 읽기는 사용자 클릭(사용자 동작 권한)에 바짝 붙어 있어야 브라우저가 허용하므로,
-     네트워크를 타는 제목 조회보다 먼저 시도한다 */
-  const blob = await captureClipboardImage();
+  const blob = await captureClipboardImage();       // 사용자 클릭에 바짝 붙어 있어야 브라우저가 허용한다
 
-  let title = editing ? editing.title : url;
-  try { const meta = await fetchPageMeta(url); if (meta && meta.title) title = meta.title; }
-  catch (e) { if (!editing) toast("제목은 자동으로 가져오지 못해 주소로 등록합니다", "bad"); }
+  n.path = urlPath(url);
+  if (DEFAULT_NODE_NAMES.indexOf((n.name || "").trim()) >= 0) n.name = nameFromUrl(url);
 
-  let shotFields = null;
-  if (blob) {
-    try {
-      const big = await readImage(blob, 1200, 0.82, false), th = await readImage(blob, 300, 0.6, false);
-      shotFields = { shot: null, shotData: big.src, shotW: big.w, shotH: big.h, shotType: big.type, thumb: th.src, shotDirty: true };
-    } catch (e) { /* 클립보드 내용을 이미지로 읽지 못하면 이미지 없이 진행 */ }
-  }
+  if (blob) { try { await setShot(blob, n, true); } catch (e) { /* 이미지 없이 진행 */ } }
 
-  if (editing) {
-    editing.url = url; editing.path = urlPath(url); editing.title = title;
-    if (shotFields) Object.assign(editing, shotFields);
-  } else {
-    const p = Object.assign({ id: uid("p"), url: url, title: title, path: urlPath(url),
-      shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H }, shotFields || {});
-    n.pages.push(p);
-  }
-  sel.page = null;
-  markDirty(); renderStage();
-  toast((editing ? "페이지 컨텐츠를 수정했습니다" : "페이지 컨텐츠를 추가했습니다") + (blob ? " · 이미지 포함" : ""), "ok");
+  markDirty(); renderFlow(); renderStage(); renderPanels();
+  toast((hadContent ? "페이지 정보를 수정했습니다" : "페이지 정보를 등록했습니다") + (blob ? " · 이미지 포함" : ""), "ok");
 }
 function renderStageFoot(n, L) {
   const d = docSize(n);
@@ -3593,21 +3537,13 @@ function initStage() {
     const n = curNode(); if (n && canEdit()) loadWebUrl(n, e.target.value);
   });
   $("#webAdd").addEventListener("click", () => { const n = curNode(); if (n && canEdit()) addOrUpdateWebPage(n); });
-  $("#stageWebPages").addEventListener("click", e => {
+  const commitWebName = e => {
     const n = curNode(); if (!n || !canEdit()) return;
-    const del = e.target.closest("[data-page-del]");
-    if (del) {
-      n.pages = (n.pages || []).filter(p => p.id !== del.dataset.pageDel);
-      if (sel.page === del.dataset.pageDel) sel.page = null;
-      markDirty(); renderStage();
-      return;
-    }
-    const chip = e.target.closest("[data-page]"); if (!chip) return;
-    const p = (n.pages || []).find(x => x.id === chip.dataset.page); if (!p) return;
-    if (sel.page === p.id) { sel.page = null; renderStage(); return; }   /* 다시 누르면 선택 해제(수정 취소) */
-    sel.page = p.id;
-    n.webUrl = p.url; markDirty(); renderStage();
-  });
+    const v = e.target.value.trim();
+    if (v && v !== n.name) { n.name = v; markDirty(); $("#stageTitle").textContent = n.name; renderFlow(); }
+  };
+  $("#webNameIn").addEventListener("change", commitWebName);
+  $("#webNameIn").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
   $("#sIn").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) * 1.2, .1, 4); renderStage(); });
   $("#sOut").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) / 1.2, .1, 4); renderStage(); });
   $("#sFit").addEventListener("click", () => {
@@ -3660,7 +3596,7 @@ function setTool(t) {
   $("#stageDoc").style.cursor = t === "select" ? "default" : "crosshair";
 }
 function selectNode(id) {
-  sel.node = id; sel.layer = null; sel.page = null;
+  sel.node = id; sel.layer = null;
   state.ui.sel = id;
   paintSelection(); renderStage(); renderPanels();
 }
@@ -3810,7 +3746,7 @@ function addNodeInBoard(b, name, path) {
     id: uid("n"), kind: "page", name: name || "새 페이지", path: path || "", note: "",
     x: Math.round(minX), y: Math.round(b.nodes.length ? maxY + 60 : 90), shot: null, shotData: null, thumb: null,
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
-    viewMode: "shot", webUrl: "", pages: []
+    viewMode: "shot", webUrl: ""
   };
   b.nodes.push(n);
   return n;
@@ -4604,10 +4540,6 @@ function unhostedTargets() {
     (n.layers || []).forEach(l => {
       if (l.kind === "image" && l.src && !isCloudHosted(l.src)) targets.push({ kind: "layer", node: n, layer: l, board: b, src: l.src });
     });
-    (n.pages || []).forEach(p => {
-      const psrc = shotSrc(p);
-      if (psrc && !isCloudHosted(psrc)) targets.push({ kind: "page", node: n, page: p, board: b, src: psrc });
-    });
   }));
   return targets;
 }
@@ -4619,14 +4551,11 @@ async function convertTargetsToUrl(targets, onProgress) {
       const blob = t.src.indexOf("data:") === 0 ? dataUrlToBlob(t.src) : await (await fetch(t.src)).blob();
       const meta = await cloudUpload(blob, {
         folder: cloudFolder(t.board.name), tags: cloudTags(t.node.name),
-        filename: t.kind === "shot" ? t.node.name : t.node.name + "-" + t.kind
+        filename: t.kind === "shot" ? t.node.name : t.node.name + "-layer"
       });
       if (t.kind === "shot") {
         t.node.shot = { url: meta.url, w: t.node.shotW, h: t.node.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
         t.node.shotData = null; t.node.shotDirty = false;
-      } else if (t.kind === "page") {
-        t.page.shot = { url: meta.url, w: t.page.shotW, h: t.page.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
-        t.page.shotData = null; t.page.shotDirty = false;
       } else {
         t.layer.src = meta.url; t.layer.uploadedAt = meta.uploadedAt; t.layer.filename = meta.filename; t.layer.publicId = meta.publicId;
       }
@@ -4757,7 +4686,7 @@ function addNodeFor(name, at) {
     id: uid("n"), kind: "page", name: name || "새 페이지", path: "", note: "",
     x: Math.round(p.x), y: Math.round(p.y), shot: null, shotData: null, thumb: null,
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
-    viewMode: "shot", webUrl: "", pages: []
+    viewMode: "shot", webUrl: ""
   };
   B().nodes.push(n);
   return n;
@@ -5030,7 +4959,7 @@ function switchBoard(i) {
   B().sel = sel.node;
   state.bi = i;
   const b = B();
-  sel = { node: b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+  sel = { node: b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null, edge: null, layer: null };
   mounted = { id: null, key: null, w: 0, h: 0 };
   Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
   Object.keys(NSZ).forEach(k => delete NSZ[k]);
@@ -5075,7 +5004,7 @@ function openBoardMenu() {
         onSave: v => {
           state.boards.push(newBoard(v.name || "새 여정"));
           state.bi = state.boards.length - 1;
-          sel = { node: null, edge: null, layer: null, page: null };
+          sel = { node: null, edge: null, layer: null };
           mounted = { id: null, key: null, w: 0, h: 0 };
           $("#nodeLayer").innerHTML = "";
           Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
@@ -5106,7 +5035,7 @@ function openBoardMenu() {
         state.boards.splice(state.bi, 1);
         state.bi = Math.max(0, state.bi - 1);
         delete history[goneId];
-        sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+        sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null };
         mounted = { id: null, key: null, w: 0, h: 0 };
         $("#nodeLayer").innerHTML = "";
         Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
@@ -5141,11 +5070,7 @@ let applyingHistory = false;
 
 function boardSnapshot(b) {
   return JSON.stringify({
-    nodes: b.nodes.map(n => {
-      const c = Object.assign({}, n); delete c.shotData; delete c.thumb;
-      c.pages = (n.pages || []).map(p => { const cp = Object.assign({}, p); delete cp.shotData; delete cp.thumb; return cp; });
-      return c;
-    }),
+    nodes: b.nodes.map(n => { const c = Object.assign({}, n); delete c.shotData; delete c.thumb; return c; }),
     edges: b.edges, lanes: b.lanes || [], selNode: sel.node
   });
 }
@@ -5190,18 +5115,11 @@ function applyBoardSnapshot(b, json) {
   b.nodes.forEach(n => { prevById[n.id] = n; });
   snap.nodes.forEach(n => {
     const prev = prevById[n.id];
-    if (prev) {
-      n.shotData = prev.shotData; n.thumb = prev.thumb; n.shotDirty = prev.shotDirty;
-      const prevPagesById = {}; (prev.pages || []).forEach(p => { prevPagesById[p.id] = p; });
-      (n.pages || []).forEach(p => {
-        const pp = prevPagesById[p.id];
-        if (pp) { p.shotData = pp.shotData; p.thumb = pp.thumb; p.shotDirty = pp.shotDirty; }
-      });
-    }
+    if (prev) { n.shotData = prev.shotData; n.thumb = prev.thumb; n.shotDirty = prev.shotDirty; }
   });
   b.nodes = snap.nodes; b.edges = snap.edges; b.lanes = snap.lanes || [];
   if (b === B()) {
-    sel = { node: snap.selNode && b.nodes.some(n => n.id === snap.selNode) ? snap.selNode : (b.nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+    sel = { node: snap.selNode && b.nodes.some(n => n.id === snap.selNode) ? snap.selNode : (b.nodes[0] || {}).id || null, edge: null, layer: null };
     mounted = { id: null, key: null, w: 0, h: 0 };
     Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
     Object.keys(NSZ).forEach(k => delete NSZ[k]);
@@ -7346,7 +7264,7 @@ async function serverLoad() {
   state = data;
   savedRefs = [];
   const b = state.boards[state.bi] || state.boards[0];
-  sel = { node: b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+  sel = { node: b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null, edge: null, layer: null };
   mounted = { id: null, key: null, w: 0, h: 0 };
   $("#nodeLayer").innerHTML = "";
   Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
@@ -7358,10 +7276,7 @@ async function serverLoad() {
 async function signImages(data) {                 // 비공개 버킷 → 7일짜리 서명 주소
   const c = supaCfg();
   const paths = [];
-  data.boards.forEach(b => b.nodes.forEach(n => {
-    if (n.shot && n.shot.path) paths.push(n.shot.path);
-    (n.pages || []).forEach(p => { if (p.shot && p.shot.path) paths.push(p.shot.path); });
-  }));
+  data.boards.forEach(b => b.nodes.forEach(n => { if (n.shot && n.shot.path) paths.push(n.shot.path); }));
   if (!paths.length) return;
   try {
     const res = await sapi("/storage/v1/object/sign/" + c.bucket, {
@@ -7373,7 +7288,6 @@ async function signImages(data) {                 // 비공개 버킷 → 7일�
     (res || []).forEach(r => { if (r.signedURL) map[r.path || r.signedURL] = c.url + "/storage/v1" + r.signedURL; });
     data.boards.forEach(b => b.nodes.forEach(n => {
       if (n.shot && n.shot.path && map[n.shot.path]) n.shot.url = map[n.shot.path];
-      (n.pages || []).forEach(p => { if (p.shot && p.shot.path && map[p.shot.path]) p.shot.url = map[p.shot.path]; });
     }));
   } catch (e) { /* 서명 실패 시 썸네일만 보인다 */ }
 }
@@ -7401,13 +7315,7 @@ async function serverSave() {
         body: u.blob
       });
       snap.data.boards.forEach(b => b.nodes.forEach(n => {
-        if (n.id !== u.node.id) return;
-        if (u.page) {
-          const p = (n.pages || []).find(x => x.id === u.page.id);
-          if (p) p.shot = { path, w: u.page.shotW, h: u.page.shotH };
-        } else {
-          n.shot = { path, w: u.node.shotW, h: u.node.shotH };
-        }
+        if (n.id === u.node.id) n.shot = { path, w: u.node.shotW, h: u.node.shotH };
       }));
     }
     snap.uploads.length = 0;
@@ -7757,7 +7665,7 @@ function importJson() {
         state.boards.forEach(b => b.nodes.forEach(n => {
           if (typeof n.shot === "string") { n.shotData = n.shot; n.shot = null; n.shotDirty = true; }
         }));
-        sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+        sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null };
         mounted = { id: null, key: null, w: 0, h: 0 };
         $("#nodeLayer").innerHTML = "";
         Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
@@ -7796,11 +7704,8 @@ function normalizeBoard(b) {
   b.nodes = (b.nodes || []).map(n => Object.assign({
     kind: "page", path: "", note: "", shot: null, shotData: null, thumb: null,
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
-    viewMode: "shot", webUrl: "", pages: []
+    viewMode: "shot", webUrl: ""
   }, n));
-  b.nodes.forEach(n => { n.pages = (n.pages || []).map(p => Object.assign({
-    id: uid("p"), url: "", title: "", path: "", shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H
-  }, p)); });
   b.nodes.forEach(n => { n.tags = (n.tags || []).map(normalizeTag); });
   b.edges = (b.edges || []).map(e => Object.assign({
     label: "", style: "solid", kind: "arrow", route: "curve", hue: "none", width: 2, head: "l", a1: "auto", a2: "auto", points: []

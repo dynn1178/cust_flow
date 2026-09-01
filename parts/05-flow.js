@@ -1004,7 +1004,7 @@ function addNode() {
     y: Math.round((surf.height / 2 - v.panY) / v.zoom - 75),
     shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H,
     hue: "none", emph: "border", size: "m", sharp: false, tags: [], camps: [], layers: [],
-    viewMode: "shot", webUrl: "", pages: []
+    viewMode: "shot", webUrl: ""
   };
   B().nodes.push(n); markDirty(); renderFlow(); selectNode(n.id); editNode(n.id);
 }

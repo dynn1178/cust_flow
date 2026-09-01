@@ -52,7 +52,7 @@ function addNodeFor(name, at) {
     id: uid("n"), kind: "page", name: name || "새 페이지", path: "", note: "",
     x: Math.round(p.x), y: Math.round(p.y), shot: null, shotData: null, thumb: null,
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
-    viewMode: "shot", webUrl: "", pages: []
+    viewMode: "shot", webUrl: ""
   };
   B().nodes.push(n);
   return n;
