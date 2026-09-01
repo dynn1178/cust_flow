@@ -204,7 +204,7 @@ function seed() {
 
 /* ---------------- 상태 ---------------- */
 let state = seed();
-let sel = { node: "n2", edge: null, layer: null };
+let sel = { node: "n2", edge: null, layer: null, page: null };
 let stageZoom = 1;               // 기본값 100% · null = 맞춤 모드 (stageFitMode 방식대로 자동 계산)
 let stageFitMode = "width";      // 맞춤 모드일 때 계산 방식: width(가로 맞춤, 기본) · height(세로 맞춤) · contain(전체 화면 맞춤)
 const STAGE_FIT = {
@@ -327,6 +327,23 @@ function buildSnapshot() {
       else if (n.shot && n.shot.ref) c.shot = { ref: n.shot.ref, w: n.shot.w, h: n.shot.h };
       else c.shot = null;
       if (c.shot && c.shot.ref) used.push(c.shot.ref);
+      /* 페이지 컨텐츠(웹 모드에서 모은 화면)도 같은 방식으로 분리한다 */
+      c.pages = (n.pages || []).map(p => {
+        const cp = Object.assign({}, p);
+        delete cp.shotData; delete cp.shotDirty;
+        const praw = p.shotDirty && p.shotData ? p.shotData : null;
+        if (praw) {
+          const blob = dataUrlToBlob(praw);
+          const ref = "img/" + n.id + "-" + p.id + "-" + Date.now().toString(36) + "." + extOf(blob.type);
+          uploads.push({ ref, blob, node: n, page: p, board: b });
+          cp.shot = { ref, w: p.shotW, h: p.shotH };
+        } else if (p.shot && p.shot.path) cp.shot = { path: p.shot.path, w: p.shot.w, h: p.shot.h };
+        else if (p.shot && p.shot.url) cp.shot = { url: p.shot.url, w: p.shot.w, h: p.shot.h };
+        else if (p.shot && p.shot.ref) cp.shot = { ref: p.shot.ref, w: p.shot.w, h: p.shot.h };
+        else cp.shot = null;
+        if (cp.shot && cp.shot.ref) used.push(cp.shot.ref);
+        return cp;
+      });
       return c;
     });
     /* 모바일에서 맞춘 화면 위치가 아니라 PC 에서 쓰던 값을 저장한다 */

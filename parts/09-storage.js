@@ -127,6 +127,10 @@ function unhostedTargets() {
     (n.layers || []).forEach(l => {
       if (l.kind === "image" && l.src && !isCloudHosted(l.src)) targets.push({ kind: "layer", node: n, layer: l, board: b, src: l.src });
     });
+    (n.pages || []).forEach(p => {
+      const psrc = shotSrc(p);
+      if (psrc && !isCloudHosted(psrc)) targets.push({ kind: "page", node: n, page: p, board: b, src: psrc });
+    });
   }));
   return targets;
 }
@@ -138,11 +142,14 @@ async function convertTargetsToUrl(targets, onProgress) {
       const blob = t.src.indexOf("data:") === 0 ? dataUrlToBlob(t.src) : await (await fetch(t.src)).blob();
       const meta = await cloudUpload(blob, {
         folder: cloudFolder(t.board.name), tags: cloudTags(t.node.name),
-        filename: t.kind === "shot" ? t.node.name : t.node.name + "-layer"
+        filename: t.kind === "shot" ? t.node.name : t.node.name + "-" + t.kind
       });
       if (t.kind === "shot") {
         t.node.shot = { url: meta.url, w: t.node.shotW, h: t.node.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
         t.node.shotData = null; t.node.shotDirty = false;
+      } else if (t.kind === "page") {
+        t.page.shot = { url: meta.url, w: t.page.shotW, h: t.page.shotH, uploadedAt: meta.uploadedAt, filename: meta.filename, publicId: meta.publicId };
+        t.page.shotData = null; t.page.shotDirty = false;
       } else {
         t.layer.src = meta.url; t.layer.uploadedAt = meta.uploadedAt; t.layer.filename = meta.filename; t.layer.publicId = meta.publicId;
       }

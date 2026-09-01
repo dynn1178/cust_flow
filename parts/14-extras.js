@@ -18,7 +18,11 @@ let applyingHistory = false;
 
 function boardSnapshot(b) {
   return JSON.stringify({
-    nodes: b.nodes.map(n => { const c = Object.assign({}, n); delete c.shotData; delete c.thumb; return c; }),
+    nodes: b.nodes.map(n => {
+      const c = Object.assign({}, n); delete c.shotData; delete c.thumb;
+      c.pages = (n.pages || []).map(p => { const cp = Object.assign({}, p); delete cp.shotData; delete cp.thumb; return cp; });
+      return c;
+    }),
     edges: b.edges, lanes: b.lanes || [], selNode: sel.node
   });
 }
@@ -63,12 +67,19 @@ function applyBoardSnapshot(b, json) {
   b.nodes.forEach(n => { prevById[n.id] = n; });
   snap.nodes.forEach(n => {
     const prev = prevById[n.id];
-    if (prev) { n.shotData = prev.shotData; n.thumb = prev.thumb; n.shotDirty = prev.shotDirty; }
+    if (prev) {
+      n.shotData = prev.shotData; n.thumb = prev.thumb; n.shotDirty = prev.shotDirty;
+      const prevPagesById = {}; (prev.pages || []).forEach(p => { prevPagesById[p.id] = p; });
+      (n.pages || []).forEach(p => {
+        const pp = prevPagesById[p.id];
+        if (pp) { p.shotData = pp.shotData; p.thumb = pp.thumb; p.shotDirty = pp.shotDirty; }
+      });
+    }
   });
   b.nodes = snap.nodes; b.edges = snap.edges; b.lanes = snap.lanes || [];
   if (b === B()) {
-    sel = { node: snap.selNode && b.nodes.some(n => n.id === snap.selNode) ? snap.selNode : (b.nodes[0] || {}).id || null, edge: null, layer: null };
-    mounted = { id: null, src: null, w: 0, h: 0 };
+    sel = { node: snap.selNode && b.nodes.some(n => n.id === snap.selNode) ? snap.selNode : (b.nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+    mounted = { id: null, key: null, w: 0, h: 0 };
     Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
     Object.keys(NSZ).forEach(k => delete NSZ[k]);
     $("#nodeLayer").innerHTML = "";

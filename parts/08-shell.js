@@ -183,8 +183,8 @@ function importJson() {
         state.boards.forEach(b => b.nodes.forEach(n => {
           if (typeof n.shot === "string") { n.shotData = n.shot; n.shot = null; n.shotDirty = true; }
         }));
-        sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null };
-        mounted = { id: null, src: null, w: 0, h: 0 };
+        sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+        mounted = { id: null, key: null, w: 0, h: 0 };
         $("#nodeLayer").innerHTML = "";
         Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
         markDirty(); renderAll(); applyMode();
@@ -224,7 +224,9 @@ function normalizeBoard(b) {
     shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
     viewMode: "shot", webUrl: "", pages: []
   }, n));
-  b.nodes.forEach(n => { n.pages = (n.pages || []).map(p => Object.assign({ id: uid("p"), url: "", title: "", path: "" }, p)); });
+  b.nodes.forEach(n => { n.pages = (n.pages || []).map(p => Object.assign({
+    id: uid("p"), url: "", title: "", path: "", shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H
+  }, p)); });
   b.nodes.forEach(n => { n.tags = (n.tags || []).map(normalizeTag); });
   b.edges = (b.edges || []).map(e => Object.assign({
     label: "", style: "solid", kind: "arrow", route: "curve", hue: "none", width: 2, head: "l", a1: "auto", a2: "auto", points: []

@@ -15,8 +15,8 @@ function switchBoard(i) {
   B().sel = sel.node;
   state.bi = i;
   const b = B();
-  sel = { node: b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null, edge: null, layer: null };
-  mounted = { id: null, src: null, w: 0, h: 0 };
+  sel = { node: b.sel && b.nodes.some(n => n.id === b.sel) ? b.sel : (b.nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+  mounted = { id: null, key: null, w: 0, h: 0 };
   Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
   Object.keys(NSZ).forEach(k => delete NSZ[k]);
   $("#nodeLayer").innerHTML = "";
@@ -60,8 +60,8 @@ function openBoardMenu() {
         onSave: v => {
           state.boards.push(newBoard(v.name || "새 여정"));
           state.bi = state.boards.length - 1;
-          sel = { node: null, edge: null, layer: null };
-          mounted = { id: null, src: null, w: 0, h: 0 };
+          sel = { node: null, edge: null, layer: null, page: null };
+          mounted = { id: null, key: null, w: 0, h: 0 };
           $("#nodeLayer").innerHTML = "";
           Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
           historyOf(B()); updateHistoryUI();
@@ -91,8 +91,8 @@ function openBoardMenu() {
         state.boards.splice(state.bi, 1);
         state.bi = Math.max(0, state.bi - 1);
         delete history[goneId];
-        sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null };
-        mounted = { id: null, src: null, w: 0, h: 0 };
+        sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null, page: null };
+        mounted = { id: null, key: null, w: 0, h: 0 };
         $("#nodeLayer").innerHTML = "";
         Object.keys(EDGE_EL).forEach(k => { EDGE_EL[k].g.remove(); delete EDGE_EL[k]; });
         historyOf(B()); updateHistoryUI();

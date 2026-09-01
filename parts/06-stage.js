@@ -4,9 +4,8 @@
    렌더 원칙: 화면 이미지는 한 번만 붙이고, 레이어 SVG만 다시 그린다.
    ======================================================================== */
 let mounted = { id: null, key: null, w: 0, h: 0 };
-const WEB_W = 1280, WEB_H = 800;          // 웹 모드 기본 캔버스 크기 — 폰 화면(DOC_W×DOC_H)과 달리 데스크톱 웹페이지 비율
 
-function docSize(n) { return n.viewMode === "web" ? { w: WEB_W, h: WEB_H } : { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
+function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
 /* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)
    삐져나온 도형·텍스트 레이어까지 포함한 실제 콘텐츠 범위 — 맞춤(가로/세로/
    전체 화면) 계산과 캔버스 크기는 항상 이 범위를 기준으로 한다. x1/y1은
@@ -143,21 +142,40 @@ const paintLayers = onFrame(renderLayers);
 
 function renderStage() {
   const n = curNode();
-  const doc = $("#stageDoc"), empty = $("#stageEmpty");
+  const doc = $("#stageDoc"), empty = $("#stageEmpty"), wrap = $("#stageWrap");
   if (!n) {
     doc.innerHTML = ""; doc.style.width = doc.style.height = "0";
     mounted = { id: null, key: null, w: 0, h: 0 };
     empty.style.display = "grid"; $("#stageTitle").textContent = "페이지를 선택하세요"; $("#stageFoot").innerHTML = "";
     $("#stageWebbar").style.display = "none";
+    wrap.classList.remove("webmode");
     return;
   }
   empty.style.display = "none";
   $("#stageTitle").textContent = n.name;
   const webMode = n.viewMode === "web";
+  wrap.classList.toggle("webmode", webMode);
   $$("#stageMode .btn").forEach(b => b.classList.toggle("on", b.dataset.mode === (webMode ? "web" : "shot")));
+  $$(".imgonly").forEach(el => { el.style.display = webMode ? "none" : ""; });
   $("#stageWebbar").style.display = webMode ? "flex" : "none";
-  if (webMode) renderWebbar(n);
-  const base = docSize(n), ext = docExtent(n), s = stageScale(n), src = webMode ? "" : shotSrc(n);
+
+  if (webMode) {
+    renderWebbar(n);
+    const key = "web:" + (n.webUrl || "");
+    if (mounted.id !== n.id || mounted.key !== key) {
+      doc.style.width = ""; doc.style.height = "";        // 웹 모드는 CSS(.webmode)가 100% 채움을 맡는다
+      doc.innerHTML = n.webUrl
+        ? '<iframe class="webview" src="' + esc(n.webUrl) + '" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>'
+        : '<div class="noshot"><div class="empty">' + ico("link") + "<div>위 주소창에 페이지 주소를 입력하고<br>이동을 눌러 주세요</div></div></div>";
+      mounted = { id: n.id, key: key, w: 0, h: 0 };
+    }
+    $("#stageFoot").innerHTML = '<span style="color:var(--ink-3); font-size:11.5px">' +
+      "웹 모드 — 페이지의 링크를 눌러 그대로 이동할 수 있습니다. 다른 도메인으로 이동한 뒤에는 브라우저 보안정책상 주소가 자동으로 갱신되지 않으니, " +
+      "정확히 담으려면 주소창에 직접 입력해 이동한 뒤 담아 주세요.</span>";
+    return;
+  }
+
+  const base = docSize(n), ext = docExtent(n), s = stageScale(n), src = shotSrc(n);
   doc.style.width = Math.round(ext.w * s) + "px";
   doc.style.height = Math.round(ext.h * s) + "px";
   $("#sVal").textContent = stageZoom ? Math.round(s * 100) + "%" : "맞춤";
@@ -165,22 +183,15 @@ function renderStage() {
   $("#sFitName").textContent = STAGE_FIT[stageFitMode].name;
 
   const shotStyle = "left:" + Math.round(-ext.x1 * s) + "px; top:" + Math.round(-ext.y1 * s) + "px; width:" + Math.round(base.w * s) + "px; height:" + Math.round(base.h * s) + "px;";
-  const key = webMode ? "web:" + (n.webUrl || "") : "shot:" + src;
+  const key = "shot:" + src;
   if (mounted.id !== n.id || mounted.key !== key || mounted.w !== base.w || mounted.h !== base.h) {
-    let main;
-    if (webMode) {
-      main = n.webUrl
-        ? '<iframe class="webview" src="' + esc(n.webUrl) + '" style="' + shotStyle + '" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>'
-        : '<div class="noshot" style="' + shotStyle + '"><div class="empty">' + ico("link") + "<div>위 주소창에 페이지 주소를 입력하고<br>이동을 눌러 주세요</div></div></div>";
-    } else {
-      main = src
-        ? '<img class="shot" src="' + src + '" alt="' + esc(n.name) + ' 화면" draggable="false" style="' + shotStyle + '">'
-        : '<div class="noshot" style="' + shotStyle + '"><div class="empty">' + ico("image") + "<div>화면 이미지를 올리거나 붙여넣기(Ctrl+V)<br>없이도 레이어를 그릴 수 있습니다</div></div></div>";
-    }
-    doc.innerHTML = main + '<svg id="layerSvg" viewBox="' + ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h + '"></svg>';
+    const shot = src
+      ? '<img class="shot" src="' + src + '" alt="' + esc(n.name) + ' 화면" draggable="false" style="' + shotStyle + '">'
+      : '<div class="noshot" style="' + shotStyle + '"><div class="empty">' + ico("image") + "<div>화면 이미지를 올리거나 붙여넣기(Ctrl+V)<br>없이도 레이어를 그릴 수 있습니다</div></div></div>";
+    doc.innerHTML = shot + '<svg id="layerSvg" viewBox="' + ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h + '"></svg>';
     mounted = { id: n.id, key: key, w: base.w, h: base.h };
   } else {
-    const img = doc.querySelector(".shot, .noshot, .webview");
+    const img = doc.querySelector(".shot, .noshot");
     if (img) positionShotEl(img, base, ext, s);
     const svg = $("#layerSvg");
     if (svg) svg.setAttribute("viewBox", ext.x1 + " " + ext.y1 + " " + ext.w + " " + ext.h);
@@ -188,9 +199,12 @@ function renderStage() {
   renderLayers();
   renderStageFoot(n, (n.layers || []).find(x => x.id === sel.layer));
 }
-/* ---------------- 웹 모드 ---------------- */
-/* 주소가 없으면 https:// 를 붙여 준다 — "example.com/x"처럼 그냥 쳐 넣어도 되게 */
-function normalizeUrl(v) {
+/* ---------------- 웹 모드 ----------------
+   실제 웹페이지를 iframe으로 그대로 띄워 링크를 따라 돌아다니며 "페이지 컨텐츠"
+   (주소·경로·화면 이미지)를 빠르게 모으기 위한 기능이다. 스크린샷 모드처럼
+   축소·배치하지 않고 패널을 꽉 채우는 실제 브라우저처럼 보여 주고, 바깥의
+   팬·줌 스크롤은 없앤 채 iframe 자체의 스크롤만 남긴다. */
+function normalizeUrl(v) {                          // 주소가 없으면 https:// 를 붙여 준다
   const t = String(v || "").trim();
   if (!t) return "";
   return /^https?:\/\//i.test(t) ? t : "https://" + t.replace(/^\/+/, "");
@@ -198,15 +212,32 @@ function normalizeUrl(v) {
 function urlPath(u) {
   try { const x = new URL(u); return x.pathname + x.search; } catch (e) { return ""; }
 }
+/* 교차 출처 iframe은 동일 출처 정책 때문에 실제 표시 중인 주소를 읽을 수 없다 —
+   같은 출처일 때만(드묾) 성공하고, 그 밖에는 마지막으로 입력한 주소로 대신한다 */
+function liveIframeUrl() {
+  const f = $("#stageDoc iframe.webview");
+  if (!f) return null;
+  try {
+    const href = f.contentWindow.location.href;
+    return href && href !== "about:blank" ? href : null;
+  } catch (e) { return null; }
+}
 function renderWebbar(n) {
   const inp = $("#webUrlIn");
   if (document.activeElement !== inp) inp.value = n.webUrl || "";
-  $("#stageWebPages").innerHTML = (n.pages || []).map(p =>
-    '<span class="webchip' + (p.url === n.webUrl ? " on" : "") + '" data-page="' + p.id + '" title="' + esc(p.url) + '">' +
-      ico("link", "xs") + '<b>' + esc(p.title || p.path || p.url) + "</b>" +
+  const editing = sel.page && (n.pages || []).find(p => p.id === sel.page);
+  const addBtn = $("#webAdd");
+  addBtn.innerHTML = editing ? (ico("edit", "xs") + "수정하기") : (ico("plus", "xs") + "추가하기");
+  addBtn.classList.toggle("editing", !!editing);
+  $("#stageWebPages").innerHTML = (n.pages || []).map(p => {
+    const th = thumbSrc(p);
+    return '<span class="webchip' + (p.id === sel.page ? " on" : "") + '" data-page="' + p.id + '" title="' + esc(p.url) + '">' +
+      (th ? '<img class="wthumb" src="' + th + '">' : ico("link", "xs")) +
+      "<b>" + esc(p.title || p.path || p.url) + "</b>" +
       (p.path ? '<span class="path mono">' + esc(p.path) + "</span>" : "") +
       (canEdit() ? '<span class="x" data-page-del="' + p.id + '">' + ico("close", "xs") + "</span>" : "") +
-    "</span>").join("") || '<span class="hint" style="font-size:11px">추가하기를 누르면 지금 이 주소가 목록에 등록됩니다</span>';
+    "</span>";
+  }).join("") || '<span class="hint" style="font-size:11px">추가하기를 누르면 지금 이 페이지가 새 페이지 컨텐츠로 등록됩니다</span>';
 }
 function loadWebUrl(n, raw) {
   const u = normalizeUrl(raw);
@@ -221,25 +252,55 @@ async function fetchPageMeta(url) {
   if (!r.ok) throw new Error(j.error || "페이지 정보를 가져오지 못했습니다");
   return j;
 }
-async function addCurrentWebPage(n) {
-  if (!n.webUrl) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
-  const url = n.webUrl;
-  n.pages = n.pages || [];
-  if (n.pages.some(p => p.url === url)) return toast("이미 등록된 페이지입니다", "bad");
-  let title = url;
-  try { const meta = await fetchPageMeta(url); if (meta && meta.title) title = meta.title; }
-  catch (e) { toast("제목은 자동으로 가져오지 못해 주소로 등록합니다", "bad"); }
-  n.pages.push({ id: uid("p"), url: url, title: title, path: urlPath(url) });
-  markDirty(); renderStage();
-  toast("연동 페이지를 추가했습니다 · " + title, "ok");
+/* 클립보드에 이미지가 있으면(스크린샷 도구 등으로 방금 복사해 둔 것) 자동으로
+   가져와 쓴다 — 없거나 권한이 없으면 조용히 건너뛴다(이미지 없이도 등록은 된다) */
+async function captureClipboardImage() {
+  if (!navigator.clipboard || !navigator.clipboard.read) return null;
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const type = item.types.find(t => t.indexOf("image/") === 0);
+      if (type) return await item.getType(type);
+    }
+  } catch (e) { /* 권한 거부 · 클립보드에 이미지 없음 등 — 조용히 건너뛴다 */ }
+  return null;
 }
-/* 페이지 목록에서 링크를 눌러 들어왔을 때 위쪽 플로우의 해당 노드를 잠깐 눈에 띄게 알려준다 */
-function flashNode(id) {
-  const el = document.querySelector('.node[data-node="' + id + '"]');
-  if (!el) return;
-  el.classList.remove("pageflash"); void el.offsetWidth;
-  el.classList.add("pageflash");
-  setTimeout(() => el.classList.remove("pageflash"), 1700);
+/* 추가하기/수정하기 — 페이지 컨텐츠가 선택돼 있으면(sel.page) 그 항목을 지금
+   상태로 덮어쓰고, 아니면 새로 만든다. 어느 쪽이든 끝나면 선택을 풀어서 다음
+   "추가하기"가 새 항목을 만들도록 한다(이미 있는 걸 계속 덮어쓰지 않도록) */
+async function addOrUpdateWebPage(n) {
+  const url = liveIframeUrl() || n.webUrl;
+  if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
+  n.pages = n.pages || [];
+  const editing = sel.page && n.pages.find(p => p.id === sel.page);
+
+  /* 클립보드 읽기는 사용자 클릭(사용자 동작 권한)에 바짝 붙어 있어야 브라우저가 허용하므로,
+     네트워크를 타는 제목 조회보다 먼저 시도한다 */
+  const blob = await captureClipboardImage();
+
+  let title = editing ? editing.title : url;
+  try { const meta = await fetchPageMeta(url); if (meta && meta.title) title = meta.title; }
+  catch (e) { if (!editing) toast("제목은 자동으로 가져오지 못해 주소로 등록합니다", "bad"); }
+
+  let shotFields = null;
+  if (blob) {
+    try {
+      const big = await readImage(blob, 1200, 0.82, false), th = await readImage(blob, 300, 0.6, false);
+      shotFields = { shot: null, shotData: big.src, shotW: big.w, shotH: big.h, shotType: big.type, thumb: th.src, shotDirty: true };
+    } catch (e) { /* 클립보드 내용을 이미지로 읽지 못하면 이미지 없이 진행 */ }
+  }
+
+  if (editing) {
+    editing.url = url; editing.path = urlPath(url); editing.title = title;
+    if (shotFields) Object.assign(editing, shotFields);
+  } else {
+    const p = Object.assign({ id: uid("p"), url: url, title: title, path: urlPath(url),
+      shot: null, shotData: null, thumb: null, shotW: DOC_W, shotH: DOC_H }, shotFields || {});
+    n.pages.push(p);
+  }
+  sel.page = null;
+  markDirty(); renderStage();
+  toast((editing ? "페이지 컨텐츠를 수정했습니다" : "페이지 컨텐츠를 추가했습니다") + (blob ? " · 이미지 포함" : ""), "ok");
 }
 function renderStageFoot(n, L) {
   const d = docSize(n);
@@ -434,7 +495,7 @@ function initStage() {
   };
 
   doc.addEventListener("pointerdown", e => {
-    const n = curNode(); if (!n || !canEdit()) return;
+    const n = curNode(); if (!n || !canEdit() || n.viewMode === "web") return;   /* 웹 모드에서는 클릭이 그대로 iframe(링크)으로 전달돼야 한다 */
     const editBtn = e.target.closest("[data-edit-layer]");
     if (editBtn) {                                       /* 텍스트 레이어 위 편집 버튼 — 어떤 도구든 항상 동작 */
       e.preventDefault(); e.stopPropagation();
@@ -583,15 +644,21 @@ function initStage() {
     if (e.key !== "Enter") return;
     const n = curNode(); if (n && canEdit()) loadWebUrl(n, e.target.value);
   });
-  $("#webAdd").addEventListener("click", () => { const n = curNode(); if (n && canEdit()) addCurrentWebPage(n); });
+  $("#webAdd").addEventListener("click", () => { const n = curNode(); if (n && canEdit()) addOrUpdateWebPage(n); });
   $("#stageWebPages").addEventListener("click", e => {
     const n = curNode(); if (!n || !canEdit()) return;
     const del = e.target.closest("[data-page-del]");
-    if (del) { n.pages = (n.pages || []).filter(p => p.id !== del.dataset.pageDel); markDirty(); renderStage(); return; }
+    if (del) {
+      n.pages = (n.pages || []).filter(p => p.id !== del.dataset.pageDel);
+      if (sel.page === del.dataset.pageDel) sel.page = null;
+      markDirty(); renderStage();
+      return;
+    }
     const chip = e.target.closest("[data-page]"); if (!chip) return;
     const p = (n.pages || []).find(x => x.id === chip.dataset.page); if (!p) return;
+    if (sel.page === p.id) { sel.page = null; renderStage(); return; }   /* 다시 누르면 선택 해제(수정 취소) */
+    sel.page = p.id;
     n.webUrl = p.url; markDirty(); renderStage();
-    selectNode(n.id); fitNodeIntoView(n.id); flashNode(n.id);
   });
   $("#sIn").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) * 1.2, .1, 4); renderStage(); });
   $("#sOut").addEventListener("click", () => { stageZoom = clamp(stageScale(curNode()) / 1.2, .1, 4); renderStage(); });
@@ -615,17 +682,18 @@ function initStage() {
   /* 실제 OS 파일 드래그일 때만 반응한다 — 레이어를 옮기다가(포인터 드래그) 우연히
      브라우저 기본 이미지 드래그가 겹쳐도 드롭존이 잘못 뜨지 않도록 방어한다. */
   const hasFiles = e => e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") >= 0;
-  ["dragenter", "dragover"].forEach(t => wrap.addEventListener(t, e => { if (!hasFiles(e)) return; e.preventDefault(); wrap.classList.add("dragover"); }));
+  const inWebMode = () => { const n = curNode(); return n && n.viewMode === "web"; };
+  ["dragenter", "dragover"].forEach(t => wrap.addEventListener(t, e => { if (inWebMode() || !hasFiles(e)) return; e.preventDefault(); wrap.classList.add("dragover"); }));
   wrap.addEventListener("dragleave", e => { if (wrap.contains(e.relatedTarget)) return; wrap.classList.remove("dragover"); });
   wrap.addEventListener("drop", e => {
     wrap.classList.remove("dragover");
-    if (!canEdit() || !hasFiles(e)) return;
+    if (!canEdit() || !hasFiles(e) || inWebMode()) return;
     e.preventDefault();
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (f && /^image\//.test(f.type)) { const n = curNode(); n && shotSrc(n) ? addImageLayer(f) : setShot(f); }
   });
   document.addEventListener("paste", e => {
-    if (!canEdit()) return;
+    if (!canEdit() || inWebMode()) return;             /* 웹 모드에서 붙여넣기는 "추가하기/수정하기"가 대신 처리한다 */
     const items = e.clipboardData && e.clipboardData.items; if (!items) return;
     for (const it of items) {
       if (it.type && it.type.indexOf("image") === 0) {
@@ -644,7 +712,7 @@ function setTool(t) {
   $("#stageDoc").style.cursor = t === "select" ? "default" : "crosshair";
 }
 function selectNode(id) {
-  sel.node = id; sel.layer = null;
+  sel.node = id; sel.layer = null; sel.page = null;
   state.ui.sel = id;
   paintSelection(); renderStage(); renderPanels();
 }
