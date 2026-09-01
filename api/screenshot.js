@@ -60,11 +60,14 @@ async function getBrowser() {
   if (!browserPromise) {
     browserPromise = (async () => {
       const executablePath = await chromium.executablePath();
+      /* @sparticuz/chromium은 "headless_shell" 빌드라 최신(puppeteer 기본값인) "새" 헤드리스
+         모드를 지원하지 않는다 — 패키지 문서대로 args·headless 모두 "shell"로 맞춰야 한다.
+         (chromium.headless 프로퍼티는 최근 버전에 더 이상 없다.) */
       return puppeteer.launch({
-        args: chromium.args,
+        args: puppeteer.defaultArgs({ args: chromium.args, headless: "shell" }),
         defaultViewport: { width: 1280, height: 800 },
         executablePath,
-        headless: chromium.headless
+        headless: "shell"
       });
     })().catch(e => { browserPromise = null; throw e; });
   }
