@@ -57,13 +57,14 @@ let browserPromise = null;                 // 워밍된 람다 인스턴스 안�
 async function getBrowser() {
   if (!browserPromise) {
     browserPromise = (async () => {
-      /* require를 여기서 늦게 해야 한다 — 모듈을 불러오는 시점(파일 맨 위)에서
-         실패하면(바이너리 파일이 배포 번들에 안 딸려갔다든지) 핸들러가 아예
-         시작도 못 해 원인 모를 500만 뜬다. 여기서 하면 아래 catch로 잡혀
-         진짜 에러 메시지가 응답에 실린다. */
+      /* 이 함수는 CommonJS인데 @sparticuz/chromium은 ESM 전용 패키지(package.json
+         "type":"module")라 require()로는 못 불러온다 — 동적 import()를 써야 한다.
+         이걸 파일 맨 위가 아니라 여기서, try/catch로 감싸 늦게 부르는 이유는:
+         실패하면(바이너리가 배포 번들에 안 딸려갔다든지) 핸들러가 아예 시작도
+         못 해 원인 모를 500만 뜨기 때문 — 여기서 하면 진짜 에러 메시지가 응답에 실린다. */
       let chromium, puppeteer;
       try {
-        chromium = require("@sparticuz/chromium");
+        chromium = (await import("@sparticuz/chromium")).default;
         puppeteer = require("puppeteer-core");
       } catch (e) {
         throw httpErr(500, "헤드리스 브라우저 모듈을 불러오지 못했습니다: " + e.message);
