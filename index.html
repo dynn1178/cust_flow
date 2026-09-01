@@ -2923,6 +2923,8 @@ function autoLayout(menuDir) {
    렌더 원칙: 화면 이미지는 한 번만 붙이고, 레이어 SVG만 다시 그린다.
    ======================================================================== */
 let mounted = { id: null, key: null, w: 0, h: 0 };
+let browseMode = "shot";   // 페이지 카드가 없을 때 스테이지가 빈 안내인지 웹 둘러보기인지
+let browseUrl = "";        // 카드 없이 웹으로 둘러볼 때 쓰는 임시 주소 — 문서에 저장되지 않는다
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
 /* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)
@@ -3062,32 +3064,39 @@ const paintLayers = onFrame(renderLayers);
 function renderStage() {
   const n = curNode();
   const doc = $("#stageDoc"), empty = $("#stageEmpty"), wrap = $("#stageWrap");
-  if (!n) {
-    doc.innerHTML = ""; doc.style.width = doc.style.height = "0";
-    mounted = { id: null, key: null, w: 0, h: 0 };
-    empty.style.display = "grid"; $("#stageTitle").textContent = "페이지를 선택하세요"; $("#stageFoot").innerHTML = "";
-    wrap.classList.remove("webmode");
-    return;
-  }
-  empty.style.display = "none";
-  $("#stageTitle").textContent = n.name;
-  const webMode = n.viewMode === "web";
+  const webMode = n ? n.viewMode === "web" : browseMode === "web";
+
   wrap.classList.toggle("webmode", webMode);
   $("#stageTools").classList.toggle("grow", webMode);
   $$("#stageMode .btn").forEach(b => b.classList.toggle("on", b.dataset.mode === (webMode ? "web" : "shot")));
   $$(".imgonly").forEach(el => { el.style.display = webMode ? "none" : ""; });
   $$(".webonly").forEach(el => { el.style.display = webMode ? "" : "none"; });
+  /* 카드가 없을 때는 이름 바꾸기·수정하기가 가리킬 대상이 없다 */
+  $("#webNameIn").style.display = (webMode && n) ? "" : "none";
+  $("#webEditCur").style.display = (webMode && n) ? "" : "none";
+
+  if (!n) {
+    if (!webMode) {
+      doc.innerHTML = ""; doc.style.width = doc.style.height = "0";
+      mounted = { id: null, key: null, w: 0, h: 0 };
+      empty.style.display = "grid"; $("#stageTitle").textContent = "페이지를 선택하세요"; $("#stageFoot").innerHTML = "";
+      return;
+    }
+    empty.style.display = "none";
+    $("#stageTitle").textContent = "웹 둘러보기";
+    renderWebToolbar(null);
+    renderWebFrame("__browse__", browseUrl);
+    $("#stageFoot").innerHTML = '<span style="color:var(--ink-3); font-size:11.5px">' +
+      "페이지 카드 없이 주소부터 둘러볼 수 있습니다 — 추가하기를 누르면 지금 화면으로 새 카드가 만들어집니다.</span>";
+    return;
+  }
+
+  empty.style.display = "none";
+  $("#stageTitle").textContent = n.name;
 
   if (webMode) {
     renderWebToolbar(n);
-    const key = "web:" + (n.webUrl || "");
-    if (mounted.id !== n.id || mounted.key !== key) {
-      doc.style.width = ""; doc.style.height = "";        // 웹 모드는 CSS(.webmode)가 100% 채움을 맡는다
-      doc.innerHTML = n.webUrl
-        ? '<iframe class="webview" src="' + esc(n.webUrl) + '" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>'
-        : '<div class="noshot"><div class="empty">' + ico("link") + "<div>위 주소창에 페이지 주소를 입력하고<br>이동을 눌러 주세요</div></div></div>";
-      mounted = { id: n.id, key: key, w: 0, h: 0 };
-    }
+    renderWebFrame(n.id, n.webUrl);
     $("#stageFoot").innerHTML = '<span style="color:var(--ink-3); font-size:11.5px">' +
       "웹 모드 — 페이지의 링크를 눌러 그대로 이동할 수 있습니다. 다른 도메인으로 이동한 뒤에는 브라우저 보안정책상 주소가 자동으로 갱신되지 않으니, " +
       "정확히 담으려면 주소창에 직접 입력해 이동한 뒤 담아 주세요.</span>";
@@ -3131,6 +3140,19 @@ function normalizeUrl(v) {                          // 주소가 없으면 https
 function urlPath(u) {
   try { const x = new URL(u); return x.pathname + x.search; } catch (e) { return ""; }
 }
+/* #stageDoc 안에 iframe(또는 안내문)을 채운다 — 카드가 있을 때는 id로, 카드
+   없이 둘러볼 때는 "__browse__"로 구분해서 같은 mounted 캐시를 함께 쓴다 */
+function renderWebFrame(id, url) {
+  const doc = $("#stageDoc");
+  const key = "web:" + (url || "");
+  if (mounted.id !== id || mounted.key !== key) {
+    doc.style.width = ""; doc.style.height = "";        // 웹 모드는 CSS(.webmode)가 100% 채움을 맡는다
+    doc.innerHTML = url
+      ? '<iframe class="webview" src="' + esc(url) + '" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>'
+      : '<div class="noshot"><div class="empty">' + ico("link") + "<div>위 주소창에 페이지 주소를 입력하고<br>이동을 눌러 주세요</div></div></div>";
+    mounted = { id: id, key: key, w: 0, h: 0 };
+  }
+}
 /* 교차 출처 iframe은 동일 출처 정책 때문에 실제 표시 중인 주소를 읽을 수 없다 —
    같은 출처일 때만(드묾) 성공하고, 그 밖에는 마지막으로 입력한 주소로 대신한다 */
 function liveIframeUrl() {
@@ -3152,13 +3174,15 @@ function nameFromUrl(url) {
 }
 function renderWebToolbar(n) {
   const nameInp = $("#webNameIn"), urlInp = $("#webUrlIn");
-  if (document.activeElement !== nameInp) nameInp.value = n.name || "";
-  if (document.activeElement !== urlInp) urlInp.value = n.webUrl || "";
+  if (n && document.activeElement !== nameInp) nameInp.value = n.name || "";
+  if (document.activeElement !== urlInp) urlInp.value = (n ? n.webUrl : browseUrl) || "";
 }
+/* n이 없으면(카드 없이 둘러보는 중) 문서에 저장하지 않는 임시 주소(browseUrl)에 담는다 */
 function loadWebUrl(n, raw) {
   const u = normalizeUrl(raw);
   if (!u) return;
-  n.webUrl = u; markDirty(); renderStage();
+  if (n) { n.webUrl = u; markDirty(); } else { browseUrl = u; }
+  renderStage();
 }
 /* 지금 로딩된 화면을 서버가 대신 열어 찍어 온다(교차 출처 iframe은 브라우저가
    직접 캡처할 수 없어 서버 헤드리스 브라우저를 거친다) — 대상 사이트가 봇을
@@ -3196,7 +3220,7 @@ async function captureCurrentWeb(url) {
    여러 카드를 잇달아 만들 수 있다. */
 async function addNewWebPage() {
   const n = curNode();
-  const url = n && (liveIframeUrl() || n.webUrl);
+  const url = liveIframeUrl() || (n ? n.webUrl : browseUrl);
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
   const blob = await captureCurrentWeb(url);
   const created = addNodeInBoard(B(), nameFromUrl(url), urlPath(url));
@@ -3209,7 +3233,8 @@ async function addNewWebPage() {
    정보로 덮어쓴다. 새로 만들지 않고 항상 curNode() 하나만 대상으로 한다. */
 async function updateCurWebPage() {
   const n = curNode();
-  const url = n && (liveIframeUrl() || n.webUrl);
+  if (!n) return;                                    // 수정할 카드가 없으면(버튼도 숨겨져 있다) 아무 것도 하지 않는다
+  const url = liveIframeUrl() || n.webUrl;
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
   const blob = await captureCurrentWeb(url);
   n.path = urlPath(url);
@@ -3551,14 +3576,16 @@ function initStage() {
   $("#btnLayerImg").addEventListener("click", () => pickFile(addImageLayer));
 
   $("#stageMode").addEventListener("click", e => {
-    const b = e.target.closest("[data-mode]"), n = curNode();
-    if (!b || !n || !canEdit()) return;
-    n.viewMode = b.dataset.mode; markDirty(); renderStage();
+    const b = e.target.closest("[data-mode]");
+    if (!b || !canEdit()) return;
+    const n = curNode();
+    if (n) { n.viewMode = b.dataset.mode; markDirty(); } else { browseMode = b.dataset.mode; }
+    renderStage();
   });
-  $("#webGo").addEventListener("click", () => { const n = curNode(); if (n && canEdit()) loadWebUrl(n, $("#webUrlIn").value); });
+  $("#webGo").addEventListener("click", () => { if (canEdit()) loadWebUrl(curNode(), $("#webUrlIn").value); });
   $("#webUrlIn").addEventListener("keydown", e => {
     if (e.key !== "Enter") return;
-    const n = curNode(); if (n && canEdit()) loadWebUrl(n, e.target.value);
+    if (canEdit()) loadWebUrl(curNode(), e.target.value);
   });
   $("#webAddNew").addEventListener("click", () => { if (canEdit()) addNewWebPage(); });
   $("#webEditCur").addEventListener("click", () => { if (canEdit()) updateCurWebPage(); });
