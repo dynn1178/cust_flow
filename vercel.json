@@ -5,5 +5,10 @@
       "source": "/index.html",
       "headers": [{ "key": "Cache-Control", "value": "no-cache, must-revalidate" }]
     }
-  ]
+  ],
+  "functions": {
+    "api/screenshot.js": {
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    }
+  }
 }
