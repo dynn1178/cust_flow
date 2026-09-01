@@ -222,29 +222,39 @@ function liveIframeUrl() {
     return href && href !== "about:blank" ? href : null;
   } catch (e) { return null; }
 }
-/* 아직 이름을 지어 주지 않은 페이지("새 페이지" 등 기본값)에는 주소에서 뽑은
-   값을 임시 이름으로 채워 준다 — 나중에 사람이 알아볼 이름으로 고치라는 뜻 */
-const DEFAULT_NODE_NAMES = ["새 페이지", "이름 없음", ""];
+/* 주소에서 이름을 뽑는다 — 마지막 경로 조각(예: "main.yb"), 없으면 호스트 이름.
+   절대 전체 URL 그대로는 쓰지 않는다(주소창과 구별이 안 되기 때문) */
 function nameFromUrl(url) {
-  const p = urlPath(url);
-  return p && p !== "/" ? p : url;
+  try {
+    const u = new URL(url);
+    const segs = u.pathname.split("/").filter(Boolean);
+    return segs.length ? decodeURIComponent(segs[segs.length - 1]) : u.hostname;
+  } catch (e) { return url; }
 }
 function renderWebToolbar(n) {
   const nameInp = $("#webNameIn"), urlInp = $("#webUrlIn");
   if (document.activeElement !== nameInp) nameInp.value = n.name || "";
   if (document.activeElement !== urlInp) urlInp.value = n.webUrl || "";
-  const hasContent = !!(shotSrc(n) || (n.path && n.path.trim()));
-  const addBtn = $("#webAdd");
-  addBtn.innerHTML = hasContent ? (ico("edit", "xs") + "수정하기") : (ico("plus", "xs") + "추가하기");
-  addBtn.classList.toggle("editing", hasContent);
 }
 function loadWebUrl(n, raw) {
   const u = normalizeUrl(raw);
   if (!u) return;
   n.webUrl = u; markDirty(); renderStage();
 }
-/* 클립보드에 이미지가 있으면(스크린샷 도구 등으로 방금 복사해 둔 것) 자동으로
-   가져와 쓴다 — 없거나 권한이 없으면 조용히 건너뛴다(이미지 없이도 등록은 된다) */
+/* 지금 로딩된 화면을 서버가 대신 열어 찍어 온다(교차 출처 iframe은 브라우저가
+   직접 캡처할 수 없어 서버 헤드리스 브라우저를 거친다) — 대상 사이트가 봇을
+   막아 두었거나 시간이 오래 걸리면 실패할 수 있다. */
+async function captureScreenshot(url) {
+  try {
+    const token = await ensureToken().catch(() => null);
+    const h = token ? { Authorization: "Bearer " + token } : {};
+    const r = await fetch("/api/screenshot?url=" + encodeURIComponent(url), { headers: h });
+    if (!r.ok) return null;
+    return await r.blob();
+  } catch (e) { return null; }
+}
+/* 서버 캡처가 안 되면(사이트 차단·시간초과 등) 클립보드에 이미지가 있는지
+   마지막으로 확인한다 — 스크린샷 도구 등으로 방금 복사해 둔 것을 대신 쓴다 */
 async function captureClipboardImage() {
   if (!navigator.clipboard || !navigator.clipboard.read) return null;
   try {
@@ -256,24 +266,38 @@ async function captureClipboardImage() {
   } catch (e) { /* 권한 거부 · 클립보드에 이미지 없음 등 — 조용히 건너뛴다 */ }
   return null;
 }
-/* 추가하기/수정하기 — 지금 보고 있는 페이지 카드(curNode) 자체를 채운다.
-   이미 화면·경로가 등록돼 있으면(=이미 만들어진 카드) 그 값을 지금 웹 정보로
-   덮어쓰고, 비어 있으면(새 카드) 지금 웹 정보로 처음 채운다 — 버튼 하나가
-   상황에 따라 "추가"와 "수정"을 겸한다. */
-async function addOrUpdateWebPage(n) {
-  const url = liveIframeUrl() || n.webUrl;
+async function captureCurrentWeb(url) {
+  toast("화면을 캡처하는 중…");
+  let blob = await captureScreenshot(url);
+  if (!blob) blob = await captureClipboardImage();
+  return blob;
+}
+/* 추가하기 — 지금 웹 정보로 완전히 새 페이지 카드를 만든다. 지금 보고 있는
+   카드는 건드리지 않고 그대로 웹 모드에 남아 있어, 링크를 계속 따라가며
+   여러 카드를 잇달아 만들 수 있다. */
+async function addNewWebPage() {
+  const n = curNode();
+  const url = n && (liveIframeUrl() || n.webUrl);
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
-  const hadContent = !!(shotSrc(n) || (n.path && n.path.trim()));
-
-  const blob = await captureClipboardImage();       // 사용자 클릭에 바짝 붙어 있어야 브라우저가 허용한다
-
+  const blob = await captureCurrentWeb(url);
+  const created = addNodeInBoard(B(), nameFromUrl(url), urlPath(url));
+  created.webUrl = url;
+  if (blob) { try { await setShot(blob, created, true); } catch (e) { /* 이미지 없이 진행 */ } }
+  markDirty(); renderFlow(); renderPanels();
+  toast("새 페이지를 추가했습니다 · " + created.name + (blob ? " · 이미지 포함" : " · 화면은 못 찍었습니다"), blob ? "ok" : "bad");
+}
+/* 수정하기 — 지금 선택돼 있는(현재 스테이지에 열려 있는) 카드를 지금 웹
+   정보로 덮어쓴다. 새로 만들지 않고 항상 curNode() 하나만 대상으로 한다. */
+async function updateCurWebPage() {
+  const n = curNode();
+  const url = n && (liveIframeUrl() || n.webUrl);
+  if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
+  const blob = await captureCurrentWeb(url);
   n.path = urlPath(url);
-  if (DEFAULT_NODE_NAMES.indexOf((n.name || "").trim()) >= 0) n.name = nameFromUrl(url);
-
+  n.name = nameFromUrl(url);
   if (blob) { try { await setShot(blob, n, true); } catch (e) { /* 이미지 없이 진행 */ } }
-
   markDirty(); renderFlow(); renderStage(); renderPanels();
-  toast((hadContent ? "페이지 정보를 수정했습니다" : "페이지 정보를 등록했습니다") + (blob ? " · 이미지 포함" : ""), "ok");
+  toast("이 페이지 정보를 수정했습니다" + (blob ? " · 이미지 포함" : " · 화면은 못 찍었습니다"), blob ? "ok" : "bad");
 }
 function renderStageFoot(n, L) {
   const d = docSize(n);
@@ -617,7 +641,8 @@ function initStage() {
     if (e.key !== "Enter") return;
     const n = curNode(); if (n && canEdit()) loadWebUrl(n, e.target.value);
   });
-  $("#webAdd").addEventListener("click", () => { const n = curNode(); if (n && canEdit()) addOrUpdateWebPage(n); });
+  $("#webAddNew").addEventListener("click", () => { if (canEdit()) addNewWebPage(); });
+  $("#webEditCur").addEventListener("click", () => { if (canEdit()) updateCurWebPage(); });
   const commitWebName = e => {
     const n = curNode(); if (!n || !canEdit()) return;
     const v = e.target.value.trim();

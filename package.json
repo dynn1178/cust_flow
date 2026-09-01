@@ -1,0 +1,10 @@
+{
+  "name": "cust-flow",
+  "private": true,
+  "version": "1.0.0",
+  "description": "고객 여정 도식화 앱 — Vercel 서버리스 함수(api/)에서만 쓰는 의존성. 앱 본체(index.html)는 빌드 없이 그대로 배포된다.",
+  "dependencies": {
+    "@sparticuz/chromium": "^137.0.1",
+    "puppeteer-core": "^24.10.2"
+  }
+}
