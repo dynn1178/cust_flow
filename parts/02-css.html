@@ -60,6 +60,18 @@
   background:var(--bg-3); flex:none}
 #stageDoc img.shot{position:absolute; display:block; object-fit:contain; border-radius:6px; pointer-events:none; user-select:none}
 #stageDoc .noshot{position:absolute; display:flex; align-items:center; justify-content:center; border-radius:6px; pointer-events:none; user-select:none}
+#stageDoc iframe.webview{position:absolute; display:block; border:0; border-radius:6px; background:#fff}
+.stage-webbar{display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:8px 14px; border-bottom:1px solid var(--stroke-2)}
+.stage-webbar #webUrlIn{flex:1; min-width:220px}
+.stage-webpages{display:flex; align-items:center; gap:5px; flex-wrap:wrap; width:100%}
+.webchip{display:inline-flex; align-items:center; gap:5px; max-width:220px; font-size:11.5px; font-weight:500;
+  padding:3px 9px; border-radius:99px; border:1px solid var(--stroke-2); background:var(--glass-2); cursor:pointer}
+.webchip:hover{background:var(--accent-soft); border-color:color-mix(in srgb,var(--accent) 35%,transparent)}
+.webchip.on{background:var(--accent-soft); border-color:var(--accent); color:var(--accent)}
+.webchip b{font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:150px}
+.webchip .path{color:var(--ink-3); font-family:var(--f-mono); font-size:10.5px}
+.webchip .x{opacity:.5; margin-left:2px}
+.webchip .x:hover{opacity:1; color:var(--bad)}
 #layerSvg{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
 #layerSvg .lyr{cursor:pointer}
 #layerSvg .lyr.sel .shape{stroke-dasharray:none; filter:drop-shadow(0 0 0 transparent)}

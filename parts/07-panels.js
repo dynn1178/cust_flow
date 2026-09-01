@@ -143,7 +143,8 @@ function addNodeInBoard(b, name, path) {
   const n = {
     id: uid("n"), kind: "page", name: name || "새 페이지", path: path || "", note: "",
     x: Math.round(minX), y: Math.round(b.nodes.length ? maxY + 60 : 90), shot: null, shotData: null, thumb: null,
-    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
+    viewMode: "shot", webUrl: "", pages: []
   };
   b.nodes.push(n);
   return n;

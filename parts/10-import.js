@@ -51,7 +51,8 @@ function addNodeFor(name, at) {
   const n = {
     id: uid("n"), kind: "page", name: name || "새 페이지", path: "", note: "",
     x: Math.round(p.x), y: Math.round(p.y), shot: null, shotData: null, thumb: null,
-    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
+    viewMode: "shot", webUrl: "", pages: []
   };
   B().nodes.push(n);
   return n;

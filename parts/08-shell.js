@@ -221,8 +221,10 @@ function normalizeBoard(b) {
   b.lanes = b.lanes || [];
   b.nodes = (b.nodes || []).map(n => Object.assign({
     kind: "page", path: "", note: "", shot: null, shotData: null, thumb: null,
-    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
+    viewMode: "shot", webUrl: "", pages: []
   }, n));
+  b.nodes.forEach(n => { n.pages = (n.pages || []).map(p => Object.assign({ id: uid("p"), url: "", title: "", path: "" }, p)); });
   b.nodes.forEach(n => { n.tags = (n.tags || []).map(normalizeTag); });
   b.edges = (b.edges || []).map(e => Object.assign({
     label: "", style: "solid", kind: "arrow", route: "curve", hue: "none", width: 2, head: "l", a1: "auto", a2: "auto", points: []

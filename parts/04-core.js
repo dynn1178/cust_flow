@@ -91,7 +91,8 @@ const GRID = 22;
 function seed() {
   const N = (id, kind, name, path, x, y, note, style) => Object.assign({
     id, kind, name, path, x, y, note: note || "", shot: null, shotData: null, thumb: null,
-    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: []
+    shotW: DOC_W, shotH: DOC_H, hue: "none", size: "m", sharp: false, tags: [], camps: [], layers: [],
+    viewMode: "shot", webUrl: "", pages: []
   }, style || {});
   const T = (platform, event, trigger, selector, status, props, note, extra) => {
     const ex = extra || {}, ts = ex.testSamples || {};

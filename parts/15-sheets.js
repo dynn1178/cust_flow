@@ -343,7 +343,7 @@ function pickRows(n) {
     (pickFilter.goal === "all" || m.goal === pickFilter.goal) &&
     (pickFilter.chan === "all" || m.chan === pickFilter.chan) &&
     (pickFilter.owner === "all" || m.owner === pickFilter.owner) &&
-    (!q || (m.code + " " + m.goal + " " + m.title + " " + m.fullName + " " + m.owner).toLowerCase().indexOf(q) >= 0)
+    (!q || (m.code + " " + m.goal + " " + m.title + " " + m.fullName + " " + m.owner + " " + m.path).toLowerCase().indexOf(q) >= 0)
   ).map(m => ({ m, on: has.indexOf(m.code) >= 0 }));
 }
 function pickListHtml(n) {
@@ -354,7 +354,8 @@ function pickListHtml(n) {
       '<input type="checkbox" data-pick="' + esc(m.code) + '"' + (on ? " checked" : "") + ">" +
       '<span class="pickmain"><b>' + esc(m.label) + "</b>" +
         '<em>' + esc(m.code) + (m.goal ? " · " + esc(m.goal) : "") + (m.owner ? " · " + esc(m.owner) : "") + "</em>" +
-        (m.fullName ? '<span class="pickfull mono">' + esc(m.fullName) + "</span>" : "") + "</span>" +
+        (m.fullName ? '<span class="pickfull mono">' + esc(m.fullName) + "</span>" : "") +
+        (m.path ? '<span class="pickfull mono">' + esc(m.path) + "</span>" : "") + "</span>" +
       '<span class="chip" style="--c:' + CSTATUS_C[m.statusCode] + '">' + esc(m.status || "-") + "</span>" +
     "</label>").join("");
 }
@@ -370,7 +371,7 @@ function openCampPicker() {
       '<div class="modal-head">' + ico("mega") + "<h3>캠페인 붙이기 · " + esc(n.name) + '</h3><button class="btn icon sm" data-x>' + ico("close", "xs") + "</button></div>" +
       '<div class="modal-body">' +
         '<div class="toolrow">' +
-          '<input class="field" id="pickQ" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 검색" style="flex:1; min-width:180px" value="' + esc(pickFilter.q) + '">' +
+          '<input class="field" id="pickQ" placeholder="캠페인코드 · 목표 · 캠페인명 · 담당자 · 경로 검색" style="flex:1; min-width:180px" value="' + esc(pickFilter.q) + '">' +
           '<select class="field" id="pickGoal">' + optionsOf(SHEETS.camps, "goal", pickFilter.goal, "모든 목표") + "</select>" +
           '<select class="field" id="pickChan">' + optionsOf(SHEETS.camps, "chan", pickFilter.chan, "모든 채널") + "</select>" +
           '<select class="field" id="pickOwner">' + optionsOf(SHEETS.camps, "owner", pickFilter.owner, "모든 담당자") + "</select>" +

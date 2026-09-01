@@ -264,6 +264,13 @@ select.field{cursor:pointer}
   content:"연결 시작점"; position:absolute; left:50%; top:-12px; transform:translateX(-50%);
   background:var(--camp); color:#fff; font-size:10.5px; font-weight:700; line-height:1;
   padding:4px 9px; border-radius:99px; white-space:nowrap; box-shadow:var(--shadow-sm); pointer-events:none; z-index:5}
+/* 연동 페이지 목록에서 링크를 눌러 이 노드로 왔다는 것을 잠깐 눈에 띄게 알려준다 —
+   선택 표시(.sel)는 계속 남지만, 이 맥동은 두 번만 뛰고 저절로 사라진다 */
+.node.pageflash .node-frame{animation:pageflash-pulse .8s ease-out 2}
+@keyframes pageflash-pulse{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent), var(--shadow)}
+  100%{box-shadow:0 0 0 14px color-mix(in srgb,var(--accent) 0%,transparent), var(--shadow)}
+}
 
 .node-title{padding:8px 8px 7px; display:flex; flex-direction:column; align-items:center; gap:1px; text-align:center}
 /* 항상 한 줄로만 — 확대·축소에 따라 폭 대비 글자 크기 비율이 달라져 2줄로
@@ -337,8 +344,9 @@ select.field{cursor:pointer}
 .g-meta{font-size:.84em; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 /* 여정 지도 노드의 실적 한 줄 — 캠페인 이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
 .perfline{display:flex; align-items:center; gap:4px; font-family:var(--f-mono); font-weight:600;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px}
-.perfline .mon{color:var(--ink-3); font-weight:500; font-size:.82em}
+  flex-wrap:wrap; row-gap:1px; margin-top:1px}
+.perfline .mon{color:var(--ink-3); font-weight:500; font-size:.82em; white-space:nowrap}
+.perfline .ctr,.perfline .sep,.perfline .cvr{white-space:nowrap}
 .perfline .ctr{color:#2f6fed} .perfline .cvr{color:#e0483f}
 .perfline .sep{color:var(--ink-3); opacity:.6}
 /* 표본을 감안해도 의미 있는 변화만 진하게 — 흐린 화살표는 노이즈일 수 있다는 뜻 */
