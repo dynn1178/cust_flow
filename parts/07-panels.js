@@ -233,20 +233,52 @@ function openTagBulkModal(file) {
   });
 }
 /* ---------------- 우측: 태깅 ---------------- */
+/* 웹 모드에서 "태그 확인"을 눌러 서버가 실제로 감지한 Amplitude·Braze·GA4
+   요청을 이 페이지에 이미 등록해 둔 태그와 견줘 보여준다 — 이벤트 이름이
+   같으면 "등록됨", 아니면 그 이름 그대로 새 태그를 만드는 버튼을 보여준다.
+   사이트 구현에 따라 놓칠 수 있는 최선 추정치라는 점을 함께 알려준다. */
+function tagDetectionHtml(n) {
+  if (!n || n.viewMode !== "web") return "";
+  if (detectedTagsLoading) {
+    return '<div class="tagdetect"><div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (몇 초 걸릴 수 있습니다)</div></div>";
+  }
+  if (!detectedTags || detectedTagsUrl !== n.webUrl) return "";
+  const rows = Object.keys(PLAT).map(key => {
+    const d = detectedTags[key] || { detected: false, events: [] };
+    const existingNames = n.tags.filter(t => platformsOf(t).indexOf(key) >= 0)
+      .map(t => (tagEventEn(t) || t.eventKo || "").trim().toLowerCase()).filter(Boolean);
+    let body;
+    if (!d.detected) {
+      body = '<span class="chip" style="--c:var(--ink-3)">감지 안 됨</span>';
+    } else if (!d.events.length) {
+      body = '<span class="chip" style="--c:var(--ink-3)">감지됨 · 이벤트 이름은 추출 못 함</span>';
+    } else {
+      body = d.events.map(name => {
+        const matched = existingNames.indexOf(name.toLowerCase()) >= 0;
+        return '<span class="chip" style="--c:' + (matched ? "var(--ok)" : "var(--warn)") + '">' +
+            ico(matched ? "check" : "alert", "xs") + esc(name) + "</span>" +
+          (!matched && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="이 이름으로 태그 추가">' + ico("plus", "xs") + "</button>" : "");
+      }).join("");
+    }
+    return '<div class="detectrow">' + platChip(key) + body + "</div>";
+  }).join("");
+  return '<div class="tagdetect"><div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span></div>' + rows + "</div>";
+}
 function renderTagPanel() {
   const n = curNode(), box = $("#tagList");
   $("#tagCount").textContent = n ? n.tags.length : 0;
   renderTagJumpSelect();
+  const detectHtml = tagDetectionHtml(n);
   if (!n) { box.innerHTML = '<div class="empty">' + ico("tag") + "<div>페이지를 선택하세요</div></div>"; updateToggleAllBtn(n); return; }
   if (!n.tags.length) {
-    box.innerHTML = '<div class="empty">' + ico("tag") + "<div>등록된 태그가 없습니다" +
+    box.innerHTML = detectHtml + '<div class="empty">' + ico("tag") + "<div>등록된 태그가 없습니다" +
       (canEdit() ? "<br>이 화면에서 발생하는 이벤트를 추가하세요" : "") + "</div></div>";
     updateToggleAllBtn(n);
     return;
   }
   const order = { amplitude: 0, braze: 1, ga4: 2 };
   const minOrder = t => platformsOf(t).reduce((m, p) => Math.min(m, order[p] != null ? order[p] : 99), 99);
-  box.innerHTML = n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
+  box.innerHTML = detectHtml + n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
     const expanded = expandedTags.has(t.id);
     return '<div class="card tagcard' + (expanded ? " expanded" : "") + '" data-tag="' + t.id + '">' +
       '<div class="card-top">' + platChips(platformsOf(t)) +
@@ -352,13 +384,13 @@ function renderCampPanel() {
 function renderPanels() { renderTagPanel(); renderCampPanel(); }
 
 /* ---------------- CRUD ---------------- */
-function editTag(id) {
+function editTag(id, prefill) {
   const n = curNode(); if (!n || !canEdit()) return;
-  const t = id ? n.tags.find(x => x.id === id) : {
+  const t = id ? n.tags.find(x => x.id === id) : Object.assign({
     platforms: ["amplitude"], path: "", eventKo: "", eventEn: "",
     area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
-  };
+  }, prefill || {});
   const values = Object.assign({}, t, {
     eventEn: tagEventEn(t), area: tagArea(t), platforms: platformsOf(t),
     path: t.path || n.path || "",           // 경로는 기본적으로 페이지에 지정된 경로를 그대로 따른다
@@ -459,6 +491,8 @@ function initPanels() {
     const id = e.target.value; if (id) jumpToTag(id);
   });
   $("#tagList").addEventListener("click", e => {
+    const da = e.target.closest("[data-detect-add]");
+    if (da) return editTag(null, { platforms: [da.dataset.detectPlat], eventEn: da.dataset.detectName });
     const ed = e.target.closest("[data-tag-edit]"), dl = e.target.closest("[data-tag-del]"), tg = e.target.closest("[data-tag-toggle]");
     if (ed) return editTag(ed.dataset.tagEdit);
     if (tg) {

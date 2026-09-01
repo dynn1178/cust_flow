@@ -440,6 +440,12 @@ select.field{cursor:pointer}
 .tagsummary .evt{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .tagcard.flash{animation:tagflash 1.4s ease}
 @keyframes tagflash{0%,100%{box-shadow:none}20%,60%{box-shadow:0 0 0 2px var(--accent)}}
+/* 웹 모드 — "태그 확인"으로 서버가 감지한 실제 트래킹과 등록된 태그를 견주는 상자 */
+.tagdetect{border:1px dashed var(--stroke); border-radius:var(--r-md); background:var(--glass-2); padding:9px 10px;
+  display:flex; flex-direction:column; gap:6px}
+.detecthead{font-size:11.5px; font-weight:600; color:var(--ink-2); display:flex; align-items:baseline; gap:6px}
+.detecthead .hint{font-weight:400; font-size:10.5px; color:var(--ink-3)}
+.detectrow{display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:11.5px}
 
 /* cards in side panels */
 .card{border-radius:var(--r-md); border:1px solid var(--stroke); background:var(--glass-2); padding:9px 10px;
@@ -474,6 +480,17 @@ select.field{cursor:pointer}
 .stage-wrap.webmode #stageScroll{overflow:hidden; display:block; padding:0}
 .stage-wrap.webmode #stageDoc{width:100%; height:100%; box-shadow:none; border-radius:0; background:#fff}
 .stage-wrap.webmode #stageDoc .noshot{position:absolute; inset:0; border-radius:0}
+/* 페이지 이름·주소 두 입력칸이 똑같이 생겨 헷갈리지 않도록, 아이콘을 앞에 붙인 자기 테두리
+   상자로 감싼다 — 안쪽 <input>은 테두리·배경 없이 그 상자에 얹힌다 */
+.webfield{display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 9px;
+  border-radius:var(--r-sm); border:1px solid var(--stroke); background:var(--glass-2)}
+.webfield .ico{flex:none; opacity:.5}
+.webfield input{flex:1; min-width:0; border:0; background:transparent; padding:0; height:100%; color:var(--ink); font-size:13px}
+.webfield input:focus{outline:none}
+.webfield:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+#webNameField{border-style:dashed}
+.spin{animation:spin .9s linear infinite; transform-origin:50% 50%}
+@keyframes spin{to{transform:rotate(360deg)}}
 #layerSvg{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
 #layerSvg .lyr{cursor:pointer}
 #layerSvg .lyr.sel .shape{stroke-dasharray:none; filter:drop-shadow(0 0 0 transparent)}
@@ -976,11 +993,18 @@ tr:hover .rowacts{opacity:1}
               <button class="btn sm" data-mode="web" title="웹 모드"><svg class="ico xs"><use href="#i-link"/></svg>웹</button>
             </div>
             <div class="tool-sep webonly" style="display:none"></div>
-            <input class="field mono webonly" id="webNameIn" placeholder="페이지 이름" style="display:none; width:120px">
-            <input class="field mono webonly" id="webUrlIn" placeholder="https://www.example.com/product/main.yb" style="display:none; flex:1; min-width:160px">
+            <span class="webfield webonly" id="webNameField" style="display:none; width:130px" title="페이지 이름">
+              <svg class="ico xs"><use href="#i-edit"/></svg>
+              <input class="mono" id="webNameIn" placeholder="페이지 이름">
+            </span>
+            <span class="webfield webonly" style="display:none; flex:1; min-width:170px" title="웹 주소">
+              <svg class="ico xs"><use href="#i-link"/></svg>
+              <input class="mono" id="webUrlIn" placeholder="https://www.example.com/product/main.yb">
+            </span>
             <button class="btn sm webonly" id="webGo" style="display:none">이동</button>
             <button class="btn sm edit-only webonly" id="webAddNew" style="display:none" title="지금 웹 정보로 새 페이지 카드를 만듭니다"><svg class="ico xs"><use href="#i-plus"/></svg>추가하기</button>
             <button class="btn sm primary edit-only webonly" id="webEditCur" style="display:none" title="지금 열려 있는 카드를 지금 웹 정보로 덮어씁니다"><svg class="ico xs"><use href="#i-edit"/></svg>수정하기</button>
+            <button class="btn sm webonly" id="webCheckTags" style="display:none" title="지금 페이지가 실제로 Amplitude·Braze·GA4로 보내는 요청을 확인합니다"><svg class="ico xs"><use href="#i-tag"/></svg>태그 확인</button>
             <div class="tool-sep edit-only imgonly"></div>
             <div class="seg edit-only imgonly" id="layerTools">
               <button class="btn sm on" data-tool="select" title="선택"><svg class="ico xs"><use href="#i-cursor"/></svg></button>
@@ -2925,6 +2949,15 @@ function autoLayout(menuDir) {
 let mounted = { id: null, key: null, w: 0, h: 0 };
 let browseMode = "shot";   // 페이지 카드가 없을 때 스테이지가 빈 안내인지 웹 둘러보기인지
 let browseUrl = "";        // 카드 없이 웹으로 둘러볼 때 쓰는 임시 주소 — 문서에 저장되지 않는다
+/* 동일 출처 정책 때문에 iframe 안에서 링크를 눌러 다른 곳으로 이동했는지는
+   감지할 수 있어도(load 이벤트) 그 새 주소를 읽을 수는 없다 — true면 지금
+   화면과 우리가 아는 주소(webUrl)가 어긋나 있을 수 있다는 뜻 */
+let addrUnknown = false;
+/* "태그 확인" 결과 — 마지막으로 확인한 주소와 그 결과(업체별 감지 여부·이벤트 이름)를
+   들고 있다가 태깅 패널에서 등록된 태그와 비교해 보여준다. 문서에는 저장하지 않는다. */
+let detectedTags = null;         // { amplitude:{detected,events}, braze:{...}, ga4:{...} }
+let detectedTagsUrl = null;
+let detectedTagsLoading = false;
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
 /* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)
@@ -3072,7 +3105,7 @@ function renderStage() {
   $$(".imgonly").forEach(el => { el.style.display = webMode ? "none" : ""; });
   $$(".webonly").forEach(el => { el.style.display = webMode ? "" : "none"; });
   /* 카드가 없을 때는 이름 바꾸기·수정하기가 가리킬 대상이 없다 */
-  $("#webNameIn").style.display = (webMode && n) ? "" : "none";
+  $("#webNameField").style.display = (webMode && n) ? "" : "none";
   $("#webEditCur").style.display = (webMode && n) ? "" : "none";
 
   if (!n) {
@@ -3086,8 +3119,7 @@ function renderStage() {
     $("#stageTitle").textContent = "웹 둘러보기";
     renderWebToolbar(null);
     renderWebFrame("__browse__", browseUrl);
-    $("#stageFoot").innerHTML = '<span style="color:var(--ink-3); font-size:11.5px">' +
-      "페이지 카드 없이 주소부터 둘러볼 수 있습니다 — 추가하기를 누르면 지금 화면으로 새 카드가 만들어집니다.</span>";
+    $("#stageFoot").innerHTML = webHintHtml("페이지 카드 없이 주소부터 둘러볼 수 있습니다 — 추가하기를 누르면 지금 화면으로 새 카드가 만들어집니다.");
     return;
   }
 
@@ -3097,9 +3129,7 @@ function renderStage() {
   if (webMode) {
     renderWebToolbar(n);
     renderWebFrame(n.id, n.webUrl);
-    $("#stageFoot").innerHTML = '<span style="color:var(--ink-3); font-size:11.5px">' +
-      "웹 모드 — 페이지의 링크를 눌러 그대로 이동할 수 있습니다. 다른 도메인으로 이동한 뒤에는 브라우저 보안정책상 주소가 자동으로 갱신되지 않으니, " +
-      "정확히 담으려면 주소창에 직접 입력해 이동한 뒤 담아 주세요.</span>";
+    $("#stageFoot").innerHTML = webHintHtml("웹 모드 — 페이지의 링크를 눌러 그대로 이동할 수 있습니다.");
     return;
   }
 
@@ -3147,11 +3177,37 @@ function renderWebFrame(id, url) {
   const key = "web:" + (url || "");
   if (mounted.id !== id || mounted.key !== key) {
     doc.style.width = ""; doc.style.height = "";        // 웹 모드는 CSS(.webmode)가 100% 채움을 맡는다
+    addrUnknown = false;                                // 방금 우리가 직접 넣은 주소이니 다시 믿을 수 있는 상태
+    if (url !== detectedTagsUrl) { detectedTags = null; detectedTagsUrl = null; renderTagPanel(); }
     doc.innerHTML = url
       ? '<iframe class="webview" src="' + esc(url) + '" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>'
       : '<div class="noshot"><div class="empty">' + ico("link") + "<div>위 주소창에 페이지 주소를 입력하고<br>이동을 눌러 주세요</div></div></div>";
     mounted = { id: id, key: key, w: 0, h: 0 };
+    const f = doc.querySelector("iframe.webview");
+    if (f) {
+      let firstLoad = true;
+      /* 이 load는 우리가 방금 넣은 src 자체가 뜬 것 — 그다음부터 fire되는 load는
+         전부 사용자가 iframe 안 링크를 눌러 다른 곳으로 넘어갔다는 뜻이다.
+         어디로 갔는지는 동일 출처 정책 때문에 알 수 없어 경고만 띄운다. */
+      f.addEventListener("load", () => {
+        if (firstLoad) { firstLoad = false; return; }
+        addrUnknown = true;
+        renderStageFootWebHint();
+      });
+    }
   }
+}
+function renderStageFootWebHint() {
+  const foot = $("#stageFoot");
+  if (!foot || !$(".weburl-hint", foot)) return;
+  foot.innerHTML = webHintHtml();
+}
+function webHintHtml(defaultText) {
+  return addrUnknown
+    ? '<span class="weburl-hint" style="color:var(--warn); font-size:11.5px; font-weight:500">' + ico("alert", "xs") +
+      "다른 페이지로 이동한 상태입니다 — 지금 주소를 알 수 없어 추가·수정하면 마지막으로 불러온 주소로 기록됩니다. " +
+      "정확히 담으려면 그 페이지 주소를 복사해 위 주소창에 붙여넣고 이동하세요.</span>"
+    : '<span class="weburl-hint" style="color:var(--ink-3); font-size:11.5px">' + defaultText + "</span>";
 }
 /* 교차 출처 iframe은 동일 출처 정책 때문에 실제 표시 중인 주소를 읽을 수 없다 —
    같은 출처일 때만(드묾) 성공하고, 그 밖에는 마지막으로 입력한 주소로 대신한다 */
@@ -3206,6 +3262,33 @@ async function captureScreenshot(url) {
     return null;
   }
 }
+/* 태그 확인 — 서버가 그 주소를 직접 열어 Amplitude·Braze·GA4로 실제 나가는
+   트래킹 요청을 엿보고 어떤 이벤트를 보내는지 최대한 뽑아 온다(최선 추정치).
+   결과는 태깅 패널에서 등록된 태그와 비교해 보여준다. */
+async function checkPageTags() {
+  const n = curNode();
+  const url = liveIframeUrl() || (n ? n.webUrl : browseUrl);
+  if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
+  detectedTagsLoading = true; detectedTags = null; detectedTagsUrl = url;
+  renderPanels();
+  stageBusy("태그를 확인하는 중… (몇 초 걸릴 수 있습니다)");
+  try {
+    const token = await ensureToken().catch(() => null);
+    const h = token ? { Authorization: "Bearer " + token } : {};
+    const r = await fetch("/api/detect-tags?url=" + encodeURIComponent(url), { headers: h });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ("서버 응답 " + r.status));
+    detectedTags = j;
+    const found = Object.keys(j).filter(k => j[k] && j[k].detected).map(k => PLAT[k] ? PLAT[k].name : k);
+    toast(found.length ? "감지됨 · " + found.join(", ") : "이 페이지에서 Amplitude·Braze·GA4 요청을 찾지 못했습니다", found.length ? "ok" : "bad");
+  } catch (e) {
+    detectedTags = null; detectedTagsUrl = null;
+    toast("태그 확인에 실패했습니다: " + ((e && e.message) || "알 수 없는 오류"), "bad");
+  } finally {
+    detectedTagsLoading = false;
+    renderStage(); renderPanels();
+  }
+}
 /* 서버 캡처가 안 되면(사이트 차단·시간초과 등) 클립보드에 이미지가 있는지
    마지막으로 확인한다 — 스크린샷 도구 등으로 방금 복사해 둔 것을 대신 쓴다 */
 async function captureClipboardImage() {
@@ -3219,10 +3302,18 @@ async function captureClipboardImage() {
   } catch (e) { /* 권한 거부 · 클립보드에 이미지 없음 등 — 조용히 건너뛴다 */ }
   return null;
 }
+/* 스테이지 아래쪽 안내줄을 잠깐 "무엇을 하는 중"으로 바꿔서 진행 상태를 보여준다 —
+   토스트 하나로는 여러 단계(캡처 → 카드 생성)가 이어질 때 잘 안 보이기 때문 */
+function stageBusy(msg) {
+  const foot = $("#stageFoot");
+  if (!foot) return;
+  foot.innerHTML = '<span style="color:var(--accent); font-size:11.5px; font-weight:600; display:inline-flex; align-items:center; gap:5px">' +
+    ico("loop", "xs spin") + esc(msg) + "</span>";
+}
 async function captureCurrentWeb(url) {
-  toast("화면을 캡처하는 중…");
+  stageBusy("화면을 캡처하는 중…");
   let blob = await captureScreenshot(url);
-  if (!blob) blob = await captureClipboardImage();
+  if (!blob) { stageBusy("클립보드 이미지를 확인하는 중…"); blob = await captureClipboardImage(); }
   return blob;
 }
 /* 추가하기 — 지금 웹 정보로 완전히 새 페이지 카드를 만든다. 지금 보고 있는
@@ -3233,10 +3324,14 @@ async function addNewWebPage() {
   const url = liveIframeUrl() || (n ? n.webUrl : browseUrl);
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
   const blob = await captureCurrentWeb(url);
+  stageBusy("페이지 카드를 만드는 중…");
   const created = addNodeInBoard(B(), nameFromUrl(url), urlPath(url));
   created.webUrl = url;
   if (blob) { try { await setShot(blob, created, true); } catch (e) { /* 이미지 없이 진행 */ } }
   markDirty(); renderFlow(); renderPanels();
+  $("#stageFoot").innerHTML = webHintHtml(n
+    ? "웹 모드 — 페이지의 링크를 눌러 그대로 이동할 수 있습니다."
+    : "페이지 카드 없이 주소부터 둘러볼 수 있습니다 — 추가하기를 누르면 지금 화면으로 새 카드가 만들어집니다.");
   toast("새 페이지를 추가했습니다 · " + created.name + (blob ? " · 이미지 포함" : " · 화면은 못 찍었습니다 (" + (lastScreenshotError || "알 수 없는 오류") + ")"), blob ? "ok" : "bad");
 }
 /* 수정하기 — 지금 선택돼 있는(현재 스테이지에 열려 있는) 카드를 지금 웹
@@ -3247,6 +3342,7 @@ async function updateCurWebPage() {
   const url = liveIframeUrl() || n.webUrl;
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
   const blob = await captureCurrentWeb(url);
+  stageBusy("카드 정보를 수정하는 중…");
   n.path = urlPath(url);
   n.name = nameFromUrl(url);
   if (blob) { try { await setShot(blob, n, true); } catch (e) { /* 이미지 없이 진행 */ } }
@@ -3599,6 +3695,7 @@ function initStage() {
   });
   $("#webAddNew").addEventListener("click", () => { if (canEdit()) addNewWebPage(); });
   $("#webEditCur").addEventListener("click", () => { if (canEdit()) updateCurWebPage(); });
+  $("#webCheckTags").addEventListener("click", () => { if (!detectedTagsLoading) checkPageTags(); });
   const commitWebName = e => {
     const n = curNode(); if (!n || !canEdit()) return;
     const v = e.target.value.trim();
@@ -3897,20 +3994,52 @@ function openTagBulkModal(file) {
   });
 }
 /* ---------------- 우측: 태깅 ---------------- */
+/* 웹 모드에서 "태그 확인"을 눌러 서버가 실제로 감지한 Amplitude·Braze·GA4
+   요청을 이 페이지에 이미 등록해 둔 태그와 견줘 보여준다 — 이벤트 이름이
+   같으면 "등록됨", 아니면 그 이름 그대로 새 태그를 만드는 버튼을 보여준다.
+   사이트 구현에 따라 놓칠 수 있는 최선 추정치라는 점을 함께 알려준다. */
+function tagDetectionHtml(n) {
+  if (!n || n.viewMode !== "web") return "";
+  if (detectedTagsLoading) {
+    return '<div class="tagdetect"><div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (몇 초 걸릴 수 있습니다)</div></div>";
+  }
+  if (!detectedTags || detectedTagsUrl !== n.webUrl) return "";
+  const rows = Object.keys(PLAT).map(key => {
+    const d = detectedTags[key] || { detected: false, events: [] };
+    const existingNames = n.tags.filter(t => platformsOf(t).indexOf(key) >= 0)
+      .map(t => (tagEventEn(t) || t.eventKo || "").trim().toLowerCase()).filter(Boolean);
+    let body;
+    if (!d.detected) {
+      body = '<span class="chip" style="--c:var(--ink-3)">감지 안 됨</span>';
+    } else if (!d.events.length) {
+      body = '<span class="chip" style="--c:var(--ink-3)">감지됨 · 이벤트 이름은 추출 못 함</span>';
+    } else {
+      body = d.events.map(name => {
+        const matched = existingNames.indexOf(name.toLowerCase()) >= 0;
+        return '<span class="chip" style="--c:' + (matched ? "var(--ok)" : "var(--warn)") + '">' +
+            ico(matched ? "check" : "alert", "xs") + esc(name) + "</span>" +
+          (!matched && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="이 이름으로 태그 추가">' + ico("plus", "xs") + "</button>" : "");
+      }).join("");
+    }
+    return '<div class="detectrow">' + platChip(key) + body + "</div>";
+  }).join("");
+  return '<div class="tagdetect"><div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span></div>' + rows + "</div>";
+}
 function renderTagPanel() {
   const n = curNode(), box = $("#tagList");
   $("#tagCount").textContent = n ? n.tags.length : 0;
   renderTagJumpSelect();
+  const detectHtml = tagDetectionHtml(n);
   if (!n) { box.innerHTML = '<div class="empty">' + ico("tag") + "<div>페이지를 선택하세요</div></div>"; updateToggleAllBtn(n); return; }
   if (!n.tags.length) {
-    box.innerHTML = '<div class="empty">' + ico("tag") + "<div>등록된 태그가 없습니다" +
+    box.innerHTML = detectHtml + '<div class="empty">' + ico("tag") + "<div>등록된 태그가 없습니다" +
       (canEdit() ? "<br>이 화면에서 발생하는 이벤트를 추가하세요" : "") + "</div></div>";
     updateToggleAllBtn(n);
     return;
   }
   const order = { amplitude: 0, braze: 1, ga4: 2 };
   const minOrder = t => platformsOf(t).reduce((m, p) => Math.min(m, order[p] != null ? order[p] : 99), 99);
-  box.innerHTML = n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
+  box.innerHTML = detectHtml + n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
     const expanded = expandedTags.has(t.id);
     return '<div class="card tagcard' + (expanded ? " expanded" : "") + '" data-tag="' + t.id + '">' +
       '<div class="card-top">' + platChips(platformsOf(t)) +
@@ -4016,13 +4145,13 @@ function renderCampPanel() {
 function renderPanels() { renderTagPanel(); renderCampPanel(); }
 
 /* ---------------- CRUD ---------------- */
-function editTag(id) {
+function editTag(id, prefill) {
   const n = curNode(); if (!n || !canEdit()) return;
-  const t = id ? n.tags.find(x => x.id === id) : {
+  const t = id ? n.tags.find(x => x.id === id) : Object.assign({
     platforms: ["amplitude"], path: "", eventKo: "", eventEn: "",
     area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
-  };
+  }, prefill || {});
   const values = Object.assign({}, t, {
     eventEn: tagEventEn(t), area: tagArea(t), platforms: platformsOf(t),
     path: t.path || n.path || "",           // 경로는 기본적으로 페이지에 지정된 경로를 그대로 따른다
@@ -4123,6 +4252,8 @@ function initPanels() {
     const id = e.target.value; if (id) jumpToTag(id);
   });
   $("#tagList").addEventListener("click", e => {
+    const da = e.target.closest("[data-detect-add]");
+    if (da) return editTag(null, { platforms: [da.dataset.detectPlat], eventEn: da.dataset.detectName });
     const ed = e.target.closest("[data-tag-edit]"), dl = e.target.closest("[data-tag-del]"), tg = e.target.closest("[data-tag-toggle]");
     if (ed) return editTag(ed.dataset.tagEdit);
     if (tg) {

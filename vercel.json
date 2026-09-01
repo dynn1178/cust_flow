@@ -9,6 +9,9 @@
   "functions": {
     "api/screenshot.js": {
       "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    },
+    "api/detect-tags.js": {
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
     }
   }
 }

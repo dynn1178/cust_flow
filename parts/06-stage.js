@@ -6,6 +6,15 @@
 let mounted = { id: null, key: null, w: 0, h: 0 };
 let browseMode = "shot";   // 페이지 카드가 없을 때 스테이지가 빈 안내인지 웹 둘러보기인지
 let browseUrl = "";        // 카드 없이 웹으로 둘러볼 때 쓰는 임시 주소 — 문서에 저장되지 않는다
+/* 동일 출처 정책 때문에 iframe 안에서 링크를 눌러 다른 곳으로 이동했는지는
+   감지할 수 있어도(load 이벤트) 그 새 주소를 읽을 수는 없다 — true면 지금
+   화면과 우리가 아는 주소(webUrl)가 어긋나 있을 수 있다는 뜻 */
+let addrUnknown = false;
+/* "태그 확인" 결과 — 마지막으로 확인한 주소와 그 결과(업체별 감지 여부·이벤트 이름)를
+   들고 있다가 태깅 패널에서 등록된 태그와 비교해 보여준다. 문서에는 저장하지 않는다. */
+let detectedTags = null;         // { amplitude:{detected,events}, braze:{...}, ga4:{...} }
+let detectedTagsUrl = null;
+let detectedTagsLoading = false;
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
 /* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)
@@ -153,7 +162,7 @@ function renderStage() {
   $$(".imgonly").forEach(el => { el.style.display = webMode ? "none" : ""; });
   $$(".webonly").forEach(el => { el.style.display = webMode ? "" : "none"; });
   /* 카드가 없을 때는 이름 바꾸기·수정하기가 가리킬 대상이 없다 */
-  $("#webNameIn").style.display = (webMode && n) ? "" : "none";
+  $("#webNameField").style.display = (webMode && n) ? "" : "none";
   $("#webEditCur").style.display = (webMode && n) ? "" : "none";
 
   if (!n) {
@@ -167,8 +176,7 @@ function renderStage() {
     $("#stageTitle").textContent = "웹 둘러보기";
     renderWebToolbar(null);
     renderWebFrame("__browse__", browseUrl);
-    $("#stageFoot").innerHTML = '<span style="color:var(--ink-3); font-size:11.5px">' +
-      "페이지 카드 없이 주소부터 둘러볼 수 있습니다 — 추가하기를 누르면 지금 화면으로 새 카드가 만들어집니다.</span>";
+    $("#stageFoot").innerHTML = webHintHtml("페이지 카드 없이 주소부터 둘러볼 수 있습니다 — 추가하기를 누르면 지금 화면으로 새 카드가 만들어집니다.");
     return;
   }
 
@@ -178,9 +186,7 @@ function renderStage() {
   if (webMode) {
     renderWebToolbar(n);
     renderWebFrame(n.id, n.webUrl);
-    $("#stageFoot").innerHTML = '<span style="color:var(--ink-3); font-size:11.5px">' +
-      "웹 모드 — 페이지의 링크를 눌러 그대로 이동할 수 있습니다. 다른 도메인으로 이동한 뒤에는 브라우저 보안정책상 주소가 자동으로 갱신되지 않으니, " +
-      "정확히 담으려면 주소창에 직접 입력해 이동한 뒤 담아 주세요.</span>";
+    $("#stageFoot").innerHTML = webHintHtml("웹 모드 — 페이지의 링크를 눌러 그대로 이동할 수 있습니다.");
     return;
   }
 
@@ -228,11 +234,37 @@ function renderWebFrame(id, url) {
   const key = "web:" + (url || "");
   if (mounted.id !== id || mounted.key !== key) {
     doc.style.width = ""; doc.style.height = "";        // 웹 모드는 CSS(.webmode)가 100% 채움을 맡는다
+    addrUnknown = false;                                // 방금 우리가 직접 넣은 주소이니 다시 믿을 수 있는 상태
+    if (url !== detectedTagsUrl) { detectedTags = null; detectedTagsUrl = null; renderTagPanel(); }
     doc.innerHTML = url
       ? '<iframe class="webview" src="' + esc(url) + '" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>'
       : '<div class="noshot"><div class="empty">' + ico("link") + "<div>위 주소창에 페이지 주소를 입력하고<br>이동을 눌러 주세요</div></div></div>";
     mounted = { id: id, key: key, w: 0, h: 0 };
+    const f = doc.querySelector("iframe.webview");
+    if (f) {
+      let firstLoad = true;
+      /* 이 load는 우리가 방금 넣은 src 자체가 뜬 것 — 그다음부터 fire되는 load는
+         전부 사용자가 iframe 안 링크를 눌러 다른 곳으로 넘어갔다는 뜻이다.
+         어디로 갔는지는 동일 출처 정책 때문에 알 수 없어 경고만 띄운다. */
+      f.addEventListener("load", () => {
+        if (firstLoad) { firstLoad = false; return; }
+        addrUnknown = true;
+        renderStageFootWebHint();
+      });
+    }
   }
+}
+function renderStageFootWebHint() {
+  const foot = $("#stageFoot");
+  if (!foot || !$(".weburl-hint", foot)) return;
+  foot.innerHTML = webHintHtml();
+}
+function webHintHtml(defaultText) {
+  return addrUnknown
+    ? '<span class="weburl-hint" style="color:var(--warn); font-size:11.5px; font-weight:500">' + ico("alert", "xs") +
+      "다른 페이지로 이동한 상태입니다 — 지금 주소를 알 수 없어 추가·수정하면 마지막으로 불러온 주소로 기록됩니다. " +
+      "정확히 담으려면 그 페이지 주소를 복사해 위 주소창에 붙여넣고 이동하세요.</span>"
+    : '<span class="weburl-hint" style="color:var(--ink-3); font-size:11.5px">' + defaultText + "</span>";
 }
 /* 교차 출처 iframe은 동일 출처 정책 때문에 실제 표시 중인 주소를 읽을 수 없다 —
    같은 출처일 때만(드묾) 성공하고, 그 밖에는 마지막으로 입력한 주소로 대신한다 */
@@ -287,6 +319,33 @@ async function captureScreenshot(url) {
     return null;
   }
 }
+/* 태그 확인 — 서버가 그 주소를 직접 열어 Amplitude·Braze·GA4로 실제 나가는
+   트래킹 요청을 엿보고 어떤 이벤트를 보내는지 최대한 뽑아 온다(최선 추정치).
+   결과는 태깅 패널에서 등록된 태그와 비교해 보여준다. */
+async function checkPageTags() {
+  const n = curNode();
+  const url = liveIframeUrl() || (n ? n.webUrl : browseUrl);
+  if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
+  detectedTagsLoading = true; detectedTags = null; detectedTagsUrl = url;
+  renderPanels();
+  stageBusy("태그를 확인하는 중… (몇 초 걸릴 수 있습니다)");
+  try {
+    const token = await ensureToken().catch(() => null);
+    const h = token ? { Authorization: "Bearer " + token } : {};
+    const r = await fetch("/api/detect-tags?url=" + encodeURIComponent(url), { headers: h });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ("서버 응답 " + r.status));
+    detectedTags = j;
+    const found = Object.keys(j).filter(k => j[k] && j[k].detected).map(k => PLAT[k] ? PLAT[k].name : k);
+    toast(found.length ? "감지됨 · " + found.join(", ") : "이 페이지에서 Amplitude·Braze·GA4 요청을 찾지 못했습니다", found.length ? "ok" : "bad");
+  } catch (e) {
+    detectedTags = null; detectedTagsUrl = null;
+    toast("태그 확인에 실패했습니다: " + ((e && e.message) || "알 수 없는 오류"), "bad");
+  } finally {
+    detectedTagsLoading = false;
+    renderStage(); renderPanels();
+  }
+}
 /* 서버 캡처가 안 되면(사이트 차단·시간초과 등) 클립보드에 이미지가 있는지
    마지막으로 확인한다 — 스크린샷 도구 등으로 방금 복사해 둔 것을 대신 쓴다 */
 async function captureClipboardImage() {
@@ -300,10 +359,18 @@ async function captureClipboardImage() {
   } catch (e) { /* 권한 거부 · 클립보드에 이미지 없음 등 — 조용히 건너뛴다 */ }
   return null;
 }
+/* 스테이지 아래쪽 안내줄을 잠깐 "무엇을 하는 중"으로 바꿔서 진행 상태를 보여준다 —
+   토스트 하나로는 여러 단계(캡처 → 카드 생성)가 이어질 때 잘 안 보이기 때문 */
+function stageBusy(msg) {
+  const foot = $("#stageFoot");
+  if (!foot) return;
+  foot.innerHTML = '<span style="color:var(--accent); font-size:11.5px; font-weight:600; display:inline-flex; align-items:center; gap:5px">' +
+    ico("loop", "xs spin") + esc(msg) + "</span>";
+}
 async function captureCurrentWeb(url) {
-  toast("화면을 캡처하는 중…");
+  stageBusy("화면을 캡처하는 중…");
   let blob = await captureScreenshot(url);
-  if (!blob) blob = await captureClipboardImage();
+  if (!blob) { stageBusy("클립보드 이미지를 확인하는 중…"); blob = await captureClipboardImage(); }
   return blob;
 }
 /* 추가하기 — 지금 웹 정보로 완전히 새 페이지 카드를 만든다. 지금 보고 있는
@@ -314,10 +381,14 @@ async function addNewWebPage() {
   const url = liveIframeUrl() || (n ? n.webUrl : browseUrl);
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
   const blob = await captureCurrentWeb(url);
+  stageBusy("페이지 카드를 만드는 중…");
   const created = addNodeInBoard(B(), nameFromUrl(url), urlPath(url));
   created.webUrl = url;
   if (blob) { try { await setShot(blob, created, true); } catch (e) { /* 이미지 없이 진행 */ } }
   markDirty(); renderFlow(); renderPanels();
+  $("#stageFoot").innerHTML = webHintHtml(n
+    ? "웹 모드 — 페이지의 링크를 눌러 그대로 이동할 수 있습니다."
+    : "페이지 카드 없이 주소부터 둘러볼 수 있습니다 — 추가하기를 누르면 지금 화면으로 새 카드가 만들어집니다.");
   toast("새 페이지를 추가했습니다 · " + created.name + (blob ? " · 이미지 포함" : " · 화면은 못 찍었습니다 (" + (lastScreenshotError || "알 수 없는 오류") + ")"), blob ? "ok" : "bad");
 }
 /* 수정하기 — 지금 선택돼 있는(현재 스테이지에 열려 있는) 카드를 지금 웹
@@ -328,6 +399,7 @@ async function updateCurWebPage() {
   const url = liveIframeUrl() || n.webUrl;
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
   const blob = await captureCurrentWeb(url);
+  stageBusy("카드 정보를 수정하는 중…");
   n.path = urlPath(url);
   n.name = nameFromUrl(url);
   if (blob) { try { await setShot(blob, n, true); } catch (e) { /* 이미지 없이 진행 */ } }
@@ -680,6 +752,7 @@ function initStage() {
   });
   $("#webAddNew").addEventListener("click", () => { if (canEdit()) addNewWebPage(); });
   $("#webEditCur").addEventListener("click", () => { if (canEdit()) updateCurWebPage(); });
+  $("#webCheckTags").addEventListener("click", () => { if (!detectedTagsLoading) checkPageTags(); });
   const commitWebName = e => {
     const n = curNode(); if (!n || !canEdit()) return;
     const v = e.target.value.trim();
