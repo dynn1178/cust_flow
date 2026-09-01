@@ -328,7 +328,7 @@ async function checkPageTags() {
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
   detectedTagsLoading = true; detectedTags = null; detectedTagsUrl = url;
   renderPanels();
-  stageBusy("태그를 확인하는 중… (몇 초 걸릴 수 있습니다)");
+  stageBusy("태그를 확인하는 중… (트래킹 스크립트가 다 뜰 때까지 10초 넘게 걸릴 수 있습니다)");
   try {
     const token = await ensureToken().catch(() => null);
     const h = token ? { Authorization: "Bearer " + token } : {};

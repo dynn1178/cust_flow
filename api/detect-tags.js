@@ -18,24 +18,27 @@
    ========================================================================== */
 const { httpErr, whoAmI, assertPublicHost, parseTargetUrl, getBrowser } = require("./_lib/browser");
 
-const VENDORS = {
-  amplitude: { hostHas: ["amplitude.com"] },
-  braze: { hostHas: ["braze.com", "braze.eu", "appboy.com"] },   // appboy = Braze의 옛 이름(오래된 SDK가 아직 씀)
-  ga4: { hostHas: ["google-analytics.com"], pathHas: ["collect"] }
-};
+/* GA4는 요즘 사이트가 서버사이드 GTM·자체 프록시 도메인으로 우회해서 보내는
+   경우가 흔해 호스트 이름만으로는 자주 놓친다 — 그래서 호스트 이름과 별개로
+   "tid=G-..." 쿼리(측정 ID 규격)가 있으면 도메인이 무엇이든 GA4로 본다. */
+function looksLikeGA4(u) {
+  const host = u.hostname.toLowerCase();
+  if (host.indexOf("google-analytics.com") >= 0 || host.indexOf("analytics.google.com") >= 0) return true;
+  const tid = u.searchParams.get("tid");
+  return !!(tid && /^G-/i.test(tid));
+}
 function vendorOf(u) {
   const host = u.hostname.toLowerCase();
-  for (const [key, spec] of Object.entries(VENDORS)) {
-    if (!spec.hostHas.some(h => host.indexOf(h) >= 0)) continue;
-    if (spec.pathHas && !spec.pathHas.some(p => u.pathname.indexOf(p) >= 0)) continue;
-    return key;
-  }
+  if (host.indexOf("amplitude.com") >= 0) return "amplitude";
+  if (host.indexOf("braze.com") >= 0 || host.indexOf("braze.eu") >= 0 || host.indexOf("appboy.com") >= 0) return "braze";  // appboy = Braze의 옛 이름(오래된 SDK가 아직 씀)
+  if (looksLikeGA4(u)) return "ga4";
   return null;
 }
 
 /* 각 업체가 실제 브라우저 SDK에서 이벤트를 실어 보내는 모양은 공식 규격이
-   없다시피 해서(관찰 기반), 여러 형태를 순서대로 시도한다. 하나도 안 맞으면
-   이벤트 이름 없이 "감지됨"만 표시한다. */
+   없다시피 해서(관찰 기반), 여러 형태를 순서대로 시도한다. JSON 구조가 예상과
+   다르면(중첩이 달라졌다든지) 정규식으로 한 번 더 훑어서 최대한 건진다.
+   하나도 안 맞으면 이벤트 이름 없이 "감지됨"만 표시한다. */
 function eventsFromGA4(u, postData) {
   const names = [];
   const en = u.searchParams.get("en");
@@ -44,41 +47,57 @@ function eventsFromGA4(u, postData) {
     try {
       const j = JSON.parse(postData);
       (j.events || []).forEach(e => { if (e && e.name) names.push(e.name); });
-    } catch (e) { /* GET 쿼리만 있고 본문은 없는 경우가 대부분 */ }
+    } catch (e) {
+      const re = /"name"\s*:\s*"([^"]+)"/g;
+      let m; while ((m = re.exec(postData))) names.push(m[1]);
+    }
   }
   return names;
 }
 function eventsFromAmplitude(u, postData) {
-  const names = [];
-  const tryParseBatch = raw => {
+  const names = new Set();
+  const scan = raw => {
+    if (!raw) return;
     try {
       const j = JSON.parse(raw);
       const list = Array.isArray(j) ? j : (j.events || (j.event_type ? [j] : []));
-      list.forEach(e => { if (e && e.event_type) names.push(e.event_type); });
-    } catch (e) { /* 아래에서 폼 인코딩으로 다시 시도 */ }
+      list.forEach(e => { if (e && e.event_type) names.add(e.event_type); });
+    } catch (e) {
+      const re = /"event_type"\s*:\s*"([^"]+)"/g;
+      let m; while ((m = re.exec(raw))) names.add(m[1]);
+    }
   };
   if (postData) {
-    tryParseBatch(postData);
-    if (!names.length) {
+    scan(postData);
+    if (!names.size) {
       try {
         const params = new URLSearchParams(postData);
         const ev = params.get("event");
-        if (ev) tryParseBatch(decodeURIComponent(ev));
+        if (ev) scan(decodeURIComponent(ev));
       } catch (e) {}
     }
   }
   const evQ = u.searchParams.get("event");
-  if (evQ) tryParseBatch(evQ);
-  return names;
+  if (evQ) scan(evQ);
+  return Array.from(names);
 }
 function eventsFromBraze(postData) {
-  const names = [];
-  if (!postData) return names;
+  const names = new Set();
+  if (!postData) return [];
   try {
     const j = JSON.parse(postData);
-    (j.events || []).forEach(e => { if (e && e.name) names.push(e.name); });
+    (j.events || []).forEach(e => { if (e && e.name) names.add(e.name); });
   } catch (e) {}
-  return names;
+  if (!names.size) {
+    /* "events" 배열 부분만 잘라서 그 안의 name만 줍는다 — attributes 등
+       다른 곳의 name까지 긁지 않도록 범위를 좁힌다 */
+    const block = /"events"\s*:\s*(\[[\s\S]*?\])/.exec(postData);
+    if (block) {
+      const re = /"name"\s*:\s*"([^"]+)"/g;
+      let m; while ((m = re.exec(block[1]))) names.add(m[1]);
+    }
+  }
+  return Array.from(names);
 }
 
 module.exports = async function handler(req, res) {
@@ -111,14 +130,16 @@ module.exports = async function handler(req, res) {
       });
       try {
         await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 10000 });
-        await new Promise(r => setTimeout(r, 3000));   // 로딩 직후 비동기로 뜨는 트래킹 스크립트를 기다린다
+        /* GTM 컨테이너가 로드된 뒤에야 gtag·Amplitude 호출이 잇달아 나가는 사이트가
+           많다 — 그 사슬이 다 이어지려면 몇 초는 걸려서 넉넉히 기다린다 */
+        await new Promise(r => setTimeout(r, 7000));
       } catch (e) { /* 여기까지 뜬 요청만으로 판단한다 */ }
     } finally {
       await page.close().catch(() => {});
     }
 
     const out = {};
-    Object.keys(VENDORS).forEach(k => {
+    ["amplitude", "braze", "ga4"].forEach(k => {
       out[k] = { detected: seenVendor[k], events: Array.from(found[k]) };
     });
     return res.status(200).json(out);
