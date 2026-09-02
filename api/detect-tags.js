@@ -112,6 +112,11 @@ module.exports = async function handler(req, res) {
 
     const found = { amplitude: new Set(), braze: new Set(), ga4: new Set() };
     const seenVendor = { amplitude: false, braze: false, ga4: false };
+    /* 파싱이 실제로 맞는지 확인하려면 원본을 봐야 한다 — 업체별로 몇 개만
+       잘라서 같이 돌려준다(요청 주소 + 본문 앞부분). 응답에 실린 값은 그대로
+       브라우저 콘솔에도 찍어서, Vercel 로그에 못 들어가도 확인할 수 있게 한다. */
+    const debug = { amplitude: [], braze: [], ga4: [] };
+    const DEBUG_MAX = 4;
 
     const browser = await getBrowser();
     const page = await browser.newPage();
@@ -127,6 +132,13 @@ module.exports = async function handler(req, res) {
           : vendor === "amplitude" ? eventsFromAmplitude(u, postData)
           : eventsFromBraze(postData);
         names.forEach(n => found[vendor].add(String(n).slice(0, 80)));
+        if (debug[vendor].length < DEBUG_MAX) {
+          debug[vendor].push({
+            method: r.method(), url: r.url().slice(0, 300),
+            body: postData ? String(postData).slice(0, 500) : null,
+            parsedNames: names
+          });
+        }
       });
       try {
         await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 10000 });
@@ -140,8 +152,9 @@ module.exports = async function handler(req, res) {
 
     const out = {};
     ["amplitude", "braze", "ga4"].forEach(k => {
-      out[k] = { detected: seenVendor[k], events: Array.from(found[k]) };
+      out[k] = { detected: seenVendor[k], events: Array.from(found[k]), debug: debug[k] };
     });
+    console.log("[detect-tags]", target.href, JSON.stringify(out));
     return res.status(200).json(out);
   } catch (e) {
     const status = e && e.status ? e.status : 500;

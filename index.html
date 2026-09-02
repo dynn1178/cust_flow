@@ -3281,6 +3281,10 @@ async function checkPageTags() {
     detectedTags = j;
     const found = Object.keys(j).filter(k => j[k] && j[k].detected).map(k => PLAT[k] ? PLAT[k].name : k);
     toast(found.length ? "감지됨 · " + found.join(", ") : "이 페이지에서 Amplitude·Braze·GA4 요청을 찾지 못했습니다", found.length ? "ok" : "bad");
+    /* 파싱이 실제와 맞는지 확인할 원본 샘플 — 콘솔에서 "detect-tags 원본"으로 펼쳐 볼 수 있다 */
+    console.groupCollapsed("[태그 확인] 원본 샘플 (문제 있으면 이걸 복사해서 알려주세요)");
+    console.log(j);
+    console.groupEnd();
   } catch (e) {
     detectedTags = null; detectedTagsUrl = null;
     toast("태그 확인에 실패했습니다: " + ((e && e.message) || "알 수 없는 오류"), "bad");
@@ -3336,18 +3340,22 @@ async function captureVisibleTab() {
     const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) return null;
 
-    /* 스크롤해도 화면에서의 이 뷰포트 자체 위치·크기는 바뀌지 않는다(안쪽
-       내용만 움직인다) — 그러니 자를 영역은 캡처 시작 전에 딱 한 번만 잰다 */
     const viewEl = scroller || doc;
-    const vrect = viewEl ? viewEl.getBoundingClientRect() : { left: 0, top: 0, width: vw, height: vh };
+    const vrect0 = viewEl ? viewEl.getBoundingClientRect() : { left: 0, top: 0, width: vw, height: vh };
     const scaleX = vw / window.innerWidth, scaleY = vh / window.innerHeight;
-    const cropW = Math.max(1, Math.round(vrect.width * scaleX));
-    const cropH = Math.max(1, Math.round(vrect.height * scaleY));
-    const cropX = Math.max(0, Math.round(vrect.left * scaleX));
-    const cropY = Math.max(0, Math.round(vrect.top * scaleY));
+    const cropW = Math.max(1, Math.round(vrect0.width * scaleX));
+    const cropH = Math.max(1, Math.round(vrect0.height * scaleY));
+    const vrect = vrect0;
     if (cropW <= 0 || cropH <= 0) return null;
 
+    /* 위치(left·top)는 매번 다시 잰다 — 상태 문구가 접히는 줄 수를 바꾸거나
+       레이아웃이 미세하게 밀리면 화면 위 좌표가 살짝 움직일 수 있어서,
+       한 번만 재고 계속 쓰면 아래쪽 구간에서 옆(아래쪽 상태줄 등)이 딸려
+       찍히는 문제가 있었다. 크기(너비·높이)는 안 바뀌니 처음 값을 그대로 쓴다 */
     const grab = () => {
+      const r = viewEl.getBoundingClientRect();
+      const cropX = Math.max(0, Math.round(r.left * scaleX));
+      const cropY = Math.max(0, Math.round(r.top * scaleY));
       const c = document.createElement("canvas");
       c.width = cropW; c.height = cropH;
       c.getContext("2d").drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
@@ -3389,7 +3397,10 @@ function stageBusy(msg) {
     ico("loop", "xs spin") + esc(msg) + "</span>";
 }
 async function captureCurrentWeb(url) {
-  stageBusy("지금 탭 화면을 캡처합니다 — 공유 승인 창이 뜨면 허용해 주세요 (아래쪽까지 잠깐 스크롤됩니다)…");
+  /* getDisplayMedia로 화면을 찍는 동안은 상태 문구를 띄우지 않는다 — #stageFoot에
+     글자를 넣으면 줄 수가 바뀌면서 레이아웃이 미세하게 밀리거나, 그 문구 자체가
+     찍힌 화면 안에 그대로 나와 버린다. 공유 승인 창(브라우저 자체 UI)이 뜨는 것만으로
+     충분히 "지금 뭔가 하고 있다"는 게 보인다. */
   let blob = await captureVisibleTab();
   if (!blob) { stageBusy("화면을 서버로 캡처하는 중…"); blob = await captureScreenshot(url); }
   if (!blob) { stageBusy("클립보드 이미지를 확인하는 중…"); blob = await captureClipboardImage(); }
