@@ -254,10 +254,16 @@ function propsFromDetected(properties) {
    사이트 구현에 따라 놓칠 수 있는 최선 추정치라는 점을 함께 알려준다. */
 function tagDetectionHtml(n) {
   if (!n || n.viewMode !== "web") return "";
+  /* $identify·session_start·page_view처럼 페이지를 열기만 해도 자동으로 나가는
+     이벤트 말고, 상품 클릭처럼 사용자가 눌러야만 나가는 커스텀 이벤트를 잡으려면
+     확인 전에 무엇을 눌러볼지 미리 알려줘야 한다 — 서버가 임의로 아무 데나
+     누르지 않도록, 여기 적은 글자가 있는 요소만 대신 눌러 본다. */
+  const clickField = '<div class="detectrow"><span class="webfield" style="flex:1; min-width:160px" title="태그 확인 전에 서버가 대신 눌러볼 텍스트">' +
+    ico("cursor", "xs") + '<input class="mono" id="tagClickIn" placeholder="확인 전 클릭할 텍스트, 쉼표로 구분 (선택)" value="' + esc(tagClickText) + '"></span></div>';
   if (detectedTagsLoading) {
-    return '<div class="tagdetect"><div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (20초 넘게 걸릴 수 있습니다)</div></div>";
+    return '<div class="tagdetect">' + clickField + '<div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (20초 넘게 걸릴 수 있습니다)</div></div>";
   }
-  if (!detectedTags || detectedTagsUrl !== n.webUrl) return "";
+  if (!detectedTags || detectedTagsUrl !== n.webUrl) return '<div class="tagdetect">' + clickField + "</div>";
   const rows = Object.keys(PLAT).map(key => {
     const d = detectedTags[key] || { detected: false, events: [] };
     const existingNames = n.tags.filter(t => platformsOf(t).indexOf(key) >= 0)
@@ -293,12 +299,17 @@ function tagDetectionHtml(n) {
         esc((o.sample && o.sample.method) || "") + " " + esc((o.sample && o.sample.url) || "") + "\n" + esc((o.sample && o.sample.body) || "") + '">' +
         esc(o.host) + (o.count > 1 ? " ×" + o.count : "") + (o.hint ? " · " + esc(o.hint) : "") + "</span>").join("") + "</div>"
     : "";
+  const clicks = detectedTags.clicks || [];
+  const clicksHtml = clicks.length
+    ? '<div class="detectrow">' + clicks.map(c => '<span class="chip" style="--c:' + (c.clicked ? "var(--ok)" : "var(--bad)") + '">' +
+        ico(c.clicked ? "check" : "alert", "xs") + esc(c.text) + (c.clicked ? "" : " · 못 찾음") + "</span>").join("") + "</div>"
+    : "";
   const raw = showDetectRaw
     ? '<pre class="detectraw">' + esc(JSON.stringify(detectedTags, null, 2)) + "</pre>"
     : "";
-  return '<div class="tagdetect"><div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
+  return '<div class="tagdetect">' + clickField + '<div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
     '<button class="btn sm" type="button" data-detect-raw style="margin-left:auto">' + (showDetectRaw ? "원본 감추기" : "원본 보기") + "</button></div>" +
-    rows + othersHtml + raw + "</div>";
+    clicksHtml + rows + othersHtml + raw + "</div>";
 }
 let showDetectRaw = false;
 function renderTagPanel() {
@@ -526,6 +537,9 @@ function initPanels() {
   });
   $("#tagJumpSelect").addEventListener("change", e => {
     const id = e.target.value; if (id) jumpToTag(id);
+  });
+  $("#tagList").addEventListener("input", e => {
+    if (e.target.id === "tagClickIn") tagClickText = e.target.value;   // 다시 그리지 않는다 — 타이핑 중 포커스가 끊기지 않도록
   });
   $("#tagList").addEventListener("click", e => {
     if (e.target.closest("[data-detect-raw]")) { showDetectRaw = !showDetectRaw; return renderTagPanel(); }

@@ -15,6 +15,11 @@ let addrUnknown = false;
 let detectedTags = null;         // { amplitude:{detected,events}, braze:{...}, ga4:{...} }
 let detectedTagsUrl = null;
 let detectedTagsLoading = false;
+/* 클릭으로만 발생하는 커스텀 이벤트(상품 클릭 등)는 페이지를 가만히 열어두기만
+   해서는 절대 나오지 않는다 — 사용자가 "이 글자가 있는 걸 눌러줘"라고 미리
+   알려주면, 서버가 대신 그 요소를 찾아 눌러 보고 그 사이 나가는 요청까지
+   같이 모아 온다. 문서에는 저장하지 않는다. */
+let tagClickText = "";
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
 /* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)
@@ -332,7 +337,9 @@ async function checkPageTags() {
   try {
     const token = await ensureToken().catch(() => null);
     const h = token ? { Authorization: "Bearer " + token } : {};
-    const r = await fetch("/api/detect-tags?url=" + encodeURIComponent(url), { headers: h });
+    let apiUrl = "/api/detect-tags?url=" + encodeURIComponent(url);
+    if (tagClickText.trim()) apiUrl += "&clicks=" + encodeURIComponent(tagClickText.trim());
+    const r = await fetch(apiUrl, { headers: h });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || ("서버 응답 " + r.status));
     detectedTags = j;

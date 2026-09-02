@@ -193,6 +193,27 @@ function hintForHost(host, targetHost) {
   const found = KNOWN_HOST_HINTS.find(([re]) => re.test(host.toLowerCase()));
   return found ? found[1] : null;
 }
+/* $identify·session_start·page_view처럼 페이지를 열기만 해도 자동으로 나가는
+   이벤트 말고, 상품 클릭처럼 사용자가 눌러야만 나가는 커스텀 이벤트는 가만히
+   기다리기만 해서는 절대 잡히지 않는다 — 그렇다고 아무 요소나 임의로 눌러
+   보면(운영 중인 상거래 사이트라) 장바구니 담기 같은 실제 사이드이펙트가 있는
+   버튼을 잘못 누를 위험이 있다. 그래서 무엇을 누를지는 항상 사용자가 글자로
+   직접 지정한 것만 — 그 글자를 포함한 클릭 가능한 요소를 찾아 대신 눌러 본다. */
+async function clickByText(page, text) {
+  try {
+    const handle = await page.evaluateHandle(t => {
+      const norm = s => (s || "").replace(/\s+/g, " ").trim();
+      const els = Array.from(document.querySelectorAll("a, button, [role='button'], [onclick]"));
+      return els.find(el => norm(el.textContent).indexOf(t) >= 0 && el.offsetParent !== null) || null;
+    }, text);
+    const el = handle.asElement();
+    if (!el) { await handle.dispose(); return false; }
+    await el.evaluate(e => e.scrollIntoView({ block: "center" })).catch(() => {});
+    await el.click({ delay: 30 });
+    await handle.dispose();
+    return true;
+  } catch (e) { return false; }
+}
 function eventsFromBraze(postData) {
   const out = [];
   if (!postData) return out;
@@ -237,6 +258,10 @@ module.exports = async function handler(req, res) {
     const pageParams = {};
     target.searchParams.forEach((v, k) => { if (v) pageParams[k] = v; });
 
+    /* 최대 3개까지만 — 늘어날수록 함수 실행 시간 제한(45초)을 넘기기 쉽다 */
+    const clickTexts = (new URL(req.url, "http://x").searchParams.get("clicks") || "")
+      .split(",").map(s => s.trim()).filter(Boolean).slice(0, 3);
+
     const found = { amplitude: new Map(), braze: new Map(), ga4: new Map() };   // name -> merged properties
     const seenVendor = { amplitude: false, braze: false, ga4: false };
     /* 파싱이 실제로 맞는지 확인하려면 원본을 봐야 한다 — 업체별로 몇 개만
@@ -252,6 +277,7 @@ module.exports = async function handler(req, res) {
     const SKIP_TYPES = ["document", "stylesheet", "image", "media", "font", "script", "websocket", "manifest"];
     const otherHosts = new Map();   // hostname -> { count, sample }
     const OTHER_MAX = 20;
+    const clickResults = [];   // [{ text, clicked }] — 요청한 클릭 시나리오가 실제로 먹혔는지
 
     const browser = await getBrowser();
     const page = await browser.newPage();
@@ -306,16 +332,28 @@ module.exports = async function handler(req, res) {
           });
           if (nextData) Object.assign(pageParams, cleanProps(nextData));
         } catch (e) { /* Next.js가 아니거나 모양이 다르면 그냥 건너뛴다 */ }
-        /* GTM 컨테이너가 로드된 뒤에야 gtag·Amplitude·Braze 호출이 잇달아 나가는
-           사이트가 많고, 실제로 재 보니 Braze는 10초 넘게 걸려서야 첫 이벤트를
-           보내는 경우도 있었다 — 넉넉히 14초까지 기다린다. */
-        await new Promise(r => setTimeout(r, 14000));
+        if (clickTexts.length) {
+          /* 클릭으로 나가는 요청은 몇 초 안에 뜨니, 자동 발생 이벤트를 기다리는
+             시간을 줄이고 그 대신 클릭 하나하나 사이에 여유를 둔다 — 45초
+             제한을 넘기지 않으려는 것. */
+          await new Promise(r => setTimeout(r, 4000));
+          for (const text of clickTexts) {
+            const ok = await clickByText(page, text);
+            clickResults.push({ text, clicked: ok });
+            await new Promise(r => setTimeout(r, 3500));
+          }
+        } else {
+          /* GTM 컨테이너가 로드된 뒤에야 gtag·Amplitude·Braze 호출이 잇달아 나가는
+             사이트가 많고, 실제로 재 보니 Braze는 10초 넘게 걸려서야 첫 이벤트를
+             보내는 경우도 있었다 — 넉넉히 14초까지 기다린다. */
+          await new Promise(r => setTimeout(r, 14000));
+        }
       } catch (e) { /* 여기까지 뜬 요청만으로 판단한다 */ }
     } finally {
       await page.close().catch(() => {});
     }
 
-    const out = { pageParams };
+    const out = { pageParams, clicks: clickResults };
     ["amplitude", "braze", "ga4"].forEach(k => {
       out[k] = {
         detected: seenVendor[k],
