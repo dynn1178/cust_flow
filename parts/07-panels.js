@@ -260,9 +260,8 @@ function tagDetectionHtml(n) {
      가져오는 것이다(봇 감지·동의 배너·교차출처·서버 실행시간 제한 어느
      것에도 걸리지 않는다). */
   const harField = '<div class="detectrow">' +
-    '<button class="btn sm" type="button" data-har-export title="DevTools 없이 캡처하는 방법">' + ico("share", "xs") + "내보내기</button>" +
     '<button class="btn sm" type="button" data-har-pick>' + ico("folder", "xs") + "HAR 파일 가져오기</button>" +
-    '<span class="hint">DevTools가 불편하면 "내보내기"로 즐겨찾기 캡처 도구를 받아 쓰세요</span>' +
+    '<span class="hint">DevTools → Network 탭 → 아무 요청 우클릭 → "Save all as HAR with content"로 내보낸 파일 — 클릭 이벤트까지 정확히 잡힙니다</span>' +
     "</div>";
   /* 이 캡처가 "무엇을 눌러서" 나온 건지는 우리가 알 수 없다(사용자만 안다) —
      여기 적어 두면 "+"로 태그를 새로 만들 때 이벤트명(한글) 칸에 그대로
@@ -573,7 +572,6 @@ function initPanels() {
     if (e.target.id === "tagSearchIn" && e.key === "Enter") { e.preventDefault(); renderTagPanel(); }
   });
   $("#tagList").addEventListener("click", e => {
-    if (e.target.closest("[data-har-export]")) return openHarExportModal();
     if (e.target.closest("[data-har-pick]")) return pickHarFile();
     if (e.target.closest("[data-tag-search]")) return renderTagPanel();
     if (e.target.closest("[data-detect-raw]")) { showDetectRaw = !showDetectRaw; return renderTagPanel(); }
