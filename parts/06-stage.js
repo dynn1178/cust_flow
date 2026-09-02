@@ -379,12 +379,14 @@ async function captureClipboardImage() {
    그려지게 만들고) 바깥 스크롤 영역(우리 쪽 DOM이라 동일 출처 정책과
    무관하다)을 스크립트로 내려가며 구간마다 한 장씩 찍어 이어 붙인다. */
 const CAPTURE_SLICES = 3;      // 지금 화면 + 그 아래 2구간(총 3배 높이)까지 담는다
+const CAPTURE_WIDTH = 1280;    // 전체화면 폭 그대로 찍으면 내용이 작게 나와서, 이 폭으로 좁혀 그만큼 크게(확대) 담는다
 async function captureVisibleTab() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return null;
   const scroller = $("#stageScroll"), doc = $("#stageDoc");
   if (!scroller || !doc) return null;
   let stream = null, video = null, wentFullscreen = false;
   const savedDocHeight = doc.style.height;
+  const savedDocWidth = doc.style.width;
   const savedOverflow = scroller.style.overflow;
   try {
     /* getDisplayMedia는 사용자 클릭에 바짝 붙어 있어야 브라우저가 허용하므로
@@ -407,6 +409,9 @@ async function captureVisibleTab() {
     if (scroller.requestFullscreen) {
       try { await scroller.requestFullscreen(); wentFullscreen = true; } catch (e) { /* 막히면 지금 크기 그대로 찍는다 */ }
     }
+    /* 화면 전체 폭 그대로 찍으면 내용이 작아 보이니, 왼쪽에 딱 CAPTURE_WIDTH만큼만
+       두고 그 안에서만 페이지를 그리게 한다 — 남는 오른쪽은 잘라내고 안 쓴다 */
+    if (wentFullscreen) doc.style.width = CAPTURE_WIDTH + "px";
     await new Promise(r => setTimeout(r, wentFullscreen ? 500 : 100));   // 전체화면 전환·리플로우 시간
 
     video = document.createElement("video");
@@ -416,12 +421,16 @@ async function captureVisibleTab() {
     const vw = video.videoWidth, vh = video.videoHeight;
     if (!vw || !vh) return null;
 
-    /* 전체화면이라 화면에 보이는 전부가 곧 웹페이지 영역이다 — 잘라낼 필요 없이
-       찍힌 프레임을 통째로 쓴다 */
+    /* 전체화면 폭(scroller.clientWidth)에 대비해 캡처 해상도가 몇 배인지 재서,
+       왼쪽 CAPTURE_WIDTH만큼만 잘라 쓴다 — 전체화면이 아니면(막힌 경우) 자를 게
+       없으니 찍힌 프레임을 통째로 쓴다 */
+    const cropW = (wentFullscreen && scroller.clientWidth > 0)
+      ? Math.max(1, Math.min(vw, Math.round(CAPTURE_WIDTH * (vw / scroller.clientWidth))))
+      : vw;
     const grab = () => {
       const c = document.createElement("canvas");
-      c.width = vw; c.height = vh;
-      c.getContext("2d").drawImage(video, 0, 0, vw, vh);
+      c.width = cropW; c.height = vh;
+      c.getContext("2d").drawImage(video, 0, 0, cropW, vh, 0, 0, cropW, vh);
       return c;
     };
 
@@ -441,7 +450,7 @@ async function captureVisibleTab() {
     }
 
     const total = document.createElement("canvas");
-    total.width = vw; total.height = vh * slices.length;
+    total.width = cropW; total.height = vh * slices.length;
     const ctx = total.getContext("2d");
     slices.forEach((s, i) => ctx.drawImage(s, 0, vh * i));
     /* PNG(무손실)는 사진·배너가 섞인 페이지에서 용량이 훨씬 커진다 — JPEG를
@@ -453,6 +462,7 @@ async function captureVisibleTab() {
     if (stream) stream.getTracks().forEach(t => t.stop());
     if (video) { video.srcObject = null; video.remove(); }
     doc.style.height = savedDocHeight;
+    doc.style.width = savedDocWidth;
     scroller.style.overflow = savedOverflow;
     scroller.scrollTop = 0;
     if (wentFullscreen && document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
