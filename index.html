@@ -4276,25 +4276,27 @@ function tagDetectionHtml(n) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지 안 됨</span>';
     } else if (!d.events.length) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지됨 · 이벤트 이름은 추출 못 함</span>';
-    } else if (matchedEvents.every(ev => evStatus(ev).fully)) {
-      /* 이름·속성 전부 이미 등록된 태그와 같다 — 하나하나 늘어놓지 않고
-         한 줄로 압축해서 새로 볼 것이 없다는 걸 바로 알 수 있게 한다. */
-      body = '<span class="chip" style="--c:var(--ok)">' + ico("check", "xs") +
-        "감지된 " + matchedEvents.length + "개 이벤트 모두 등록된 태그와 일치</span>";
     } else {
       body = matchedEvents.map(ev => {
         const name = ev.name, propCount = Object.keys(ev.properties || {}).length;
         const st = evStatus(ev);
         const matched = !!st.tagMatch;
-        const color = matched ? (st.fully ? "var(--ok)" : "var(--warn)") : "var(--warn)";
+        /* 바뀐 게 없는 항목은 눈에 띄지 않게 옅게, 새로 생겼거나 달라진
+           항목만 색을 줘서 강조한다 — 다 늘어놓되 변화만 눈에 띄도록. */
+        const color = matched ? (st.fully ? "var(--ink-3)" : "var(--warn)") : "var(--warn)";
         const label = matched ? (st.fully ? "" : " · 새 속성 " + st.newKeys.length + "개") : "";
         const title = matched
           ? (st.fully ? (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음") : "새로 발견된 속성: " + esc(st.newKeys.join(", ")))
           : (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음");
+        /* 이름이 이미 등록돼 있어도 새로 발견된 속성이 있으면(!st.fully) 그냥
+           지나칠 게 아니라 버튼을 눌러 등록 전/후를 비교하고 덮어쓸지 정할 수
+           있어야 한다 — 완전히 같을 때만(matched && fully) 버튼이 필요 없다. */
+        const needsAction = !matched || !st.fully;
         return '<span class="chip" style="--c:' + color + '" title="' + title + '">' +
             ico(matched ? "check" : "alert", "xs") + esc(name) +
             (propCount ? " · 속성 " + propCount + "개" : "") + label + "</span>" +
-          (!matched && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="이 이름과 속성 그대로 태그 추가">' + ico("plus", "xs") + "</button>" : "");
+          (needsAction && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="' +
+            (matched ? "새로 발견된 속성 확인하고 덮어쓰기" : "이 이름과 속성 그대로 태그 추가") + '">' + ico(matched ? "loop" : "plus", "xs") + "</button>" : "");
       }).join("");
     }
     return '<div class="detectrow">' + platChip(key) + body + "</div>";
