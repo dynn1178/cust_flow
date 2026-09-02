@@ -35,6 +35,9 @@
 /* 웹 모드 — "태그 확인"으로 서버가 감지한 실제 트래킹과 등록된 태그를 견주는 상자 */
 .tagdetect{border:1px dashed var(--stroke); border-radius:var(--r-md); background:var(--glass-2); padding:9px 10px;
   display:flex; flex-direction:column; gap:6px}
+.tagdupe{border:1px solid color-mix(in srgb, var(--warn) 40%, var(--stroke)); border-radius:var(--r-md);
+  background:color-mix(in srgb, var(--warn) 8%, var(--glass-2)); padding:9px 10px; display:flex; flex-direction:column; gap:6px}
+.tagdupe .detectrow{align-items:center}
 .detecthead{font-size:11.5px; font-weight:600; color:var(--ink-2); display:flex; align-items:baseline; gap:6px}
 .detecthead .hint{font-weight:400; font-size:10.5px; color:var(--ink-3)}
 .detectrow{display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:11.5px}
@@ -191,6 +194,9 @@ tr:hover .rowacts{opacity:1}
    5개 span이 부모 grid의 칼럼에 바로 편입돼, 값이 없는 칸도 자리를 지켜 줄마다 칼럼이 맞는다 */
 .proplines{display:grid; grid-template-columns:max-content minmax(44px,120px) minmax(56px,160px) max-content minmax(40px,1fr);
   column-gap:8px; row-gap:4px; font-size:11.5px; color:var(--ink-2); line-height:1.4; align-items:baseline; min-width:0; max-width:100%; overflow-x:auto}
+.difftable{display:flex; flex-direction:column; gap:4px; max-height:320px; overflow:auto; border:1px solid var(--stroke-2);
+  border-radius:var(--r-md); padding:8px; background:var(--glass-2)}
+.diffrow{display:flex; align-items:baseline; gap:8px}
 .propline{display:contents}
 .propline .pko{font-weight:600; color:var(--ink); overflow-wrap:anywhere}
 .propline .pen{font-family:var(--f-mono); font-size:10.5px; overflow-wrap:anywhere}

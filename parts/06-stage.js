@@ -11,14 +11,6 @@ let browseUrl = "";        // 카드 없이 웹으로 둘러볼 때 쓰는 임�
 let detectedTags = null;         // { amplitude:{detected,events}, braze:{...}, ga4:{...} }
 let detectedTagsUrl = null;
 let detectedTagsLoading = false;
-/* 잡힌 이벤트가 많아지면 하나하나 훑어보기 번거롭다 — "해외패키지"처럼
-   업무상 익숙한 키워드로 이벤트 이름·속성 이름·속성 값을 한 번에 훑어서
-   관련된 것만 추려 보여준다. 새로 요청을 보내는 게 아니라 이미 받아 둔
-   결과(detectedTags) 안에서만 걸러낸다. */
-let tagSearchText = "";
-/* 캡처만 봐서는 "무엇을 눌러서" 나온 이벤트인지 알 수 없다 — 사용자가 여기
-   적어 두면, "+"로 새 태그를 만들 때 이벤트명(한글) 칸에 그대로 들어간다. */
-let tagClickLabel = "";
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
 /* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)

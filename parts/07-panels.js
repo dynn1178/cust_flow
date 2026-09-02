@@ -88,6 +88,111 @@ function effectiveProps(t) {
     .concat((t.props || []).map(p => Object.assign({}, p, { common: false })));
 }
 
+/* ---------------- 플랫폼만 다른 중복 태그 찾아 합치기 ----------------
+   Amplitude·Braze가 같은 커스텀 래퍼로 같은 이벤트를 각자 쏘는 사이트가
+   있어서(둘 다에서 감지됨) "+"로 두 번 퀵애드하면 이벤트명·속성이 완전히
+   같은 태그가 플랫폼만 다르게 두 장 생긴다 — 공통 속성은 문서 전체가 같이
+   쓰는 값이라 비교 의미가 없어 빼고, 태그 고유 속성(en+sample)만으로
+   "내용이 같다"를 판단한다. */
+function tagFingerprint(t) {
+  const props = (t.props || []).map(p => (p.en || "").trim().toLowerCase() + "=" + String(p.sample == null ? "" : p.sample).trim().toLowerCase()).sort().join("|");
+  return [(tagEventEn(t) || t.eventKo || "").trim().toLowerCase(), tagArea(t).trim().toLowerCase(), props].join("::");
+}
+function duplicateTagGroups(n) {
+  const groups = new Map();
+  (n.tags || []).forEach(t => {
+    const fp = tagFingerprint(t);
+    if (!fp.split("::")[0]) return;   // 이벤트명 없는 태그는 비교할 근거가 없다
+    if (!groups.has(fp)) groups.set(fp, []);
+    groups.get(fp).push(t);
+  });
+  return Array.from(groups.values()).filter(g => g.length > 1);
+}
+function duplicateTagsHtml(n) {
+  if (!n || !canEdit()) return "";
+  const groups = duplicateTagGroups(n);
+  if (!groups.length) return "";
+  return '<div class="tagdupe">' + groups.map(g => {
+    const allPlats = Array.from(new Set(g.reduce((a, t) => a.concat(platformsOf(t)), [])));
+    return '<div class="detectrow">' + ico("copy", "xs") +
+      '<span>' + esc(tagEventEn(g[0]) || g[0].eventKo || "(이름 없음)") + " — 플랫폼만 다른 동일한 태그 " + g.length + "개</span>" +
+      platChips(allPlats) +
+      '<button class="btn sm primary" data-merge-tags="' + g.map(t => t.id).join(",") + '" style="margin-left:auto">' +
+        ico("check", "xs") + "하나로 합치기</button>" +
+    "</div>";
+  }).join("") + "</div>";
+}
+function mergeTags(ids) {
+  const n = curNode(); if (!n || !canEdit()) return;
+  const group = ids.map(id => n.tags.find(t => t.id === id)).filter(Boolean);
+  if (group.length < 2) return;
+  const keep = group[0];
+  keep.platforms = Array.from(new Set(group.reduce((a, t) => a.concat(platformsOf(t)), [])));
+  delete keep.platform;   // 예전 문서의 단일 플랫폼 필드는 이제 의미 없다
+  const dropIds = group.slice(1).map(t => t.id);
+  n.tags = n.tags.filter(t => dropIds.indexOf(t.id) < 0);
+  markDirty(); renderPanels(); renderTagView(true);
+  toast("태그 " + group.length + "개를 하나로 합쳤습니다", "ok");
+}
+
+/* ---------------- 태그를 다른 페이지·여정지도로 이동/복사 ----------------
+   모든 보드가 이미 한 state 안에 같이 올라와 있어서(허용:04-core.js B()),
+   다른 여정지도의 페이지로 옮기는 것도 지금 보드 안에서 옮기는 것과 똑같이
+   그 자리에서 바로 되는 메모리 조작이다 — globalSearchResults()/qsRow()와
+   같은 "모든 보드를 훑어 페이지 찾기" 틀을 그대로 가져다 쓴다. */
+function openTagMovePicker(tagId) {
+  const srcNode = curNode(); if (!srcNode || !canEdit()) return;
+  const tag = srcNode.tags.find(t => t.id === tagId); if (!tag) return;
+  let mode = "move";
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass qsearch" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("share") + "<h3>태그를 다른 페이지로</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body" style="gap:8px">' +
+        '<div class="seg" id="tagMoveMode">' +
+          '<button class="btn sm on" type="button" data-mode="move">' + ico("share", "xs") + "이동</button>" +
+          '<button class="btn sm" type="button" data-mode="copy">' + ico("copy", "xs") + "복사</button>" +
+        "</div>" +
+        '<input class="field" id="tmqInput" placeholder="페이지 이름·경로로 찾기 (모든 여정지도)">' +
+        '<div id="tmqResults" class="qs-results"></div>' +
+      "</div>" +
+    "</div></div>";
+  const inp = $("#tmqInput"), out = $("#tmqResults");
+  const render = () => {
+    const q = inp.value.toLowerCase().trim();
+    const rows = [];
+    state.boards.forEach(b => b.nodes.forEach(n => {
+      if (n === srcNode) return;   // 자기 자신은 옮길 대상이 될 수 없다
+      if (q && (n.name + " " + (n.path || "")).toLowerCase().indexOf(q) < 0) return;
+      rows.push({ n, b });
+    }));
+    if (!rows.length) { out.innerHTML = '<div class="empty">' + ico("search") + "<div>일치하는 페이지가 없습니다</div></div>"; return; }
+    out.innerHTML = rows.slice(0, 50).map(({ n, b }) =>
+      qsRow("map", n.name, b.name + (n.path ? " · " + n.path : ""), state.boards.indexOf(b), n.id)).join("");
+  };
+  inp.addEventListener("input", render);
+  $("#tagMoveMode").addEventListener("click", e => {
+    const b = e.target.closest("[data-mode]"); if (!b) return;
+    mode = b.dataset.mode;
+    $$("#tagMoveMode .btn").forEach(x => x.classList.toggle("on", x === b));
+  });
+  out.addEventListener("click", e => {
+    const row = e.target.closest("[data-node]"); if (!row) return;
+    const bi = +row.dataset.bi, nodeId = row.dataset.node;
+    const targetBoard = state.boards[bi], targetNode = targetBoard && targetBoard.nodes.find(x => x.id === nodeId);
+    if (!targetNode) return;
+    targetNode.tags.push(Object.assign({}, tag, { id: uid("t") }));
+    if (mode === "move") srcNode.tags = srcNode.tags.filter(x => x.id !== tag.id);
+    markDirty(); renderFlow(); renderPanels(); renderTagView(true);
+    closeModal();
+    toast((mode === "move" ? "이동" : "복사") + "했습니다 · " + targetBoard.name + " · " + targetNode.name, "ok");
+  });
+  root.addEventListener("keydown", e => { if (e.key === "Escape") { e.stopPropagation(); closeModal(); } });
+  root.addEventListener("click", e => { if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal(); });
+  render();
+  setTimeout(() => inp.focus(), 0);
+}
+
 /* ---------------- 태그/캠페인 CSV 일괄 업로드 · 샘플 양식 ----------------
    기존 CSV 내보내기(btnTagCsv/btnCampCsv)와 같은 컬럼·따옴표 규칙을 써서
    왕복 호환되게 만든다. */
@@ -263,31 +368,13 @@ function tagDetectionHtml(n) {
     '<button class="btn sm" type="button" data-har-pick>' + ico("folder", "xs") + "HAR 파일 가져오기</button>" +
     '<span class="hint">DevTools → Network 탭 → 아무 요청 우클릭 → "Save all as HAR with content"로 내보낸 파일 — 클릭 이벤트까지 정확히 잡힙니다</span>' +
     "</div>";
-  /* 이 캡처가 "무엇을 눌러서" 나온 건지는 우리가 알 수 없다(사용자만 안다) —
-     여기 적어 두면 "+"로 태그를 새로 만들 때 이벤트명(한글) 칸에 그대로
-     들어가서, 나중에 태그명만 보고도 어떤 동작인지 알 수 있게 한다. */
-  const clickLabelField = '<div class="detectrow"><span class="webfield" style="flex:1; min-width:160px" title="이 캡처에서 무엇을 눌렀는지 — 새 태그의 이벤트명(한글) 칸에 자동으로 들어갑니다">' +
-    ico("cursor", "xs") + '<input id="tagClickLabelIn" placeholder="무엇을 눌렀을 때 수집했나요? (예: 유사상품추천 영역 內 상품 클릭)" value="' + esc(tagClickLabel) + '"></span></div>';
   if (detectedTagsLoading) {
     return '<div class="tagdetect">' + harField + '<div class="detectrow">' + ico("loop", "xs spin") + "확인하는 중…</div></div>";
   }
   if (!detectedTags || detectedTagsUrl !== n.webUrl) return '<div class="tagdetect">' + harField + "</div>";
-  /* "해외패키지"처럼 업무상 익숙한 키워드로, 이미 잡아 둔 이벤트 이름·속성
-     이름·속성 값을 한 번에 훑어 관련된 것만 추려 본다 — 새로 요청을 보내지
-     않고 지금 결과 안에서만 찾는다. */
-  const searchQ = tagSearchText.trim().toLowerCase();
-  const matchesSearch = ev => {
-    if (!searchQ) return true;
-    if (String(ev.name).toLowerCase().indexOf(searchQ) >= 0) return true;
-    return Object.entries(ev.properties || {}).some(([k, v]) =>
-      k.toLowerCase().indexOf(searchQ) >= 0 || String(v).toLowerCase().indexOf(searchQ) >= 0);
-  };
-  const searchField = '<div class="detectrow"><span class="webfield" style="flex:1; min-width:160px" title="이미 잡힌 이벤트/속성을 키워드로 찾기">' +
-    ico("search", "xs") + '<input class="mono" id="tagSearchIn" placeholder="이벤트·속성 검색 (예: 해외패키지)" value="' + esc(tagSearchText) + '"></span>' +
-    '<button class="btn sm" type="button" data-tag-search>탐색</button></div>';
   const rows = Object.keys(PLAT).map(key => {
     const d = detectedTags[key] || { detected: false, events: [] };
-    const matchedEvents = d.events.filter(matchesSearch);
+    const matchedEvents = d.events;
     const tagsForPlat = n.tags.filter(t => platformsOf(t).indexOf(key) >= 0);
     /* 이름만 같은지가 아니라, 캡처된 속성이 이미 등록된 태그의 속성 목록
        안에 전부 들어있는지까지 봐서 "완전히 같다"를 판단한다 — 새로 발견된
@@ -305,8 +392,6 @@ function tagDetectionHtml(n) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지 안 됨</span>';
     } else if (!d.events.length) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지됨 · 이벤트 이름은 추출 못 함</span>';
-    } else if (searchQ && !matchedEvents.length) {
-      body = '<span class="chip" style="--c:var(--ink-3)">"' + esc(tagSearchText.trim()) + '"과 일치하는 이벤트 없음</span>';
     } else if (matchedEvents.every(ev => evStatus(ev).fully)) {
       /* 이름·속성 전부 이미 등록된 태그와 같다 — 하나하나 늘어놓지 않고
          한 줄로 압축해서 새로 볼 것이 없다는 걸 바로 알 수 있게 한다. */
@@ -335,7 +420,7 @@ function tagDetectionHtml(n) {
     : "";
   return '<div class="tagdetect">' + harField + '<div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
     '<button class="btn sm" type="button" data-detect-raw style="margin-left:auto">' + (showDetectRaw ? "원본 감추기" : "원본 보기") + "</button></div>" +
-    clickLabelField + searchField + rows + raw + "</div>";
+    rows + raw + "</div>";
 }
 let showDetectRaw = false;
 function renderTagPanel() {
@@ -343,6 +428,7 @@ function renderTagPanel() {
   $("#tagCount").textContent = n ? n.tags.length : 0;
   renderTagJumpSelect();
   const detectHtml = tagDetectionHtml(n);
+  const dupeHtml = duplicateTagsHtml(n);
   if (!n) { box.innerHTML = '<div class="empty">' + ico("tag") + "<div>페이지를 선택하세요</div></div>"; updateToggleAllBtn(n); return; }
   if (!n.tags.length) {
     box.innerHTML = detectHtml + '<div class="empty">' + ico("tag") + "<div>등록된 태그가 없습니다" +
@@ -352,11 +438,13 @@ function renderTagPanel() {
   }
   const order = { amplitude: 0, braze: 1, ga4: 2 };
   const minOrder = t => platformsOf(t).reduce((m, p) => Math.min(m, order[p] != null ? order[p] : 99), 99);
-  box.innerHTML = detectHtml + n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
+  box.innerHTML = detectHtml + dupeHtml + n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
     const expanded = expandedTags.has(t.id);
     return '<div class="card tagcard' + (expanded ? " expanded" : "") + '" data-tag="' + t.id + '">' +
       '<div class="card-top">' + platChips(platformsOf(t)) +
-        '<div class="spacer"></div>' + acts("tag", t.id) + "</div>" +
+        '<div class="spacer"></div>' +
+        (canEdit() ? '<button class="btn icon sm edit-only" data-tag-move="' + t.id + '" title="다른 페이지로 이동·복사">' + ico("share", "xs") + "</button>" : "") +
+        acts("tag", t.id) + "</div>" +
       '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
         '<span class="tagcaret">▸</span>' +
         '<span class="evt">' + esc(t.action || "(태그명 없음)") + "</span>" +
@@ -460,11 +548,17 @@ function renderPanels() { renderTagPanel(); renderCampPanel(); }
 /* ---------------- CRUD ---------------- */
 function editTag(id, prefill) {
   const n = curNode(); if (!n || !canEdit()) return;
-  const t = id ? n.tags.find(x => x.id === id) : Object.assign({
+  /* id가 있어도 prefill을 적용할 수 있어야 한다(덮어쓰기 확인 후 "새로 캡처된
+     값"을 기존 태그 위에 미리 채워 보여주는 용도) — 그래서 실제 문서에 쓸
+     때 손댈 진짜 객체(live)와, 폼에 보여줄 값(t)을 분리한다. 저장은 항상
+     live에 쓰고, t는 화면에 뭘 보여줄지 계산하는 데만 쓴다. */
+  const live = id ? n.tags.find(x => x.id === id) : null;
+  if (id && !live) return;
+  const t = Object.assign({
     platforms: ["amplitude"], path: "", eventKo: "", eventEn: "",
     area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
-  }, prefill || {});
+  }, live || {}, prefill || {});
   const values = Object.assign({}, t, {
     eventEn: tagEventEn(t), area: tagArea(t), platforms: platformsOf(t),
     path: t.path || n.path || "",           // 경로는 기본적으로 페이지에 지정된 경로를 그대로 따른다
@@ -511,12 +605,76 @@ function editTag(id, prefill) {
         eventEn: v.eventEn || "unnamed_event", platforms: v.platforms && v.platforms.length ? v.platforms : ["amplitude"],
         props: specificProps
       });
-      if (id) Object.assign(t, rec); else { rec.id = uid("t"); n.tags.push(rec); }
+      if (id) Object.assign(live, rec); else { rec.id = uid("t"); n.tags.push(rec); }
       markDirty(); renderFlow(); renderPanels(); renderTagView(true);
     },
     onDelete: id ? () => confirmDel("태그 " + tagEventEn(t) + " 를 삭제할까요?", () => {
       n.tags = n.tags.filter(x => x.id !== id); markDirty(); renderFlow(); renderPanels(); renderTagView(true);
     }) : null
+  });
+}
+
+/* ---------------- 감지된 이벤트를 태그로 추가 — 이미 있으면 덮어쓸지 확인 ----------------
+   HAR을 다시 가져와서 "+"를 누르면 지난번과 똑같은 이벤트명(영어)이 또
+   나오는 게 흔하다 — 그때마다 매번 새 태그를 만들면 중복만 쌓인다. 같은
+   플랫폼에 같은 이벤트명이 이미 있으면 조용히 새로 만들지 않고, 등록 전
+   (기존 속성)과 등록 후(방금 캡처된 속성)를 나란히 보여줘서 뭐가 (삭제)
+   되고 뭐가 (추가)되는지 확인한 다음에 결정하게 한다. */
+function diffProps(oldMap, newMap) {
+  const keys = Array.from(new Set(Object.keys(oldMap).concat(Object.keys(newMap))));
+  return keys.map(k => {
+    const inOld = Object.prototype.hasOwnProperty.call(oldMap, k);
+    const inNew = Object.prototype.hasOwnProperty.call(newMap, k);
+    let mark = null;
+    if (inOld && !inNew) mark = "삭제";
+    else if (!inOld && inNew) mark = "추가";
+    else if (String(oldMap[k]) !== String(newMap[k])) mark = "변경";
+    return { key: k, oldVal: inOld ? oldMap[k] : "", newVal: inNew ? newMap[k] : "", mark };
+  }).sort((a, b) => a.key.localeCompare(b.key));
+}
+function diffRowHtml(d) {
+  const color = d.mark === "삭제" ? "var(--bad)" : d.mark === "추가" ? "var(--ok)" : d.mark === "변경" ? "var(--warn)" : "var(--ink-3)";
+  const valueHtml = d.mark === "삭제" ? esc(d.oldVal)
+    : d.mark === "추가" ? esc(d.newVal)
+    : d.mark === "변경" ? esc(d.oldVal) + " → " + esc(d.newVal)
+    : esc(d.oldVal);
+  return '<div class="diffrow">' +
+    '<span class="mono" style="font-size:11px">' + esc(d.key) + "</span>" +
+    '<span class="mono" style="font-size:11px; flex:1; min-width:0; overflow-wrap:anywhere">' + valueHtml + "</span>" +
+    (d.mark ? '<span class="chip" style="--c:' + color + '">(' + d.mark + ")</span>" : "") +
+  "</div>";
+}
+function addDetectedTag(key, name, ev) {
+  const n = curNode(); if (!n || !canEdit()) return;
+  const props = propsFromDetected(ev && ev.properties);
+  const existing = n.tags.find(t => platformsOf(t).indexOf(key) >= 0 && (tagEventEn(t) || "").trim().toLowerCase() === String(name).trim().toLowerCase());
+  if (!existing) return editTag(null, { platforms: [key], eventEn: name, props });
+
+  const oldMap = {}; (existing.props || []).forEach(p => { if (p.en) oldMap[p.en] = p.sample || ""; });
+  const newMap = Object.assign({}, (ev && ev.properties) || {});
+  const diffs = diffProps(oldMap, newMap);
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass" style="width:min(560px,100%)" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("alert") + "<h3>이미 등록된 태그입니다</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' +
+        '<p class="hint">"' + esc(name) + '"은(는) 이미 <b>' + esc(existing.action || existing.eventKo || "이름 없는 태그") + "</b>(으)로 등록돼 있습니다. " +
+          "덮어쓰면 속성이 아래처럼 바뀝니다 — 등록 전 값 기준으로 (삭제)·(추가)·(변경)을 표시합니다.</p>" +
+        '<div class="difftable">' + (diffs.length ? diffs.map(diffRowHtml).join("") : '<div class="hint">속성 차이가 없습니다</div>') + "</div>" +
+      "</div>" +
+      '<div class="modal-foot">' +
+        '<button class="btn" data-x>취소</button><div class="spacer"></div>' +
+        '<button class="btn" data-ow-new>새 태그로 추가</button>' +
+        '<button class="btn primary" data-ow-confirm>덮어쓰기</button>' +
+      "</div>" +
+    "</div></div>";
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
+    if (e.target.closest("[data-ow-new]")) { closeModal(); return editTag(null, { platforms: [key], eventEn: name, props }); }
+    if (e.target.closest("[data-ow-confirm]")) {
+      closeModal();
+      return editTag(existing.id, { platforms: Array.from(new Set(platformsOf(existing).concat([key]))), eventEn: name, props });
+    }
   });
 }
 function editCamp(id) {
@@ -564,23 +722,18 @@ function initPanels() {
   $("#tagJumpSelect").addEventListener("change", e => {
     const id = e.target.value; if (id) jumpToTag(id);
   });
-  $("#tagList").addEventListener("input", e => {
-    if (e.target.id === "tagSearchIn") tagSearchText = e.target.value;             // "탐색" 눌러야 실제로 걸러진다
-    if (e.target.id === "tagClickLabelIn") tagClickLabel = e.target.value;         // 다시 그리지 않는다 — 타이핑 중 포커스가 끊기지 않도록
-  });
-  $("#tagList").addEventListener("keydown", e => {
-    if (e.target.id === "tagSearchIn" && e.key === "Enter") { e.preventDefault(); renderTagPanel(); }
-  });
   $("#tagList").addEventListener("click", e => {
+    const mg = e.target.closest("[data-merge-tags]");
+    if (mg) return mergeTags(mg.dataset.mergeTags.split(","));
+    const mv = e.target.closest("[data-tag-move]");
+    if (mv) return openTagMovePicker(mv.dataset.tagMove);
     if (e.target.closest("[data-har-pick]")) return pickHarFile();
-    if (e.target.closest("[data-tag-search]")) return renderTagPanel();
     if (e.target.closest("[data-detect-raw]")) { showDetectRaw = !showDetectRaw; return renderTagPanel(); }
     const da = e.target.closest("[data-detect-add]");
     if (da) {
       const key = da.dataset.detectPlat, name = da.dataset.detectName;
       const ev = detectedTags && detectedTags[key] && (detectedTags[key].events || []).find(x => x.name === name);
-      const props = propsFromDetected(ev && ev.properties);
-      return editTag(null, { platforms: [key], eventEn: name, eventKo: tagClickLabel.trim(), props });
+      return addDetectedTag(key, name, ev);
     }
     const ed = e.target.closest("[data-tag-edit]"), dl = e.target.closest("[data-tag-del]"), tg = e.target.closest("[data-tag-toggle]");
     if (ed) return editTag(ed.dataset.tagEdit);
