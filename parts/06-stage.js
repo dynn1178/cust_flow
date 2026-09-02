@@ -359,6 +359,84 @@ async function captureClipboardImage() {
   } catch (e) { /* 권한 거부 · 클립보드에 이미지 없음 등 — 조용히 건너뛴다 */ }
   return null;
 }
+/* 지금 이 브라우저 탭에 실제로 그려져 있는 화면을 그대로 찍는다 — 화면 공유
+   API(getDisplayMedia)는 동일 출처 정책과 무관하게 "사람 눈에 보이는 픽셀"을
+   그대로 가져오므로, 다른 도메인 iframe 안에서 링크를 눌러 어디로 이동했든
+   지금 보이는 그 화면 그대로 캡처된다 — 서버 왕복도 필요 없다.
+   크롬 계열은 preferCurrentTab로 "지금 탭 공유"를 곧장 고를 수 있게 하지만,
+   그래도 매번 브라우저의 공유 승인이 한 번씩 뜬다(취소하면 조용히 넘어간다).
+
+   화면에 보이는 한 구간만이 아니라 그 아래도 담기 위해: iframe을 잠깐
+   화면보다 훨씬 키워서(그만큼 안의 페이지가 실제로 더 많이 그려지게 만들고)
+   바깥 스크롤 영역(우리 쪽 DOM이라 동일 출처 정책과 무관하다)을 스크립트로
+   내려가며 구간마다 한 장씩 찍어 이어 붙인다. iframe 안 콘텐츠 자체를
+   스크롤하는 게 아니라 iframe을 더 크게 그리는 것이라 교차 출처와 무관하다. */
+const CAPTURE_SLICES = 3;      // 지금 화면 + 그 아래 2구간(총 3배 높이)까지 담는다
+async function captureVisibleTab() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return null;
+  let stream = null, video = null;
+  const doc = $("#stageDoc"), scroller = $("#stageScroll");
+  const savedDocHeight = doc ? doc.style.height : "";
+  const savedOverflow = scroller ? scroller.style.overflow : "";
+  const savedScrollTop = scroller ? scroller.scrollTop : 0;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { displaySurface: "browser" },
+      preferCurrentTab: true,
+      selfBrowserSurface: "include",
+      audio: false
+    });
+    video = document.createElement("video");
+    video.srcObject = stream; video.muted = true;
+    await video.play();
+    await new Promise(r => requestAnimationFrame(r));      // 첫 프레임이 실제로 그려질 때까지 한 틱 대기
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) return null;
+
+    /* 스크롤해도 화면에서의 이 뷰포트 자체 위치·크기는 바뀌지 않는다(안쪽
+       내용만 움직인다) — 그러니 자를 영역은 캡처 시작 전에 딱 한 번만 잰다 */
+    const viewEl = scroller || doc;
+    const vrect = viewEl ? viewEl.getBoundingClientRect() : { left: 0, top: 0, width: vw, height: vh };
+    const scaleX = vw / window.innerWidth, scaleY = vh / window.innerHeight;
+    const cropW = Math.max(1, Math.round(vrect.width * scaleX));
+    const cropH = Math.max(1, Math.round(vrect.height * scaleY));
+    const cropX = Math.max(0, Math.round(vrect.left * scaleX));
+    const cropY = Math.max(0, Math.round(vrect.top * scaleY));
+    if (cropW <= 0 || cropH <= 0) return null;
+
+    const grab = () => {
+      const c = document.createElement("canvas");
+      c.width = cropW; c.height = cropH;
+      c.getContext("2d").drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+      return c;
+    };
+
+    const slices = [grab()];
+    if (doc && scroller && vrect.height > 0) {
+      doc.style.height = (vrect.height * CAPTURE_SLICES) + "px";   // iframe을 키워 실제로 더 많이 그리게 한다
+      scroller.style.overflow = "auto";
+      await new Promise(r => setTimeout(r, 450));                 // 커진 크기에 페이지가 다시 그려질 시간
+      for (let i = 1; i < CAPTURE_SLICES; i++) {
+        scroller.scrollTop = vrect.height * i;                    // 우리 쪽 DOM 스크롤 — 교차 출처와 무관
+        await new Promise(r => setTimeout(r, 280));
+        slices.push(grab());
+      }
+    }
+
+    const total = document.createElement("canvas");
+    total.width = cropW; total.height = cropH * slices.length;
+    const ctx = total.getContext("2d");
+    slices.forEach((s, i) => ctx.drawImage(s, 0, cropH * i));
+    return await new Promise(res => total.toBlob(res, "image/jpeg", 0.85));
+  } catch (e) {
+    return null;                 // 사용자가 공유를 취소했거나, 브라우저가 지원하지 않는다
+  } finally {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    if (video) { video.srcObject = null; video.remove(); }
+    if (doc) doc.style.height = savedDocHeight;
+    if (scroller) { scroller.style.overflow = savedOverflow; scroller.scrollTop = savedScrollTop; }
+  }
+}
 /* 스테이지 아래쪽 안내줄을 잠깐 "무엇을 하는 중"으로 바꿔서 진행 상태를 보여준다 —
    토스트 하나로는 여러 단계(캡처 → 카드 생성)가 이어질 때 잘 안 보이기 때문 */
 function stageBusy(msg) {
@@ -368,8 +446,9 @@ function stageBusy(msg) {
     ico("loop", "xs spin") + esc(msg) + "</span>";
 }
 async function captureCurrentWeb(url) {
-  stageBusy("화면을 캡처하는 중…");
-  let blob = await captureScreenshot(url);
+  stageBusy("지금 탭 화면을 캡처합니다 — 공유 승인 창이 뜨면 허용해 주세요 (아래쪽까지 잠깐 스크롤됩니다)…");
+  let blob = await captureVisibleTab();
+  if (!blob) { stageBusy("화면을 서버로 캡처하는 중…"); blob = await captureScreenshot(url); }
   if (!blob) { stageBusy("클립보드 이미지를 확인하는 중…"); blob = await captureClipboardImage(); }
   return blob;
 }
