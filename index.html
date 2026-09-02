@@ -2952,10 +2952,6 @@ function autoLayout(menuDir) {
 let mounted = { id: null, key: null, w: 0, h: 0 };
 let browseMode = "shot";   // 페이지 카드가 없을 때 스테이지가 빈 안내인지 웹 둘러보기인지
 let browseUrl = "";        // 카드 없이 웹으로 둘러볼 때 쓰는 임시 주소 — 문서에 저장되지 않는다
-/* 동일 출처 정책 때문에 iframe 안에서 링크를 눌러 다른 곳으로 이동했는지는
-   감지할 수 있어도(load 이벤트) 그 새 주소를 읽을 수는 없다 — true면 지금
-   화면과 우리가 아는 주소(webUrl)가 어긋나 있을 수 있다는 뜻 */
-let addrUnknown = false;
 /* "태그 확인" 결과 — 마지막으로 확인한 주소와 그 결과(업체별 감지 여부·이벤트 이름)를
    들고 있다가 태깅 패널에서 등록된 태그와 비교해 보여준다. 문서에는 저장하지 않는다. */
 let detectedTags = null;         // { amplitude:{detected,events}, braze:{...}, ga4:{...} }
@@ -3188,37 +3184,15 @@ function renderWebFrame(id, url) {
   const key = "web:" + (url || "");
   if (mounted.id !== id || mounted.key !== key) {
     doc.style.width = ""; doc.style.height = "";        // 웹 모드는 CSS(.webmode)가 100% 채움을 맡는다
-    addrUnknown = false;                                // 방금 우리가 직접 넣은 주소이니 다시 믿을 수 있는 상태
     if (url !== detectedTagsUrl) { detectedTags = null; detectedTagsUrl = null; renderTagPanel(); }
     doc.innerHTML = url
       ? '<iframe class="webview" src="' + esc(url) + '" sandbox="allow-scripts allow-same-origin allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>'
       : '<div class="noshot"><div class="empty">' + ico("link") + "<div>위 주소창에 페이지 주소를 입력하고<br>이동을 눌러 주세요</div></div></div>";
     mounted = { id: id, key: key, w: 0, h: 0 };
-    const f = doc.querySelector("iframe.webview");
-    if (f) {
-      let firstLoad = true;
-      /* 이 load는 우리가 방금 넣은 src 자체가 뜬 것 — 그다음부터 fire되는 load는
-         전부 사용자가 iframe 안 링크를 눌러 다른 곳으로 넘어갔다는 뜻이다.
-         어디로 갔는지는 동일 출처 정책 때문에 알 수 없어 경고만 띄운다. */
-      f.addEventListener("load", () => {
-        if (firstLoad) { firstLoad = false; return; }
-        addrUnknown = true;
-        renderStageFootWebHint();
-      });
-    }
   }
 }
-function renderStageFootWebHint() {
-  const foot = $("#stageFoot");
-  if (!foot || !$(".weburl-hint", foot)) return;
-  foot.innerHTML = webHintHtml();
-}
 function webHintHtml(defaultText) {
-  return addrUnknown
-    ? '<span class="weburl-hint" style="color:var(--warn); font-size:11.5px; font-weight:500">' + ico("alert", "xs") +
-      "다른 페이지로 이동한 상태입니다 — 지금 주소를 알 수 없어 추가·수정하면 마지막으로 불러온 주소로 기록됩니다. " +
-      "정확히 담으려면 그 페이지 주소를 복사해 위 주소창에 붙여넣고 이동하세요.</span>"
-    : '<span class="weburl-hint" style="color:var(--ink-3); font-size:11.5px">' + defaultText + "</span>";
+  return '<span class="weburl-hint" style="color:var(--ink-3); font-size:11.5px">' + defaultText + "</span>";
 }
 /* 교차 출처 iframe은 동일 출처 정책 때문에 실제 표시 중인 주소를 읽을 수 없다 —
    같은 출처일 때만(드묾) 성공하고, 그 밖에는 마지막으로 입력한 주소로 대신한다 */
@@ -3337,9 +3311,25 @@ function harCaptureScript() {
     "var X=window.XMLHttpRequest,oO=X.prototype.open,oS=X.prototype.send;" +
     "X.prototype.open=function(m,u){this.__tcM=m;this.__tcU=u;return oO.apply(this,arguments);};" +
     "X.prototype.send=function(b){push(this.__tcU,this.__tcM,typeof b==='string'?b:null);return oS.apply(this,arguments);};" +
+    /* GA4 등 오래된 방식의 트래킹은 fetch/XHR/sendBeacon이 아니라
+       new Image().src=... 처럼 이미지 태그로 신호만 보내는 "픽셀 비콘"을
+       쓰기도 한다 — 이건 저 셋을 다 가로채도 안 잡혀서 결과가 비어 보이는
+       흔한 원인이다. img.src에 값을 넣는 순간도 같이 가로챈다. */
+    "var imgDesc=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src');" +
+    "if(imgDesc&&imgDesc.set){Object.defineProperty(HTMLImageElement.prototype,'src',{configurable:true,enumerable:imgDesc.enumerable,get:imgDesc.get,set:function(v){try{push(v,'GET',null);}catch(e){}return imgDesc.set.call(this,v);}});}" +
+    /* sendBeacon은 문자열 대신 Blob으로 본문을 실어 보내는 경우도 흔한데,
+       Blob은 만들어진 뒤엔 내용을 동기적으로 다시 읽을 방법이 없다 — 그래서
+       Blob이 "만들어지는 순간"(원본 조각이 아직 문자열 그대로일 때) 미리
+       내용을 기억해 뒀다가, sendBeacon에 그 Blob이 오면 그때 꺼내 쓴다. */
+    "var oBlob=window.Blob,blobText=new WeakMap();" +
+    "window.Blob=function(parts,opts){var b=new oBlob(parts,opts);try{blobText.set(b,(parts||[]).map(function(p){return typeof p==='string'?p:'';}).join(''));}catch(e){}return b;};" +
+    "window.Blob.prototype=oBlob.prototype;" +
     "var oB=navigator.sendBeacon?navigator.sendBeacon.bind(navigator):null;" +
-    "if(oB){navigator.sendBeacon=function(u,d){push(u,'POST',typeof d==='string'?d:null);return oB(u,d);};}" +
-    "window.__tagcapRestore=[function(){window.fetch=oF;},function(){X.prototype.open=oO;X.prototype.send=oS;},function(){if(oB)navigator.sendBeacon=oB;}];" +
+    "if(oB){navigator.sendBeacon=function(u,d){var body=null;try{body=typeof d==='string'?d:(d&&blobText.has(d)?blobText.get(d):null);}catch(e){}push(u,'POST',body);return oB(u,d);};}" +
+    "window.__tagcapRestore=[function(){window.fetch=oF;},function(){X.prototype.open=oO;X.prototype.send=oS;}," +
+      "function(){if(imgDesc)Object.defineProperty(HTMLImageElement.prototype,'src',imgDesc);}," +
+      "function(){window.Blob=oBlob;}," +
+      "function(){if(oB)navigator.sendBeacon=oB;}];" +
     "var badge=document.createElement('div');badge.textContent='🔴 태그 캡처 중 — 즐겨찾기를 다시 누르면 종료·다운로드됩니다';" +
     "badge.style.cssText='position:fixed;top:8px;right:8px;z-index:2147483647;background:#111;color:#fff;padding:6px 10px;border-radius:6px;font:12px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)';" +
     "document.body.appendChild(badge);window.__tagcapBadge=badge;" +
