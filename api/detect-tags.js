@@ -35,31 +35,53 @@ function vendorOf(u) {
   return null;
 }
 
-/* event_properties·params·properties 안의 값만 쓰므로, SDK가 자동으로 붙이는
-   부가정보(device_id·session_id·ip 등 이벤트 최상위 필드)는 애초에 안 섞인다 —
-   비어 있거나 null인 값만 걸러낸다. */
-function cleanProps(obj) {
+/* 실제로 관찰해 보니 자체 래퍼를 쓰는 사이트가 많다 — 예를 들어
+   {name:"ss", data:{n:"pkg_view_prodMain", p:{deviceType:"WEB_PC", ...}}}
+   처럼 진짜 속성이 몇 단계 더 안쪽(data.p)에 들어있는 경우가 흔하다.
+   그래서 얼마나 깊이 들어있든 상관없이 맨 안쪽 값(leaf)까지 내려가서
+   "그 값의 원래 키 이름 = 값"으로 펼쳐 담는다 — deviceType이 어디에 있든
+   그대로 deviceType 속성이 되게 하려는 것. 배열이나 빈 객체는 그대로 하나의
+   값으로 남긴다(펼치면 의미가 사라지는 경우가 많아서). */
+function flattenProps(obj, depth) {
   const out = {};
-  Object.keys(obj || {}).forEach(k => {
+  if (!obj || typeof obj !== "object" || (depth || 0) > 4) return out;
+  Object.keys(obj).forEach(k => {
     const v = obj[k];
-    if (v === null || v === undefined) return;
-    if (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0) return;
+    if (v === null || v === undefined || v === "") return;
+    if (Array.isArray(v)) { if (v.length) out[k] = v; return; }
+    if (typeof v === "object") {
+      const nested = flattenProps(v, (depth || 0) + 1);
+      if (Object.keys(nested).length) Object.assign(out, nested);
+      return;
+    }
     out[k] = v;
   });
   return out;
 }
+const cleanProps = flattenProps;
 
 /* 각 업체가 실제 브라우저 SDK에서 이벤트를 실어 보내는 모양은 공식 규격이
    없다시피 해서(관찰 기반), 여러 형태를 순서대로 시도한다. JSON 구조가 예상과
    다르면(중첩이 달라졌다든지) 정규식으로 한 번 더 훑어서 최대한 건진다.
    이름만이 아니라 그 이벤트가 실어 보낸 속성(event_properties 등)도 같이
    돌려줘서, 태그를 만들 때 속성 칸까지 자동으로 채울 수 있게 한다. */
+/* GA4(Measurement Protocol)가 쓰는 프로토콜용 파라미터 — 클라이언트 ID·동의값·
+   User-Agent Client Hints 등 SDK가 자동으로 붙이는 것들이라 실제로 개발자가
+   심은 "이벤트 속성"이 아니다. 이 목록에 없는 나머지만 속성으로 본다.
+   ep.* / epn.* (커스텀 파라미터의 공식 접두사)는 접두사를 떼고 남긴다. */
+const GA4_RESERVED = ["v", "tid", "gtm", "_p", "cid", "_gaz", "gcd", "npa", "dma", "dma_cps",
+  "_eu", "are", "frm", "pscdl", "_s", "sid", "sct", "seg", "dl", "dt", "ul", "sr", "uaa", "uab",
+  "uafvl", "uam", "uamb", "uap", "uapv", "uafm", "_et", "_fplc", "gcs", "_dbg", "tfd", "en", "_ss"];
 function eventsFromGA4(u, postData) {
   const out = [];
   const en = u.searchParams.get("en");
   if (en) {
     const props = {};
-    u.searchParams.forEach((v, k) => { if (k !== "en" && k !== "tid" && k !== "v") props[k] = v; });
+    u.searchParams.forEach((v, k) => {
+      if (GA4_RESERVED.indexOf(k) >= 0) return;
+      const clean = k.replace(/^epn?\./, "");     // ep.discount, epn.price 같은 커스텀 파라미터 접두사
+      props[clean] = v;
+    });
     out.push({ name: en, properties: cleanProps(props) });
   }
   if (postData) {
@@ -73,18 +95,32 @@ function eventsFromGA4(u, postData) {
   }
   return out;
 }
+/* 표준 Amplitude SDK는 {event_type, event_properties}로 보내지만, 자체 래퍼를
+   씌운 사이트는 {name, data:{n, p}} 처럼 아예 다른 키 이름을 쓰기도 한다.
+   이벤트 이름이 될 만한 필드와, 나머지는 전부 속성 후보로 본다. */
+const AMP_NAME_KEYS = ["event_type", "name", "eventType", "n"];
+const AMP_META_KEYS = ["device_id", "event_id", "session_id", "insert_id", "ip", "language",
+  "library", "platform", "time", "user_agent", "user_id", "app_version", "os_name", "os_version",
+  "device_model", "country", "region", "city", "dma", "idfa", "adid", "uuid"];
 function eventsFromAmplitude(u, postData) {
   const out = [];
   const scan = raw => {
     if (!raw) return false;
     try {
       const j = JSON.parse(raw);
-      const list = Array.isArray(j) ? j : (j.events || (j.event_type ? [j] : []));
+      const list = Array.isArray(j) ? j : (j.events || (AMP_NAME_KEYS.some(k => j[k]) ? [j] : []));
       let any = false;
       list.forEach(e => {
-        if (!e || !e.event_type) return;
+        if (!e) return;
+        const nameKey = AMP_NAME_KEYS.find(k => e[k]);
+        if (!nameKey) return;
         any = true;
-        out.push({ name: e.event_type, properties: cleanProps(e.event_properties) });
+        const rest = {};
+        Object.keys(e).forEach(k => {
+          if (k === nameKey || k === "event_properties" || k === "user_properties") return;
+          if (AMP_META_KEYS.indexOf(k) < 0) rest[k] = e[k];
+        });
+        out.push({ name: e[nameKey], properties: flattenProps(Object.assign({}, e.event_properties, rest)) });
       });
       return any;
     } catch (e) {

@@ -374,21 +374,19 @@ async function captureClipboardImage() {
    보이는 게 웹페이지뿐이라 계산해서 잘라낼 필요 자체가 없어진다(찍은 화면
    전체가 곧 웹페이지다).
 
-   화면에 보이는 한 구간만이 아니라 그 아래도 담기 위해: 전체화면 상태에서
-   iframe을 화면 높이의 몇 배로 키워(그만큼 안의 페이지가 실제로 더 많이
-   그려지게 만들고) 바깥 스크롤 영역(우리 쪽 DOM이라 동일 출처 정책과
-   무관하다)을 스크립트로 내려가며 구간마다 한 장씩 찍어 이어 붙인다. */
-const CAPTURE_SLICES = 3;      // 지금 화면 + 그 아래 2구간(총 3배 높이)까지 담는다
+   전에는 아래쪽 내용까지 담으려고 iframe을 화면 높이의 몇 배로 늘려 한 번에
+   더 그리게 한 뒤 스크롤하며 이어 붙였는데, 이건 실제 스크롤이 아니라
+   "그냥 더 크게 그리기"라서 스크롤 시점에만 나타나는 스티키 내비게이션 같은
+   요소가 중간에 원래 자리 그대로 나타나 "헤더가 또 나온다" 같은 어색한
+   이음매가 생겼다. 그래서 지금은 화면에 보이는 딱 한 구간만, 깔끔하게 찍는다. */
 const CAPTURE_WIDTH = 1400;    // 전체화면 폭 그대로 찍으면 내용이 작게 나와서, 이 폭으로 좁혀 그만큼 크게(확대) 담는다
 async function captureVisibleTab() {
   if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) return null;
   const scroller = $("#stageScroll"), doc = $("#stageDoc");
   if (!scroller || !doc) return null;
   let stream = null, video = null, wentFullscreen = false;
-  const savedDocHeight = doc.style.height;
   const savedDocWidth = doc.style.width;
   const savedDocMargin = doc.style.margin;
-  const savedOverflow = scroller.style.overflow;
   try {
     /* getDisplayMedia는 사용자 클릭에 바짝 붙어 있어야 브라우저가 허용하므로
        전체화면 전환보다 먼저 요청한다 — 스트림은 전체화면으로 바뀐 뒤에도
@@ -431,45 +429,19 @@ async function captureVisibleTab() {
       cropX = Math.max(0, Math.round(r.left * scaleX));
       cropW = Math.max(1, Math.min(vw - cropX, Math.round(r.width * scaleX)));
     }
-    const grab = () => {
-      const c = document.createElement("canvas");
-      c.width = cropW; c.height = vh;
-      c.getContext("2d").drawImage(video, cropX, 0, cropW, vh, 0, 0, cropW, vh);
-      return c;
-    };
-
-    const slices = [grab()];
-    if (wentFullscreen) {
-      const stepH = scroller.clientHeight;
-      if (stepH > 0) {
-        doc.style.height = (stepH * CAPTURE_SLICES) + "px";   // iframe을 키워 실제로 더 많이 그리게 한다
-        scroller.style.overflow = "auto";
-        await new Promise(r => setTimeout(r, 450));           // 커진 크기에 페이지가 다시 그려질 시간
-        for (let i = 1; i < CAPTURE_SLICES; i++) {
-          scroller.scrollTop = stepH * i;                     // 우리 쪽 DOM 스크롤 — 교차 출처와 무관
-          await new Promise(r => setTimeout(r, 280));
-          slices.push(grab());
-        }
-      }
-    }
-
-    const total = document.createElement("canvas");
-    total.width = cropW; total.height = vh * slices.length;
-    const ctx = total.getContext("2d");
-    slices.forEach((s, i) => ctx.drawImage(s, 0, vh * i));
+    const canvas = document.createElement("canvas");
+    canvas.width = cropW; canvas.height = vh;
+    canvas.getContext("2d").drawImage(video, cropX, 0, cropW, vh, 0, 0, cropW, vh);
     /* PNG(무손실)는 사진·배너가 섞인 페이지에서 용량이 훨씬 커진다 — JPEG를
        쓰되 화질을 높여(0.95) setShot()에서 한 번 더 압축돼도 티가 덜 나게 한다 */
-    return await new Promise(res => total.toBlob(res, "image/jpeg", 0.95));
+    return await new Promise(res => canvas.toBlob(res, "image/jpeg", 0.95));
   } catch (e) {
     return null;                 // 사용자가 공유를 취소했거나, 브라우저가 지원하지 않는다
   } finally {
     if (stream) stream.getTracks().forEach(t => t.stop());
     if (video) { video.srcObject = null; video.remove(); }
-    doc.style.height = savedDocHeight;
     doc.style.width = savedDocWidth;
     doc.style.margin = savedDocMargin;
-    scroller.style.overflow = savedOverflow;
-    scroller.scrollTop = 0;
     if (wentFullscreen && document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) {} }
   }
 }
