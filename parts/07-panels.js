@@ -404,15 +404,14 @@ function tagDetectionHtml(n) {
         const title = matched
           ? (st.fully ? (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음") : "새로 발견된 속성: " + esc(st.newKeys.join(", ")))
           : (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음");
-        /* 이름이 이미 등록돼 있어도 새로 발견된 속성이 있으면(!st.fully) 그냥
-           지나칠 게 아니라 버튼을 눌러 등록 전/후를 비교하고 덮어쓸지 정할 수
-           있어야 한다 — 완전히 같을 때만(matched && fully) 버튼이 필요 없다. */
-        const needsAction = !matched || !st.fully;
+        /* 완전히 같아 보여도(matched && fully) 우리 자동 판단이 항상 맞는다는
+           보장은 없다 — 버튼을 늘 켜 둬서 사용자가 언제든 직접 눌러 등록
+           전/후 비교(삭제·추가·변경)를 확인할 수 있게 한다. */
         return '<span class="chip" style="--c:' + color + '" title="' + title + '">' +
             ico(matched ? "check" : "alert", "xs") + esc(name) +
             (propCount ? " · 속성 " + propCount + "개" : "") + label + "</span>" +
-          (needsAction && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="' +
-            (matched ? "새로 발견된 속성 확인하고 덮어쓰기" : "이 이름과 속성 그대로 태그 추가") + '">' + ico(matched ? "loop" : "plus", "xs") + "</button>" : "");
+          (canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="' +
+            (matched ? "등록 전/후 비교하고 덮어쓰기" : "이 이름과 속성 그대로 태그 추가") + '">' + ico(matched ? "loop" : "plus", "xs") + "</button>" : "");
       }).join("");
     }
     return '<div class="detectrow">' + platChip(key) + body + "</div>";
