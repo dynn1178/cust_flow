@@ -27,11 +27,24 @@ function looksLikeGA4(u) {
   const tid = u.searchParams.get("tid");
   return !!(tid && /^G-/i.test(tid));
 }
-function vendorOf(u) {
+/* 광고 차단 우회 등으로 자체(커스텀) 도메인 뒤에 Braze를 숨겨 두면 호스트
+   이름만으로는 못 알아본다 — Braze SDK가 보내는 요청 본문에는 어느 도메인을
+   쓰든 항상 app_group_id가 실려 있어서, 이 필드로 도메인과 무관하게 알아본다. */
+function looksLikeBrazeBody(postData) {
+  if (!postData) return false;
+  try {
+    const j = JSON.parse(postData);
+    return !!(j && (j.app_group_id || j.appGroupId) && (j.events || j.attributes || j.triggers || j.purchases));
+  } catch (e) {
+    return /"app_group_id"\s*:/.test(postData);
+  }
+}
+function vendorOf(u, postData) {
   const host = u.hostname.toLowerCase();
   if (host.indexOf("amplitude.com") >= 0) return "amplitude";
   if (host.indexOf("braze.com") >= 0 || host.indexOf("braze.eu") >= 0 || host.indexOf("appboy.com") >= 0) return "braze";  // appboy = Braze의 옛 이름(오래된 SDK가 아직 씀)
   if (looksLikeGA4(u)) return "ga4";
+  if (looksLikeBrazeBody(postData)) return "braze";
   return null;
 }
 
@@ -192,10 +205,10 @@ module.exports = async function handler(req, res) {
       page.on("request", r => {
         let u;
         try { u = new URL(r.url()); } catch (e) { return; }
-        const vendor = vendorOf(u);
+        const postData = r.postData ? r.postData() : null;
+        const vendor = vendorOf(u, postData);
         if (!vendor) return;
         seenVendor[vendor] = true;
-        const postData = r.postData ? r.postData() : null;
         const items = vendor === "ga4" ? eventsFromGA4(u, postData)
           : vendor === "amplitude" ? eventsFromAmplitude(u, postData)
           : eventsFromBraze(postData);
