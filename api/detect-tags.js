@@ -239,6 +239,19 @@ module.exports = async function handler(req, res) {
       });
       try {
         await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 10000 });
+        /* Next.js 사이트는 주소의 물음표(?) 뒤 쿼리 말고도, 페이지 안에 심어 둔
+           __NEXT_DATA__ 스크립트(서버에서 렌더링할 때 쓴 원본 데이터)에 dspSid 같은
+           동적 라우트 값이 들어 있는 경우가 많다 — 있으면 같이 주워 담는다.
+           Next.js가 아닌 사이트에서는 그냥 아무 것도 못 찾고 조용히 넘어간다. */
+        try {
+          const nextData = await page.evaluate(() => {
+            const el = document.getElementById("__NEXT_DATA__");
+            if (!el) return null;
+            const j = JSON.parse(el.textContent);
+            return (j.props && j.props.pageProps && j.props.pageProps.query) || null;
+          });
+          if (nextData) Object.assign(pageParams, cleanProps(nextData));
+        } catch (e) { /* Next.js가 아니거나 모양이 다르면 그냥 건너뛴다 */ }
         /* GTM 컨테이너가 로드된 뒤에야 gtag·Amplitude·Braze 호출이 잇달아 나가는
            사이트가 많고, 실제로 재 보니 Braze는 10초 넘게 걸려서야 첫 이벤트를
            보내는 경우도 있었다 — 넉넉히 14초까지 기다린다. */

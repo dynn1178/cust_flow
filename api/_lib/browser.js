@@ -91,13 +91,19 @@ async function getBrowser() {
    같은 트래킹 결과를 보려는 것이라, 일반 브라우저처럼 보이도록 몇 가지만
    맞춰 준다 — 우회가 목적이 아니라 정확한 측정이 목적이다. */
 async function preparePage(page) {
+  /* 이건 결과를 더 정확하게 만들기 위한 보너스일 뿐이지 핵심 기능이 아니다 —
+     이 중 하나라도 실패해서 캡처·태그 확인 전체가 멈추면 안 되므로 각각 따로
+     실패를 삼킨다(어느 하나가 이 버전의 puppeteer-core/Chromium에서 막혀도
+     나머지는 계속 적용된다). */
   const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
-  await page.setUserAgent(ua);
-  await page.setExtraHTTPHeaders({ "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7" });
-  await page.evaluateOnNewDocument(() => {
-    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-    Object.defineProperty(navigator, "languages", { get: () => ["ko-KR", "ko", "en-US", "en"] });
-  });
+  try { await page.setUserAgent(ua); } catch (e) {}
+  try { await page.setExtraHTTPHeaders({ "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7" }); } catch (e) {}
+  try {
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+      Object.defineProperty(navigator, "languages", { get: () => ["ko-KR", "ko", "en-US", "en"] });
+    });
+  } catch (e) {}
 }
 
 module.exports = { httpErr, whoAmI, assertPublicHost, parseTargetUrl, getBrowser, preparePage };
