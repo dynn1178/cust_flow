@@ -4133,12 +4133,23 @@ function tagDetectionHtml(n) {
     }
     return '<div class="detectrow">' + platChip(key) + body + "</div>";
   }).join("");
+  /* Amplitude·Braze·GA4 세 곳 말고 다른 도메인으로 나간 요청들 — 사내 로그 서버나
+     아직 목록에 없는 새 벤더 SDK를 놓치지 않도록, 매칭 여부와 상관없이 실제로
+     나간 요청 자체를 보여준다(브라우저 확장 프로그램의 "정해진 패턴만 안다"는
+     한계를 넘어서려는 것). */
+  const others = detectedTags.other || [];
+  const othersHtml = others.length
+    ? '<div class="detectrow"><span class="chip" style="--c:var(--ink-3)">' + ico("search", "xs") + "기타 " + others.length + "개 도메인</span>" +
+      others.map(o => '<span class="chip" style="--c:var(--ink-2)" title="' +
+        esc((o.sample && o.sample.method) || "") + " " + esc((o.sample && o.sample.url) || "") + "\n" + esc((o.sample && o.sample.body) || "") + '">' +
+        esc(o.host) + (o.count > 1 ? " ×" + o.count : "") + "</span>").join("") + "</div>"
+    : "";
   const raw = showDetectRaw
     ? '<pre class="detectraw">' + esc(JSON.stringify(detectedTags, null, 2)) + "</pre>"
     : "";
   return '<div class="tagdetect"><div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
     '<button class="btn sm" type="button" data-detect-raw style="margin-left:auto">' + (showDetectRaw ? "원본 감추기" : "원본 보기") + "</button></div>" +
-    rows + raw + "</div>";
+    rows + othersHtml + raw + "</div>";
 }
 let showDetectRaw = false;
 function renderTagPanel() {

@@ -209,6 +209,14 @@ module.exports = async function handler(req, res) {
        브라우저 콘솔에도 찍어서, Vercel 로그에 못 들어가도 확인할 수 있게 한다. */
     const debug = { amplitude: [], braze: [], ga4: [] };
     const DEBUG_MAX = 4;
+    /* 미리 정해 둔 3개 업체 패턴에 안 걸리는 요청(사내 로그 서버, 아직 모르는
+       벤더 SDK 등)을 놓치지 않으려고 — 도메인별로 한 번씩 표본을 남긴다.
+       정적 자원(스크립트·이미지·CSS 등)과 지금 보고 있는 페이지 자신에게
+       보내는 요청은 태그일 확률이 낮아 뺀다. HAR 캡처가 하는 역할을 여기서
+       대신한다: 벤더 매칭에 기대지 않고 실제로 나간 요청 자체를 본다. */
+    const SKIP_TYPES = ["document", "stylesheet", "image", "media", "font", "script", "websocket", "manifest"];
+    const otherHosts = new Map();   // hostname -> { count, sample }
+    const OTHER_MAX = 20;
 
     const browser = await getBrowser();
     const page = await browser.newPage();
@@ -219,23 +227,34 @@ module.exports = async function handler(req, res) {
         try { u = new URL(r.url()); } catch (e) { return; }
         const postData = r.postData ? r.postData() : null;
         const vendor = vendorOf(u, postData);
-        if (!vendor) return;
-        seenVendor[vendor] = true;
-        const items = vendor === "ga4" ? eventsFromGA4(u, postData)
-          : vendor === "amplitude" ? eventsFromAmplitude(u, postData)
-          : eventsFromBraze(postData);
-        items.forEach(it => {
-          const name = String(it.name).slice(0, 80);
-          if (!found[vendor].has(name)) found[vendor].set(name, Object.assign({}, pageParams));
-          Object.assign(found[vendor].get(name), it.properties || {});
-        });
-        if (debug[vendor].length < DEBUG_MAX) {
-          debug[vendor].push({
-            method: r.method(), url: r.url().slice(0, 300),
-            body: postData ? String(postData).slice(0, 500) : null,
-            parsed: items
+        if (vendor) {
+          seenVendor[vendor] = true;
+          const items = vendor === "ga4" ? eventsFromGA4(u, postData)
+            : vendor === "amplitude" ? eventsFromAmplitude(u, postData)
+            : eventsFromBraze(postData);
+          items.forEach(it => {
+            const name = String(it.name).slice(0, 80);
+            if (!found[vendor].has(name)) found[vendor].set(name, Object.assign({}, pageParams));
+            Object.assign(found[vendor].get(name), it.properties || {});
           });
+          if (debug[vendor].length < DEBUG_MAX) {
+            debug[vendor].push({
+              method: r.method(), url: r.url().slice(0, 300),
+              body: postData ? String(postData).slice(0, 500) : null,
+              parsed: items
+            });
+          }
+          return;
         }
+        if (SKIP_TYPES.indexOf(r.resourceType()) >= 0) return;
+        if (u.hostname === target.hostname) return;
+        if (!otherHosts.has(u.hostname) && otherHosts.size >= OTHER_MAX) return;
+        const rec = otherHosts.get(u.hostname) || { count: 0, sample: null };
+        rec.count++;
+        if (!rec.sample) {
+          rec.sample = { method: r.method(), url: r.url().slice(0, 300), body: postData ? String(postData).slice(0, 300) : null };
+        }
+        otherHosts.set(u.hostname, rec);
       });
       try {
         await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 10000 });
@@ -269,6 +288,11 @@ module.exports = async function handler(req, res) {
         debug: debug[k]
       };
     });
+    /* 3개 업체에 안 걸린 나머지 도메인들 — 요청 수가 많은 순으로 정렬해서,
+       사내 로그 서버·새 벤더 SDK 같은 걸 놓치지 않고 눈에 띄게 한다 */
+    out.other = Array.from(otherHosts.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([host, rec]) => ({ host, count: rec.count, sample: rec.sample }));
     console.log("[detect-tags]", target.href, JSON.stringify(out));
     return res.status(200).json(out);
   } catch (e) {
