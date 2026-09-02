@@ -20,6 +20,9 @@ let detectedTagsLoading = false;
    관련된 것만 추려 보여준다. 새로 요청을 보내는 게 아니라 이미 받아 둔
    결과(detectedTags) 안에서만 걸러낸다. */
 let tagSearchText = "";
+/* 캡처만 봐서는 "무엇을 눌러서" 나온 이벤트인지 알 수 없다 — 사용자가 여기
+   적어 두면, "+"로 새 태그를 만들 때 이벤트명(한글) 칸에 그대로 들어간다. */
+let tagClickLabel = "";
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
 /* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)
@@ -360,6 +363,69 @@ async function checkPageTags() {
    브라우저에서 직접 클릭해 보고 DevTools Network 탭에서 내보낸 HAR 파일을
    그대로 가져와서 그 안의 요청들을 훑는다. 봇 감지·동의 배너·교차출처·
    서버 실행시간 제한 어느 것도 걸리지 않는, 가장 확실한 방법이다. */
+/* DevTools를 열어 Network 탭 → "Save all as HAR with content"를 매번 누르는
+   게 불편하다는 요청 — 그렇다고 우리 앱 페이지에서 다른 도메인 탭의 네트워크
+   요청을 대신 지켜볼 방법은 없다(교차출처). 대신 즐겨찾기 막대에 한 번만
+   등록해 두는 북마클릿을 준다 — 실제 사이트 탭에서 그 즐겨찾기를 누르면 그
+   페이지 자신의 자바스크립트로 fetch·XHR·sendBeacon을 가로채 기록하고, 다시
+   누르면 지금까지 잡은 걸 우리가 이미 읽을 줄 아는 .har 파일로 내려받는다 —
+   DevTools도, "Save as HAR"도 필요 없다. */
+function harCaptureScript() {
+  return "(function(){" +
+    "if(window.__tagcapActive){" +
+      "window.__tagcapActive=false;" +
+      "var entries=(window.__tagcapEntries||[]).map(function(e){return {request:{url:e.url,method:e.method,postData:e.postData!=null?{text:e.postData}:undefined}};});" +
+      "var har={log:{version:'1.2',creator:{name:'tagcap-bookmarklet',version:'1'},entries:entries}};" +
+      "var blob=new Blob([JSON.stringify(har)],{type:'application/json'});" +
+      "var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tagcap-'+Date.now()+'.har';" +
+      "document.body.appendChild(a);a.click();a.remove();" +
+      "if(window.__tagcapRestore){window.__tagcapRestore.forEach(function(fn){fn();});window.__tagcapRestore=null;}" +
+      "if(window.__tagcapBadge){window.__tagcapBadge.remove();window.__tagcapBadge=null;}" +
+      "alert('캡처 종료 — '+entries.length+'개 요청을 파일로 저장했습니다.');" +
+      "return;" +
+    "}" +
+    "window.__tagcapActive=true;window.__tagcapEntries=[];" +
+    "function push(u,m,b){try{window.__tagcapEntries.push({url:String(u),method:m||'GET',postData:b!=null?String(b):null});}catch(e){}}" +
+    "var oF=window.fetch;" +
+    "window.fetch=function(input,init){try{var u=typeof input==='string'?input:(input&&input.url);var m=(init&&init.method)||(input&&input.method)||'GET';var b=(init&&init.body)||null;push(u,m,typeof b==='string'?b:null);}catch(e){}return oF.apply(this,arguments);};" +
+    "var X=window.XMLHttpRequest,oO=X.prototype.open,oS=X.prototype.send;" +
+    "X.prototype.open=function(m,u){this.__tcM=m;this.__tcU=u;return oO.apply(this,arguments);};" +
+    "X.prototype.send=function(b){push(this.__tcU,this.__tcM,typeof b==='string'?b:null);return oS.apply(this,arguments);};" +
+    "var oB=navigator.sendBeacon?navigator.sendBeacon.bind(navigator):null;" +
+    "if(oB){navigator.sendBeacon=function(u,d){push(u,'POST',typeof d==='string'?d:null);return oB(u,d);};}" +
+    "window.__tagcapRestore=[function(){window.fetch=oF;},function(){X.prototype.open=oO;X.prototype.send=oS;},function(){if(oB)navigator.sendBeacon=oB;}];" +
+    "var badge=document.createElement('div');badge.textContent='🔴 태그 캡처 중 — 즐겨찾기를 다시 누르면 종료·다운로드됩니다';" +
+    "badge.style.cssText='position:fixed;top:8px;right:8px;z-index:2147483647;background:#111;color:#fff;padding:6px 10px;border-radius:6px;font:12px sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.3)';" +
+    "document.body.appendChild(badge);window.__tagcapBadge=badge;" +
+  "})();";
+}
+function harBookmarkletHref() { return "javascript:" + encodeURIComponent(harCaptureScript()); }
+function openHarExportModal() {
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass" style="width:min(480px,100%)" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("share") + "<h3>DevTools 없이 캡처하기</h3>" +
+        '<button class="btn icon sm" data-x>' + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' +
+        '<p class="hint">아래 링크를 즐겨찾기 막대로 <b>드래그</b>해서 등록하세요 — 클릭하면 지금 이 화면에서 실행되어 아무 효과가 없습니다.</p>' +
+        '<p style="text-align:center; margin:16px 0">' +
+          '<a href="' + esc(harBookmarkletHref()) + '" class="btn primary" data-bookmarklet style="display:inline-flex">' + ico("cursor", "xs") + "태그 캡처</a>" +
+        "</p>" +
+        '<ol class="hint" style="padding-left:18px; margin:0; display:flex; flex-direction:column; gap:6px">' +
+          "<li>실제 사이트를 열고 방금 등록한 즐겨찾기를 클릭 — 화면 오른쪽 위에 캡처 중 표시가 뜹니다.</li>" +
+          "<li>확인하고 싶은 만큼 클릭·이동해 보세요.</li>" +
+          "<li>즐겨찾기를 다시 클릭 — 캡처가 끝나며 .har 파일이 자동으로 저장됩니다.</li>" +
+          '<li>여기로 돌아와 <b>"HAR 파일 가져오기"</b>로 그 파일을 선택하세요.</li>' +
+        "</ol>" +
+        '<p class="hint" style="margin:10px 0 0">완전히 다른 페이지로 새로고침하면 캡처가 초기화됩니다 — 화면 이동 없이 내용만 바뀌는 사이트(이번 사이트처럼)에서 잘 맞습니다.</p>' +
+      "</div>" +
+      '<div class="modal-foot"><div class="spacer"></div><button class="btn" data-x>닫기</button></div>' +
+    "</div></div>";
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-bookmarklet]")) { e.preventDefault(); return toast("클릭 말고 즐겨찾기 막대로 드래그해 주세요", "bad"); }
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal();
+  });
+}
 function pickHarFile() {
   const n = curNode();
   const url = liveIframeUrl() || (n ? n.webUrl : browseUrl);

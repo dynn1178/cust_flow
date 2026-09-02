@@ -260,9 +260,15 @@ function tagDetectionHtml(n) {
      가져오는 것이다(봇 감지·동의 배너·교차출처·서버 실행시간 제한 어느
      것에도 걸리지 않는다). */
   const harField = '<div class="detectrow">' +
+    '<button class="btn sm" type="button" data-har-export title="DevTools 없이 캡처하는 방법">' + ico("share", "xs") + "내보내기</button>" +
     '<button class="btn sm" type="button" data-har-pick>' + ico("folder", "xs") + "HAR 파일 가져오기</button>" +
-    '<span class="hint">실제 브라우저에서 클릭해 본 뒤 DevTools → Network → "Save all as HAR with content"로 내보낸 파일 — 클릭 이벤트까지 정확히 잡힙니다</span>' +
+    '<span class="hint">DevTools가 불편하면 "내보내기"로 즐겨찾기 캡처 도구를 받아 쓰세요</span>' +
     "</div>";
+  /* 이 캡처가 "무엇을 눌러서" 나온 건지는 우리가 알 수 없다(사용자만 안다) —
+     여기 적어 두면 "+"로 태그를 새로 만들 때 이벤트명(한글) 칸에 그대로
+     들어가서, 나중에 태그명만 보고도 어떤 동작인지 알 수 있게 한다. */
+  const clickLabelField = '<div class="detectrow"><span class="webfield" style="flex:1; min-width:160px" title="이 캡처에서 무엇을 눌렀는지 — 새 태그의 이벤트명(한글) 칸에 자동으로 들어갑니다">' +
+    ico("cursor", "xs") + '<input id="tagClickLabelIn" placeholder="무엇을 눌렀을 때 수집했나요? (예: 유사상품추천 영역 內 상품 클릭)" value="' + esc(tagClickLabel) + '"></span></div>';
   if (detectedTagsLoading) {
     return '<div class="tagdetect">' + harField + '<div class="detectrow">' + ico("loop", "xs spin") + "확인하는 중…</div></div>";
   }
@@ -283,8 +289,18 @@ function tagDetectionHtml(n) {
   const rows = Object.keys(PLAT).map(key => {
     const d = detectedTags[key] || { detected: false, events: [] };
     const matchedEvents = d.events.filter(matchesSearch);
-    const existingNames = n.tags.filter(t => platformsOf(t).indexOf(key) >= 0)
-      .map(t => (tagEventEn(t) || t.eventKo || "").trim().toLowerCase()).filter(Boolean);
+    const tagsForPlat = n.tags.filter(t => platformsOf(t).indexOf(key) >= 0);
+    /* 이름만 같은지가 아니라, 캡처된 속성이 이미 등록된 태그의 속성 목록
+       안에 전부 들어있는지까지 봐서 "완전히 같다"를 판단한다 — 새로 발견된
+       속성이 있으면 이름은 일치해도 완전히 같은 건 아니다. */
+    const evStatus = ev => {
+      const tagMatch = tagsForPlat.find(t => (tagEventEn(t) || t.eventKo || "").trim().toLowerCase() === String(ev.name).trim().toLowerCase());
+      if (!tagMatch) return { tagMatch: null, fully: false, newKeys: [] };
+      const registered = effectiveProps(tagMatch).map(p => (p.en || "").trim().toLowerCase()).filter(Boolean);
+      const captured = Object.keys(ev.properties || {});
+      const newKeys = captured.filter(k => registered.indexOf(k.toLowerCase()) < 0);
+      return { tagMatch, fully: !newKeys.length, newKeys };
+    };
     let body;
     if (!d.detected) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지 안 됨</span>';
@@ -292,14 +308,24 @@ function tagDetectionHtml(n) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지됨 · 이벤트 이름은 추출 못 함</span>';
     } else if (searchQ && !matchedEvents.length) {
       body = '<span class="chip" style="--c:var(--ink-3)">"' + esc(tagSearchText.trim()) + '"과 일치하는 이벤트 없음</span>';
+    } else if (matchedEvents.every(ev => evStatus(ev).fully)) {
+      /* 이름·속성 전부 이미 등록된 태그와 같다 — 하나하나 늘어놓지 않고
+         한 줄로 압축해서 새로 볼 것이 없다는 걸 바로 알 수 있게 한다. */
+      body = '<span class="chip" style="--c:var(--ok)">' + ico("check", "xs") +
+        "감지된 " + matchedEvents.length + "개 이벤트 모두 등록된 태그와 일치</span>";
     } else {
       body = matchedEvents.map(ev => {
         const name = ev.name, propCount = Object.keys(ev.properties || {}).length;
-        const matched = existingNames.indexOf(String(name).toLowerCase()) >= 0;
-        return '<span class="chip" style="--c:' + (matched ? "var(--ok)" : "var(--warn)") + '" title="' +
-            (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음") + '">' +
+        const st = evStatus(ev);
+        const matched = !!st.tagMatch;
+        const color = matched ? (st.fully ? "var(--ok)" : "var(--warn)") : "var(--warn)";
+        const label = matched ? (st.fully ? "" : " · 새 속성 " + st.newKeys.length + "개") : "";
+        const title = matched
+          ? (st.fully ? (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음") : "새로 발견된 속성: " + esc(st.newKeys.join(", ")))
+          : (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음");
+        return '<span class="chip" style="--c:' + color + '" title="' + title + '">' +
             ico(matched ? "check" : "alert", "xs") + esc(name) +
-            (propCount ? " · 속성 " + propCount + "개" : "") + "</span>" +
+            (propCount ? " · 속성 " + propCount + "개" : "") + label + "</span>" +
           (!matched && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="이 이름과 속성 그대로 태그 추가">' + ico("plus", "xs") + "</button>" : "");
       }).join("");
     }
@@ -310,7 +336,7 @@ function tagDetectionHtml(n) {
     : "";
   return '<div class="tagdetect">' + harField + '<div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
     '<button class="btn sm" type="button" data-detect-raw style="margin-left:auto">' + (showDetectRaw ? "원본 감추기" : "원본 보기") + "</button></div>" +
-    searchField + rows + raw + "</div>";
+    clickLabelField + searchField + rows + raw + "</div>";
 }
 let showDetectRaw = false;
 function renderTagPanel() {
@@ -540,12 +566,14 @@ function initPanels() {
     const id = e.target.value; if (id) jumpToTag(id);
   });
   $("#tagList").addEventListener("input", e => {
-    if (e.target.id === "tagSearchIn") tagSearchText = e.target.value;   // "탐색" 눌러야 실제로 걸러진다
+    if (e.target.id === "tagSearchIn") tagSearchText = e.target.value;             // "탐색" 눌러야 실제로 걸러진다
+    if (e.target.id === "tagClickLabelIn") tagClickLabel = e.target.value;         // 다시 그리지 않는다 — 타이핑 중 포커스가 끊기지 않도록
   });
   $("#tagList").addEventListener("keydown", e => {
     if (e.target.id === "tagSearchIn" && e.key === "Enter") { e.preventDefault(); renderTagPanel(); }
   });
   $("#tagList").addEventListener("click", e => {
+    if (e.target.closest("[data-har-export]")) return openHarExportModal();
     if (e.target.closest("[data-har-pick]")) return pickHarFile();
     if (e.target.closest("[data-tag-search]")) return renderTagPanel();
     if (e.target.closest("[data-detect-raw]")) { showDetectRaw = !showDetectRaw; return renderTagPanel(); }
@@ -554,7 +582,7 @@ function initPanels() {
       const key = da.dataset.detectPlat, name = da.dataset.detectName;
       const ev = detectedTags && detectedTags[key] && (detectedTags[key].events || []).find(x => x.name === name);
       const props = propsFromDetected(ev && ev.properties);
-      return editTag(null, { platforms: [key], eventEn: name, props });
+      return editTag(null, { platforms: [key], eventEn: name, eventKo: tagClickLabel.trim(), props });
     }
     const ed = e.target.closest("[data-tag-edit]"), dl = e.target.closest("[data-tag-del]"), tg = e.target.closest("[data-tag-toggle]");
     if (ed) return editTag(ed.dataset.tagEdit);
