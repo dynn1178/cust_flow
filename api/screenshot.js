@@ -13,7 +13,7 @@
 
    권한 — 로그인한 회원 누구나
    ========================================================================== */
-const { httpErr, whoAmI, assertPublicHost, parseTargetUrl, getBrowser } = require("./_lib/browser");
+const { httpErr, whoAmI, assertPublicHost, parseTargetUrl, getBrowser, preparePage } = require("./_lib/browser");
 
 module.exports = async function handler(req, res) {
   res.setHeader("Cache-Control", "private, no-store");
@@ -27,6 +27,7 @@ module.exports = async function handler(req, res) {
 
     const browser = await getBrowser();
     const page = await browser.newPage();
+    await preparePage(page);
     try {
       /* "load"(모든 하위 자원까지 다 끝나기를 기다림)는 광고·추적 스크립트가 계속
          떠 있는 페이지에서 몇 초씩 안 끝나기도 해서 너무 느렸다. 그렇다고

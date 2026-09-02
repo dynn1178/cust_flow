@@ -16,7 +16,7 @@
 
    권한 — 로그인한 회원 누구나
    ========================================================================== */
-const { httpErr, whoAmI, assertPublicHost, parseTargetUrl, getBrowser } = require("./_lib/browser");
+const { httpErr, whoAmI, assertPublicHost, parseTargetUrl, getBrowser, preparePage } = require("./_lib/browser");
 
 /* GA4는 요즘 사이트가 서버사이드 GTM·자체 프록시 도메인으로 우회해서 보내는
    경우가 흔해 호스트 이름만으로는 자주 놓친다 — 그래서 호스트 이름과 별개로
@@ -84,7 +84,9 @@ const cleanProps = flattenProps;
    ep.* / epn.* (커스텀 파라미터의 공식 접두사)는 접두사를 떼고 남긴다. */
 const GA4_RESERVED = ["v", "tid", "gtm", "_p", "cid", "_gaz", "gcd", "npa", "dma", "dma_cps",
   "_eu", "are", "frm", "pscdl", "_s", "sid", "sct", "seg", "dl", "dt", "ul", "sr", "uaa", "uab",
-  "uafvl", "uam", "uamb", "uap", "uapv", "uafm", "_et", "_fplc", "gcs", "_dbg", "tfd", "en", "_ss"];
+  "uafvl", "uam", "uamb", "uap", "uapv", "uafm", "_et", "_fplc", "gcs", "_dbg", "tfd", "en", "_ss",
+  "ir", "rcb", "uaw", "gaf", "tag_exp", "_fv", "_nsi", "aip", "cs", "cm", "cn", "ck", "cc", "ci",
+  "richsstsse", "gtm_up", "up", "uid", "_c"];
 function eventsFromGA4(u, postData) {
   const out = [];
   const en = u.searchParams.get("en");
@@ -210,6 +212,7 @@ module.exports = async function handler(req, res) {
 
     const browser = await getBrowser();
     const page = await browser.newPage();
+    await preparePage(page);
     try {
       page.on("request", r => {
         let u;

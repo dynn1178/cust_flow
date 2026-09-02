@@ -84,4 +84,20 @@ async function getBrowser() {
   return browserPromise;
 }
 
-module.exports = { httpErr, whoAmI, assertPublicHost, parseTargetUrl, getBrowser };
+/* 헤드리스 브라우저라는 게 사이트에 그대로 드러나면(User-Agent에 박힌
+   "HeadlessChrome", navigator.webdriver=true, 영어 기본 언어) 일부 사이트·SDK가
+   "자동화된 방문"으로 보고 실제 트래킹 이벤트를 아예 안 보내기도 한다(관찰됨 —
+   Braze가 이 사이트에서 그랬다). 우리는 QA 목적으로 실제 방문자가 보는 것과
+   같은 트래킹 결과를 보려는 것이라, 일반 브라우저처럼 보이도록 몇 가지만
+   맞춰 준다 — 우회가 목적이 아니라 정확한 측정이 목적이다. */
+async function preparePage(page) {
+  const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+  await page.setUserAgent(ua);
+  await page.setExtraHTTPHeaders({ "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7" });
+  await page.evaluateOnNewDocument(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+    Object.defineProperty(navigator, "languages", { get: () => ["ko-KR", "ko", "en-US", "en"] });
+  });
+}
+
+module.exports = { httpErr, whoAmI, assertPublicHost, parseTargetUrl, getBrowser, preparePage };
