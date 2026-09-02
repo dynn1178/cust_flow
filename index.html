@@ -4138,11 +4138,13 @@ function tagDetectionHtml(n) {
      나간 요청 자체를 보여준다(브라우저 확장 프로그램의 "정해진 패턴만 안다"는
      한계를 넘어서려는 것). */
   const others = detectedTags.other || [];
+  /* 자사 서버·이미 알려진 광고 픽셀은 옅게, 처음 보는 도메인(hint 없음)은
+     진하게 — 매번 하나씩 찾아보지 않아도 "이건 새로 나온 것"이 한눈에 띄도록. */
   const othersHtml = others.length
     ? '<div class="detectrow"><span class="chip" style="--c:var(--ink-3)">' + ico("search", "xs") + "기타 " + others.length + "개 도메인</span>" +
-      others.map(o => '<span class="chip" style="--c:var(--ink-2)" title="' +
+      others.map(o => '<span class="chip" style="--c:' + (o.hint ? "var(--ink-3)" : "var(--ink-1)") + '" title="' +
         esc((o.sample && o.sample.method) || "") + " " + esc((o.sample && o.sample.url) || "") + "\n" + esc((o.sample && o.sample.body) || "") + '">' +
-        esc(o.host) + (o.count > 1 ? " ×" + o.count : "") + "</span>").join("") + "</div>"
+        esc(o.host) + (o.count > 1 ? " ×" + o.count : "") + (o.hint ? " · " + esc(o.hint) : "") + "</span>").join("") + "</div>"
     : "";
   const raw = showDetectRaw
     ? '<pre class="detectraw">' + esc(JSON.stringify(detectedTags, null, 2)) + "</pre>"

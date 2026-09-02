@@ -158,6 +158,41 @@ function eventsFromAmplitude(u, postData) {
   if (evQ) scan(evQ);
   return out;
 }
+/* "기타" 목록에 뜨는 도메인은 매번 사람이 검색해서 뭔지 알아내야 해서 불편하다 —
+   자주 보이는 광고·리타게팅 도메인과 자사 도메인 정도는 미리 라벨을 붙여 준다.
+   GA4/Amplitude/Braze처럼 실제 파싱을 하는 게 아니라, "이건 이미 알려진 광고
+   픽셀이다/자사 서버다" 정도만 알려줘서 새로 나온 도메인만 눈에 띄게 하려는
+   것 — 광고 벤더용 파서는 만들지 않는다(요청받은 범위 밖). */
+const KNOWN_HOST_HINTS = [
+  [/(^|\.)doubleclick\.net$/, "구글 광고(DoubleClick)"],
+  [/(^|\.)facebook\.com$/, "메타(페이스북) 픽셀"],
+  [/(^|\.)criteo\.com$/, "Criteo 리타게팅"],
+  [/(^|\.)moloco\.com$/, "Moloco 광고 DSP"],
+  [/(^|\.)acrosspf\.com$/, "AcrossB 광고 네트워크"],
+  [/(^|\.)daangn\.com$/, "당근마켓 광고"],
+  [/ad\.daum\.net$/, "카카오/다음 광고"],
+  [/veta\.naver\.com$/, "네이버 광고 추적"],
+  [/wcs\.naver\.com$/, "네이버 전환추적(WCS)"],
+  [/(^|\.)creativecdn\.com$/, "RTB하우스 리타게팅"],
+  [/onetag\.co\.kr$/, "원태그(태그매니저)"],
+  [/(^|\.)kollus\.com$/, "Kollus 동영상 스트리밍"],
+  [/(^|\.)google\.com$/, "구글 서비스(reCAPTCHA·지도 등, 확인 필요)"],
+  [/(^|\.)openai\.com$/, "OpenAI 연동(AI 챗봇 등으로 추정, 확인 필요)"]
+];
+const COMPOUND_TLDS = ["co.kr", "or.kr", "ne.kr", "go.kr", "co.jp", "co.uk", "com.cn"];
+function baseDomainOf(host) {
+  const parts = host.toLowerCase().split(".");
+  for (const tld of COMPOUND_TLDS) {
+    const tp = tld.split(".");
+    if (parts.length > tp.length && parts.slice(-tp.length).join(".") === tld) return parts.slice(-(tp.length + 1)).join(".");
+  }
+  return parts.slice(-2).join(".");
+}
+function hintForHost(host, targetHost) {
+  if (baseDomainOf(host) === baseDomainOf(targetHost)) return "자사 서버로 추정";
+  const found = KNOWN_HOST_HINTS.find(([re]) => re.test(host.toLowerCase()));
+  return found ? found[1] : null;
+}
 function eventsFromBraze(postData) {
   const out = [];
   if (!postData) return out;
@@ -292,7 +327,7 @@ module.exports = async function handler(req, res) {
        사내 로그 서버·새 벤더 SDK 같은 걸 놓치지 않고 눈에 띄게 한다 */
     out.other = Array.from(otherHosts.entries())
       .sort((a, b) => b[1].count - a[1].count)
-      .map(([host, rec]) => ({ host, count: rec.count, sample: rec.sample }));
+      .map(([host, rec]) => ({ host, count: rec.count, sample: rec.sample, hint: hintForHost(host, target.hostname) }));
     console.log("[detect-tags]", target.href, JSON.stringify(out));
     return res.status(200).json(out);
   } catch (e) {
