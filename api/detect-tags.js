@@ -172,6 +172,12 @@ module.exports = async function handler(req, res) {
     const target = parseTargetUrl(req);
     await assertPublicHost(target.hostname);
 
+    /* 페이지 자체 주소에 실려 있는 값(예: ?dspSid=AAFB000)도 QA에 쓸모 있는
+       속성인 경우가 많다 — 트래킹 요청과 별개로, 지금 연 페이지 주소의 쿼리
+       파라미터를 모아 감지된 모든 이벤트의 속성에 함께 얹어 준다. */
+    const pageParams = {};
+    target.searchParams.forEach((v, k) => { if (v) pageParams[k] = v; });
+
     const found = { amplitude: new Map(), braze: new Map(), ga4: new Map() };   // name -> merged properties
     const seenVendor = { amplitude: false, braze: false, ga4: false };
     /* 파싱이 실제로 맞는지 확인하려면 원본을 봐야 한다 — 업체별로 몇 개만
@@ -195,7 +201,7 @@ module.exports = async function handler(req, res) {
           : eventsFromBraze(postData);
         items.forEach(it => {
           const name = String(it.name).slice(0, 80);
-          if (!found[vendor].has(name)) found[vendor].set(name, {});
+          if (!found[vendor].has(name)) found[vendor].set(name, Object.assign({}, pageParams));
           Object.assign(found[vendor].get(name), it.properties || {});
         });
         if (debug[vendor].length < DEBUG_MAX) {
@@ -216,7 +222,7 @@ module.exports = async function handler(req, res) {
       await page.close().catch(() => {});
     }
 
-    const out = {};
+    const out = { pageParams };
     ["amplitude", "braze", "ga4"].forEach(k => {
       out[k] = {
         detected: seenVendor[k],
