@@ -446,6 +446,8 @@ select.field{cursor:pointer}
 .detecthead{font-size:11.5px; font-weight:600; color:var(--ink-2); display:flex; align-items:baseline; gap:6px}
 .detecthead .hint{font-weight:400; font-size:10.5px; color:var(--ink-3)}
 .detectrow{display:flex; align-items:center; gap:5px; flex-wrap:wrap; font-size:11.5px}
+.detectraw{max-height:280px; overflow:auto; font-family:var(--f-mono); font-size:10.5px; line-height:1.5;
+  background:var(--bg-3); border:1px solid var(--stroke-2); border-radius:var(--r-sm); padding:8px; white-space:pre-wrap; word-break:break-all}
 
 /* cards in side panels */
 .card{border-radius:var(--r-md); border:1px solid var(--stroke); background:var(--glass-2); padding:9px 10px;
@@ -4131,8 +4133,14 @@ function tagDetectionHtml(n) {
     }
     return '<div class="detectrow">' + platChip(key) + body + "</div>";
   }).join("");
-  return '<div class="tagdetect"><div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span></div>' + rows + "</div>";
+  const raw = showDetectRaw
+    ? '<pre class="detectraw">' + esc(JSON.stringify(detectedTags, null, 2)) + "</pre>"
+    : "";
+  return '<div class="tagdetect"><div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
+    '<button class="btn sm" type="button" data-detect-raw style="margin-left:auto">' + (showDetectRaw ? "원본 감추기" : "원본 보기") + "</button></div>" +
+    rows + raw + "</div>";
 }
+let showDetectRaw = false;
 function renderTagPanel() {
   const n = curNode(), box = $("#tagList");
   $("#tagCount").textContent = n ? n.tags.length : 0;
@@ -4360,6 +4368,7 @@ function initPanels() {
     const id = e.target.value; if (id) jumpToTag(id);
   });
   $("#tagList").addEventListener("click", e => {
+    if (e.target.closest("[data-detect-raw]")) { showDetectRaw = !showDetectRaw; return renderTagPanel(); }
     const da = e.target.closest("[data-detect-add]");
     if (da) {
       const key = da.dataset.detectPlat, name = da.dataset.detectName;
