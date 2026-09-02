@@ -1,7 +1,7 @@
 /* ============================================================================
    /api/detect-tags — 웹 모드에서 "태그 확인"을 누르면 그 주소를 서버가 대신
    열어, 페이지가 실제로 Amplitude·Braze·GA4로 보내는 트래킹 요청을 엿보고
-   어떤 이벤트를 보내는지 최대한 뽑아 돌려준다.
+   어떤 이벤트를, 어떤 속성과 함께 보내는지 최대한 뽑아 돌려준다.
 
    iframe 안 페이지는 다른 도메인이라 브라우저 스크립트로 직접 엿볼 수 없지만
    (api/screenshot.js와 같은 이유), 여기서는 서버 자신의 헤드리스 브라우저가
@@ -9,7 +9,7 @@
 
    각 업체 전송 형식(payload)은 공식 문서가 아니라 실제 관찰로 짐작한 것이라,
    업체가 형식을 바꾸거나 커스텀 도메인을 쓰면 놓칠 수 있다 — "감지됨/이벤트
-   이름"은 최선을 다한 추정치이지 100% 보장이 아니다.
+   이름/속성"은 최선을 다한 추정치이지 100% 보장이 아니다.
 
    필요한 환경변수 (api/sheets.js 와 같다)
      SUPABASE_URL, SUPABASE_ANON_KEY
@@ -35,41 +35,67 @@ function vendorOf(u) {
   return null;
 }
 
+/* event_properties·params·properties 안의 값만 쓰므로, SDK가 자동으로 붙이는
+   부가정보(device_id·session_id·ip 등 이벤트 최상위 필드)는 애초에 안 섞인다 —
+   비어 있거나 null인 값만 걸러낸다. */
+function cleanProps(obj) {
+  const out = {};
+  Object.keys(obj || {}).forEach(k => {
+    const v = obj[k];
+    if (v === null || v === undefined) return;
+    if (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0) return;
+    out[k] = v;
+  });
+  return out;
+}
+
 /* 각 업체가 실제 브라우저 SDK에서 이벤트를 실어 보내는 모양은 공식 규격이
    없다시피 해서(관찰 기반), 여러 형태를 순서대로 시도한다. JSON 구조가 예상과
    다르면(중첩이 달라졌다든지) 정규식으로 한 번 더 훑어서 최대한 건진다.
-   하나도 안 맞으면 이벤트 이름 없이 "감지됨"만 표시한다. */
+   이름만이 아니라 그 이벤트가 실어 보낸 속성(event_properties 등)도 같이
+   돌려줘서, 태그를 만들 때 속성 칸까지 자동으로 채울 수 있게 한다. */
 function eventsFromGA4(u, postData) {
-  const names = [];
+  const out = [];
   const en = u.searchParams.get("en");
-  if (en) names.push(en);
+  if (en) {
+    const props = {};
+    u.searchParams.forEach((v, k) => { if (k !== "en" && k !== "tid" && k !== "v") props[k] = v; });
+    out.push({ name: en, properties: cleanProps(props) });
+  }
   if (postData) {
     try {
       const j = JSON.parse(postData);
-      (j.events || []).forEach(e => { if (e && e.name) names.push(e.name); });
+      (j.events || []).forEach(e => { if (e && e.name) out.push({ name: e.name, properties: cleanProps(e.params) }); });
     } catch (e) {
       const re = /"name"\s*:\s*"([^"]+)"/g;
-      let m; while ((m = re.exec(postData))) names.push(m[1]);
+      let m; while ((m = re.exec(postData))) out.push({ name: m[1], properties: {} });
     }
   }
-  return names;
+  return out;
 }
 function eventsFromAmplitude(u, postData) {
-  const names = new Set();
+  const out = [];
   const scan = raw => {
-    if (!raw) return;
+    if (!raw) return false;
     try {
       const j = JSON.parse(raw);
       const list = Array.isArray(j) ? j : (j.events || (j.event_type ? [j] : []));
-      list.forEach(e => { if (e && e.event_type) names.add(e.event_type); });
+      let any = false;
+      list.forEach(e => {
+        if (!e || !e.event_type) return;
+        any = true;
+        out.push({ name: e.event_type, properties: cleanProps(e.event_properties) });
+      });
+      return any;
     } catch (e) {
       const re = /"event_type"\s*:\s*"([^"]+)"/g;
-      let m; while ((m = re.exec(raw))) names.add(m[1]);
+      let m, any = false;
+      while ((m = re.exec(raw))) { out.push({ name: m[1], properties: {} }); any = true; }
+      return any;
     }
   };
   if (postData) {
-    scan(postData);
-    if (!names.size) {
+    if (!scan(postData)) {
       try {
         const params = new URLSearchParams(postData);
         const ev = params.get("event");
@@ -79,25 +105,25 @@ function eventsFromAmplitude(u, postData) {
   }
   const evQ = u.searchParams.get("event");
   if (evQ) scan(evQ);
-  return Array.from(names);
+  return out;
 }
 function eventsFromBraze(postData) {
-  const names = new Set();
-  if (!postData) return [];
+  const out = [];
+  if (!postData) return out;
   try {
     const j = JSON.parse(postData);
-    (j.events || []).forEach(e => { if (e && e.name) names.add(e.name); });
+    (j.events || []).forEach(e => { if (e && e.name) out.push({ name: e.name, properties: cleanProps(e.properties) }); });
   } catch (e) {}
-  if (!names.size) {
+  if (!out.length) {
     /* "events" 배열 부분만 잘라서 그 안의 name만 줍는다 — attributes 등
        다른 곳의 name까지 긁지 않도록 범위를 좁힌다 */
     const block = /"events"\s*:\s*(\[[\s\S]*?\])/.exec(postData);
     if (block) {
       const re = /"name"\s*:\s*"([^"]+)"/g;
-      let m; while ((m = re.exec(block[1]))) names.add(m[1]);
+      let m; while ((m = re.exec(block[1]))) out.push({ name: m[1], properties: {} });
     }
   }
-  return Array.from(names);
+  return out;
 }
 
 module.exports = async function handler(req, res) {
@@ -110,7 +136,7 @@ module.exports = async function handler(req, res) {
     const target = parseTargetUrl(req);
     await assertPublicHost(target.hostname);
 
-    const found = { amplitude: new Set(), braze: new Set(), ga4: new Set() };
+    const found = { amplitude: new Map(), braze: new Map(), ga4: new Map() };   // name -> merged properties
     const seenVendor = { amplitude: false, braze: false, ga4: false };
     /* 파싱이 실제로 맞는지 확인하려면 원본을 봐야 한다 — 업체별로 몇 개만
        잘라서 같이 돌려준다(요청 주소 + 본문 앞부분). 응답에 실린 값은 그대로
@@ -128,15 +154,19 @@ module.exports = async function handler(req, res) {
         if (!vendor) return;
         seenVendor[vendor] = true;
         const postData = r.postData ? r.postData() : null;
-        const names = vendor === "ga4" ? eventsFromGA4(u, postData)
+        const items = vendor === "ga4" ? eventsFromGA4(u, postData)
           : vendor === "amplitude" ? eventsFromAmplitude(u, postData)
           : eventsFromBraze(postData);
-        names.forEach(n => found[vendor].add(String(n).slice(0, 80)));
+        items.forEach(it => {
+          const name = String(it.name).slice(0, 80);
+          if (!found[vendor].has(name)) found[vendor].set(name, {});
+          Object.assign(found[vendor].get(name), it.properties || {});
+        });
         if (debug[vendor].length < DEBUG_MAX) {
           debug[vendor].push({
             method: r.method(), url: r.url().slice(0, 300),
             body: postData ? String(postData).slice(0, 500) : null,
-            parsedNames: names
+            parsed: items
           });
         }
       });
@@ -152,7 +182,11 @@ module.exports = async function handler(req, res) {
 
     const out = {};
     ["amplitude", "braze", "ga4"].forEach(k => {
-      out[k] = { detected: seenVendor[k], events: Array.from(found[k]), debug: debug[k] };
+      out[k] = {
+        detected: seenVendor[k],
+        events: Array.from(found[k].entries()).map(([name, properties]) => ({ name, properties })),
+        debug: debug[k]
+      };
     });
     console.log("[detect-tags]", target.href, JSON.stringify(out));
     return res.status(200).json(out);

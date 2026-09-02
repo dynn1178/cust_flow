@@ -233,6 +233,21 @@ function openTagBulkModal(file) {
   });
 }
 /* ---------------- 우측: 태깅 ---------------- */
+/* 감지된 이벤트의 실제 속성값을 보고 타입을 짐작해, 태그 폼의 속성(props) 칸을
+   그대로 채울 수 있는 모양으로 바꾼다 — 한글명은 비워 둬서 사람이 채우게 한다 */
+function guessPropType(v) {
+  if (typeof v === "number") return "number";
+  if (typeof v === "boolean") return "boolean";
+  if (Array.isArray(v)) return "array";
+  if (v && typeof v === "object") return "object";
+  return "string";
+}
+function propsFromDetected(properties) {
+  return Object.entries(properties || {}).map(([k, v]) => ({
+    ko: "", en: k, type: guessPropType(v),
+    sample: typeof v === "object" && v !== null ? JSON.stringify(v) : String(v)
+  }));
+}
 /* 웹 모드에서 "태그 확인"을 눌러 서버가 실제로 감지한 Amplitude·Braze·GA4
    요청을 이 페이지에 이미 등록해 둔 태그와 견줘 보여준다 — 이벤트 이름이
    같으면 "등록됨", 아니면 그 이름 그대로 새 태그를 만드는 버튼을 보여준다.
@@ -253,11 +268,14 @@ function tagDetectionHtml(n) {
     } else if (!d.events.length) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지됨 · 이벤트 이름은 추출 못 함</span>';
     } else {
-      body = d.events.map(name => {
-        const matched = existingNames.indexOf(name.toLowerCase()) >= 0;
-        return '<span class="chip" style="--c:' + (matched ? "var(--ok)" : "var(--warn)") + '">' +
-            ico(matched ? "check" : "alert", "xs") + esc(name) + "</span>" +
-          (!matched && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="이 이름으로 태그 추가">' + ico("plus", "xs") + "</button>" : "");
+      body = d.events.map(ev => {
+        const name = ev.name, propCount = Object.keys(ev.properties || {}).length;
+        const matched = existingNames.indexOf(String(name).toLowerCase()) >= 0;
+        return '<span class="chip" style="--c:' + (matched ? "var(--ok)" : "var(--warn)") + '" title="' +
+            (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음") + '">' +
+            ico(matched ? "check" : "alert", "xs") + esc(name) +
+            (propCount ? " · 속성 " + propCount + "개" : "") + "</span>" +
+          (!matched && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="이 이름과 속성 그대로 태그 추가">' + ico("plus", "xs") + "</button>" : "");
       }).join("");
     }
     return '<div class="detectrow">' + platChip(key) + body + "</div>";
@@ -492,7 +510,12 @@ function initPanels() {
   });
   $("#tagList").addEventListener("click", e => {
     const da = e.target.closest("[data-detect-add]");
-    if (da) return editTag(null, { platforms: [da.dataset.detectPlat], eventEn: da.dataset.detectName });
+    if (da) {
+      const key = da.dataset.detectPlat, name = da.dataset.detectName;
+      const ev = detectedTags && detectedTags[key] && (detectedTags[key].events || []).find(x => x.name === name);
+      const props = propsFromDetected(ev && ev.properties);
+      return editTag(null, { platforms: [key], eventEn: name, props });
+    }
     const ed = e.target.closest("[data-tag-edit]"), dl = e.target.closest("[data-tag-del]"), tg = e.target.closest("[data-tag-toggle]");
     if (ed) return editTag(ed.dataset.tagEdit);
     if (tg) {
