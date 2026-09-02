@@ -3273,7 +3273,7 @@ async function checkPageTags() {
   if (!url) return toast("먼저 주소를 입력하고 이동해 주세요", "bad");
   detectedTagsLoading = true; detectedTags = null; detectedTagsUrl = url;
   renderPanels();
-  stageBusy("태그를 확인하는 중… (트래킹 스크립트가 다 뜰 때까지 10초 넘게 걸릴 수 있습니다)");
+  stageBusy("태그를 확인하는 중… (트래킹 스크립트가 다 뜰 때까지 20초 넘게 걸릴 수 있습니다)");
   try {
     const token = await ensureToken().catch(() => null);
     const h = token ? { Authorization: "Bearer " + token } : {};
@@ -4108,7 +4108,7 @@ function propsFromDetected(properties) {
 function tagDetectionHtml(n) {
   if (!n || n.viewMode !== "web") return "";
   if (detectedTagsLoading) {
-    return '<div class="tagdetect"><div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (10초 넘게 걸릴 수 있습니다)</div></div>";
+    return '<div class="tagdetect"><div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (20초 넘게 걸릴 수 있습니다)</div></div>";
   }
   if (!detectedTags || detectedTagsUrl !== n.webUrl) return "";
   const rows = Object.keys(PLAT).map(key => {

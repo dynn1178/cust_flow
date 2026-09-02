@@ -255,7 +255,7 @@ function propsFromDetected(properties) {
 function tagDetectionHtml(n) {
   if (!n || n.viewMode !== "web") return "";
   if (detectedTagsLoading) {
-    return '<div class="tagdetect"><div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (10초 넘게 걸릴 수 있습니다)</div></div>";
+    return '<div class="tagdetect"><div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (20초 넘게 걸릴 수 있습니다)</div></div>";
   }
   if (!detectedTags || detectedTagsUrl !== n.webUrl) return "";
   const rows = Object.keys(PLAT).map(key => {

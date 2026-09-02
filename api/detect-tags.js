@@ -161,7 +161,16 @@ function eventsFromBraze(postData) {
   if (!postData) return out;
   try {
     const j = JSON.parse(postData);
-    (j.events || []).forEach(e => { if (e && e.name) out.push({ name: e.name, properties: cleanProps(e.properties) }); });
+    (j.events || []).forEach(e => {
+      if (!e) return;
+      /* 표준 Braze는 {name, properties}지만, 자체 래퍼를 쓰는 사이트는
+         {name:"ce", data:{n:실제이름, p:실제속성}} 처럼 진짜 이름·속성이
+         한 단계 더 안쪽(data)에 있다 — Amplitude 때와 같은 패턴이라 똑같이 본다. */
+      const realName = (e.data && e.data.n) || e.name;
+      if (!realName) return;
+      const propsSrc = (e.data && e.data.p) ? e.data.p : e.properties;
+      out.push({ name: realName, properties: flattenProps(propsSrc) });
+    });
   } catch (e) {}
   if (!out.length) {
     /* "events" 배열 부분만 잘라서 그 안의 name만 줍는다 — attributes 등
@@ -227,9 +236,10 @@ module.exports = async function handler(req, res) {
       });
       try {
         await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 10000 });
-        /* GTM 컨테이너가 로드된 뒤에야 gtag·Amplitude 호출이 잇달아 나가는 사이트가
-           많다 — 그 사슬이 다 이어지려면 몇 초는 걸려서 넉넉히 기다린다 */
-        await new Promise(r => setTimeout(r, 7000));
+        /* GTM 컨테이너가 로드된 뒤에야 gtag·Amplitude·Braze 호출이 잇달아 나가는
+           사이트가 많고, 실제로 재 보니 Braze는 10초 넘게 걸려서야 첫 이벤트를
+           보내는 경우도 있었다 — 넉넉히 14초까지 기다린다. */
+        await new Promise(r => setTimeout(r, 14000));
       } catch (e) { /* 여기까지 뜬 요청만으로 판단한다 */ }
     } finally {
       await page.close().catch(() => {});
@@ -251,4 +261,4 @@ module.exports = async function handler(req, res) {
   }
 };
 
-module.exports.config = { maxDuration: 30 };
+module.exports.config = { maxDuration: 45 };   // 대기 시간을 늘린 만큼(고정 14초 대기 포함) 여유를 더 둔다
