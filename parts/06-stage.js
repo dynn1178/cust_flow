@@ -20,6 +20,11 @@ let detectedTagsLoading = false;
    알려주면, 서버가 대신 그 요소를 찾아 눌러 보고 그 사이 나가는 요청까지
    같이 모아 온다. 문서에는 저장하지 않는다. */
 let tagClickText = "";
+/* 잡힌 이벤트가 많아지면 하나하나 훑어보기 번거롭다 — "해외패키지"처럼
+   업무상 익숙한 키워드로 이벤트 이름·속성 이름·속성 값을 한 번에 훑어서
+   관련된 것만 추려 보여준다. 새로 요청을 보내는 게 아니라 이미 받아 둔
+   결과(detectedTags) 안에서만 걸러낸다. */
+let tagSearchText = "";
 
 function docSize(n) { return { w: n.shotW || DOC_W, h: n.shotH || DOC_H }; }
 /* 화면 이미지 크기만이 아니라, 이미지 밖으로(위·아래·왼쪽·오른쪽 어느 쪽이든)

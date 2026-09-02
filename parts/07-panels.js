@@ -264,8 +264,22 @@ function tagDetectionHtml(n) {
     return '<div class="tagdetect">' + clickField + '<div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (20초 넘게 걸릴 수 있습니다)</div></div>";
   }
   if (!detectedTags || detectedTagsUrl !== n.webUrl) return '<div class="tagdetect">' + clickField + "</div>";
+  /* "해외패키지"처럼 업무상 익숙한 키워드로, 이미 잡아 둔 이벤트 이름·속성
+     이름·속성 값을 한 번에 훑어 관련된 것만 추려 본다 — 새로 요청을 보내지
+     않고 지금 결과 안에서만 찾는다. */
+  const searchQ = tagSearchText.trim().toLowerCase();
+  const matchesSearch = ev => {
+    if (!searchQ) return true;
+    if (String(ev.name).toLowerCase().indexOf(searchQ) >= 0) return true;
+    return Object.entries(ev.properties || {}).some(([k, v]) =>
+      k.toLowerCase().indexOf(searchQ) >= 0 || String(v).toLowerCase().indexOf(searchQ) >= 0);
+  };
+  const searchField = '<div class="detectrow"><span class="webfield" style="flex:1; min-width:160px" title="이미 잡힌 이벤트/속성을 키워드로 찾기">' +
+    ico("search", "xs") + '<input class="mono" id="tagSearchIn" placeholder="이벤트·속성 검색 (예: 해외패키지)" value="' + esc(tagSearchText) + '"></span>' +
+    '<button class="btn sm" type="button" data-tag-search>탐색</button></div>';
   const rows = Object.keys(PLAT).map(key => {
     const d = detectedTags[key] || { detected: false, events: [] };
+    const matchedEvents = d.events.filter(matchesSearch);
     const existingNames = n.tags.filter(t => platformsOf(t).indexOf(key) >= 0)
       .map(t => (tagEventEn(t) || t.eventKo || "").trim().toLowerCase()).filter(Boolean);
     let body;
@@ -273,32 +287,25 @@ function tagDetectionHtml(n) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지 안 됨</span>';
     } else if (!d.events.length) {
       body = '<span class="chip" style="--c:var(--ink-3)">감지됨 · 이벤트 이름은 추출 못 함</span>';
+    } else if (searchQ && !matchedEvents.length) {
+      body = '<span class="chip" style="--c:var(--ink-3)">"' + esc(tagSearchText.trim()) + '"과 일치하는 이벤트 없음</span>';
     } else {
-      body = d.events.map(ev => {
+      body = matchedEvents.map(ev => {
         const name = ev.name, propCount = Object.keys(ev.properties || {}).length;
         const matched = existingNames.indexOf(String(name).toLowerCase()) >= 0;
+        /* 페이지를 열기만 해도 나가는 이벤트(load)와 지정한 클릭으로만 나간
+           이벤트(click)를 구분해서 보여준다 — 섞이면 QA할 때 헷갈린다. */
+        const phaseLabel = ev.phase === "click" ? "클릭" : ev.phase === "load+click" ? "로딩+클릭" : "로딩";
         return '<span class="chip" style="--c:' + (matched ? "var(--ok)" : "var(--warn)") + '" title="' +
             (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음") + '">' +
             ico(matched ? "check" : "alert", "xs") + esc(name) +
+            ' <em style="opacity:.6; font-style:normal">· ' + phaseLabel + '</em>' +
             (propCount ? " · 속성 " + propCount + "개" : "") + "</span>" +
           (!matched && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="이 이름과 속성 그대로 태그 추가">' + ico("plus", "xs") + "</button>" : "");
       }).join("");
     }
     return '<div class="detectrow">' + platChip(key) + body + "</div>";
   }).join("");
-  /* Amplitude·Braze·GA4 세 곳 말고 다른 도메인으로 나간 요청들 — 사내 로그 서버나
-     아직 목록에 없는 새 벤더 SDK를 놓치지 않도록, 매칭 여부와 상관없이 실제로
-     나간 요청 자체를 보여준다(브라우저 확장 프로그램의 "정해진 패턴만 안다"는
-     한계를 넘어서려는 것). */
-  const others = detectedTags.other || [];
-  /* 자사 서버·이미 알려진 광고 픽셀은 옅게, 처음 보는 도메인(hint 없음)은
-     진하게 — 매번 하나씩 찾아보지 않아도 "이건 새로 나온 것"이 한눈에 띄도록. */
-  const othersHtml = others.length
-    ? '<div class="detectrow"><span class="chip" style="--c:var(--ink-3)">' + ico("search", "xs") + "기타 " + others.length + "개 도메인</span>" +
-      others.map(o => '<span class="chip" style="--c:' + (o.hint ? "var(--ink-3)" : "var(--ink-1)") + '" title="' +
-        esc((o.sample && o.sample.method) || "") + " " + esc((o.sample && o.sample.url) || "") + "\n" + esc((o.sample && o.sample.body) || "") + '">' +
-        esc(o.host) + (o.count > 1 ? " ×" + o.count : "") + (o.hint ? " · " + esc(o.hint) : "") + "</span>").join("") + "</div>"
-    : "";
   const clicks = detectedTags.clicks || [];
   const clicksHtml = clicks.length
     ? '<div class="detectrow">' + clicks.map(c => '<span class="chip" style="--c:' + (c.clicked ? "var(--ok)" : "var(--bad)") + '">' +
@@ -309,7 +316,7 @@ function tagDetectionHtml(n) {
     : "";
   return '<div class="tagdetect">' + clickField + '<div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
     '<button class="btn sm" type="button" data-detect-raw style="margin-left:auto">' + (showDetectRaw ? "원본 감추기" : "원본 보기") + "</button></div>" +
-    clicksHtml + rows + othersHtml + raw + "</div>";
+    clicksHtml + searchField + rows + raw + "</div>";
 }
 let showDetectRaw = false;
 function renderTagPanel() {
@@ -539,9 +546,14 @@ function initPanels() {
     const id = e.target.value; if (id) jumpToTag(id);
   });
   $("#tagList").addEventListener("input", e => {
-    if (e.target.id === "tagClickIn") tagClickText = e.target.value;   // 다시 그리지 않는다 — 타이핑 중 포커스가 끊기지 않도록
+    if (e.target.id === "tagClickIn") tagClickText = e.target.value;     // 다시 그리지 않는다 — 타이핑 중 포커스가 끊기지 않도록
+    if (e.target.id === "tagSearchIn") tagSearchText = e.target.value;   // "탐색" 눌러야 실제로 걸러진다
+  });
+  $("#tagList").addEventListener("keydown", e => {
+    if (e.target.id === "tagSearchIn" && e.key === "Enter") { e.preventDefault(); renderTagPanel(); }
   });
   $("#tagList").addEventListener("click", e => {
+    if (e.target.closest("[data-tag-search]")) return renderTagPanel();
     if (e.target.closest("[data-detect-raw]")) { showDetectRaw = !showDetectRaw; return renderTagPanel(); }
     const da = e.target.closest("[data-detect-add]");
     if (da) {

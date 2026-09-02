@@ -158,41 +158,6 @@ function eventsFromAmplitude(u, postData) {
   if (evQ) scan(evQ);
   return out;
 }
-/* "기타" 목록에 뜨는 도메인은 매번 사람이 검색해서 뭔지 알아내야 해서 불편하다 —
-   자주 보이는 광고·리타게팅 도메인과 자사 도메인 정도는 미리 라벨을 붙여 준다.
-   GA4/Amplitude/Braze처럼 실제 파싱을 하는 게 아니라, "이건 이미 알려진 광고
-   픽셀이다/자사 서버다" 정도만 알려줘서 새로 나온 도메인만 눈에 띄게 하려는
-   것 — 광고 벤더용 파서는 만들지 않는다(요청받은 범위 밖). */
-const KNOWN_HOST_HINTS = [
-  [/(^|\.)doubleclick\.net$/, "구글 광고(DoubleClick)"],
-  [/(^|\.)facebook\.com$/, "메타(페이스북) 픽셀"],
-  [/(^|\.)criteo\.com$/, "Criteo 리타게팅"],
-  [/(^|\.)moloco\.com$/, "Moloco 광고 DSP"],
-  [/(^|\.)acrosspf\.com$/, "AcrossB 광고 네트워크"],
-  [/(^|\.)daangn\.com$/, "당근마켓 광고"],
-  [/ad\.daum\.net$/, "카카오/다음 광고"],
-  [/veta\.naver\.com$/, "네이버 광고 추적"],
-  [/wcs\.naver\.com$/, "네이버 전환추적(WCS)"],
-  [/(^|\.)creativecdn\.com$/, "RTB하우스 리타게팅"],
-  [/onetag\.co\.kr$/, "원태그(태그매니저)"],
-  [/(^|\.)kollus\.com$/, "Kollus 동영상 스트리밍"],
-  [/(^|\.)google\.com$/, "구글 서비스(reCAPTCHA·지도 등, 확인 필요)"],
-  [/(^|\.)openai\.com$/, "OpenAI 연동(AI 챗봇 등으로 추정, 확인 필요)"]
-];
-const COMPOUND_TLDS = ["co.kr", "or.kr", "ne.kr", "go.kr", "co.jp", "co.uk", "com.cn"];
-function baseDomainOf(host) {
-  const parts = host.toLowerCase().split(".");
-  for (const tld of COMPOUND_TLDS) {
-    const tp = tld.split(".");
-    if (parts.length > tp.length && parts.slice(-tp.length).join(".") === tld) return parts.slice(-(tp.length + 1)).join(".");
-  }
-  return parts.slice(-2).join(".");
-}
-function hintForHost(host, targetHost) {
-  if (baseDomainOf(host) === baseDomainOf(targetHost)) return "자사 서버로 추정";
-  const found = KNOWN_HOST_HINTS.find(([re]) => re.test(host.toLowerCase()));
-  return found ? found[1] : null;
-}
 /* $identify·session_start·page_view처럼 페이지를 열기만 해도 자동으로 나가는
    이벤트 말고, 상품 클릭처럼 사용자가 눌러야만 나가는 커스텀 이벤트는 가만히
    기다리기만 해서는 절대 잡히지 않는다 — 그렇다고 아무 요소나 임의로 눌러
@@ -262,22 +227,18 @@ module.exports = async function handler(req, res) {
     const clickTexts = (new URL(req.url, "http://x").searchParams.get("clicks") || "")
       .split(",").map(s => s.trim()).filter(Boolean).slice(0, 3);
 
-    const found = { amplitude: new Map(), braze: new Map(), ga4: new Map() };   // name -> merged properties
+    const found = { amplitude: new Map(), braze: new Map(), ga4: new Map() };   // name -> { properties, phases }
     const seenVendor = { amplitude: false, braze: false, ga4: false };
     /* 파싱이 실제로 맞는지 확인하려면 원본을 봐야 한다 — 업체별로 몇 개만
        잘라서 같이 돌려준다(요청 주소 + 본문 앞부분). 응답에 실린 값은 그대로
        브라우저 콘솔에도 찍어서, Vercel 로그에 못 들어가도 확인할 수 있게 한다. */
     const debug = { amplitude: [], braze: [], ga4: [] };
     const DEBUG_MAX = 4;
-    /* 미리 정해 둔 3개 업체 패턴에 안 걸리는 요청(사내 로그 서버, 아직 모르는
-       벤더 SDK 등)을 놓치지 않으려고 — 도메인별로 한 번씩 표본을 남긴다.
-       정적 자원(스크립트·이미지·CSS 등)과 지금 보고 있는 페이지 자신에게
-       보내는 요청은 태그일 확률이 낮아 뺀다. HAR 캡처가 하는 역할을 여기서
-       대신한다: 벤더 매칭에 기대지 않고 실제로 나간 요청 자체를 본다. */
-    const SKIP_TYPES = ["document", "stylesheet", "image", "media", "font", "script", "websocket", "manifest"];
-    const otherHosts = new Map();   // hostname -> { count, sample }
-    const OTHER_MAX = 20;
     const clickResults = [];   // [{ text, clicked }] — 요청한 클릭 시나리오가 실제로 먹혔는지
+    /* $identify·session_start·page_view처럼 페이지를 열기만 해도 나가는 이벤트와,
+       상품 클릭처럼 사용자 동작이 있어야만 나가는 이벤트를 섞어서 보여주면 QA할
+       때 헷갈린다 — 지금 어느 단계에서 잡힌 요청인지 이벤트마다 같이 남긴다. */
+    let capturePhase = "load";
 
     const browser = await getBrowser();
     const page = await browser.newPage();
@@ -288,34 +249,25 @@ module.exports = async function handler(req, res) {
         try { u = new URL(r.url()); } catch (e) { return; }
         const postData = r.postData ? r.postData() : null;
         const vendor = vendorOf(u, postData);
-        if (vendor) {
-          seenVendor[vendor] = true;
-          const items = vendor === "ga4" ? eventsFromGA4(u, postData)
-            : vendor === "amplitude" ? eventsFromAmplitude(u, postData)
-            : eventsFromBraze(postData);
-          items.forEach(it => {
-            const name = String(it.name).slice(0, 80);
-            if (!found[vendor].has(name)) found[vendor].set(name, Object.assign({}, pageParams));
-            Object.assign(found[vendor].get(name), it.properties || {});
+        if (!vendor) return;   // GA4/Amplitude/Braze만 본다 — 그 외 도메인은 더 이상 수집하지 않는다
+        seenVendor[vendor] = true;
+        const items = vendor === "ga4" ? eventsFromGA4(u, postData)
+          : vendor === "amplitude" ? eventsFromAmplitude(u, postData)
+          : eventsFromBraze(postData);
+        items.forEach(it => {
+          const name = String(it.name).slice(0, 80);
+          if (!found[vendor].has(name)) found[vendor].set(name, { properties: Object.assign({}, pageParams), phases: new Set() });
+          const entry = found[vendor].get(name);
+          Object.assign(entry.properties, it.properties || {});
+          entry.phases.add(capturePhase);
+        });
+        if (debug[vendor].length < DEBUG_MAX) {
+          debug[vendor].push({
+            method: r.method(), url: r.url().slice(0, 300),
+            body: postData ? String(postData).slice(0, 500) : null,
+            parsed: items
           });
-          if (debug[vendor].length < DEBUG_MAX) {
-            debug[vendor].push({
-              method: r.method(), url: r.url().slice(0, 300),
-              body: postData ? String(postData).slice(0, 500) : null,
-              parsed: items
-            });
-          }
-          return;
         }
-        if (SKIP_TYPES.indexOf(r.resourceType()) >= 0) return;
-        if (u.hostname === target.hostname) return;
-        if (!otherHosts.has(u.hostname) && otherHosts.size >= OTHER_MAX) return;
-        const rec = otherHosts.get(u.hostname) || { count: 0, sample: null };
-        rec.count++;
-        if (!rec.sample) {
-          rec.sample = { method: r.method(), url: r.url().slice(0, 300), body: postData ? String(postData).slice(0, 300) : null };
-        }
-        otherHosts.set(u.hostname, rec);
       });
       try {
         await page.goto(target.href, { waitUntil: "domcontentloaded", timeout: 10000 });
@@ -337,6 +289,7 @@ module.exports = async function handler(req, res) {
              시간을 줄이고 그 대신 클릭 하나하나 사이에 여유를 둔다 — 45초
              제한을 넘기지 않으려는 것. */
           await new Promise(r => setTimeout(r, 4000));
+          capturePhase = "click";
           for (const text of clickTexts) {
             const ok = await clickByText(page, text);
             clickResults.push({ text, clicked: ok });
@@ -357,15 +310,12 @@ module.exports = async function handler(req, res) {
     ["amplitude", "braze", "ga4"].forEach(k => {
       out[k] = {
         detected: seenVendor[k],
-        events: Array.from(found[k].entries()).map(([name, properties]) => ({ name, properties })),
+        /* phase: "load"(가만히 있어도 나감) · "click"(지정한 클릭으로 나감) ·
+           "load+click"(둘 다에서 나감 — 흔치 않지만 가능) */
+        events: Array.from(found[k].entries()).map(([name, v]) => ({ name, properties: v.properties, phase: Array.from(v.phases).join("+") })),
         debug: debug[k]
       };
     });
-    /* 3개 업체에 안 걸린 나머지 도메인들 — 요청 수가 많은 순으로 정렬해서,
-       사내 로그 서버·새 벤더 SDK 같은 걸 놓치지 않고 눈에 띄게 한다 */
-    out.other = Array.from(otherHosts.entries())
-      .sort((a, b) => b[1].count - a[1].count)
-      .map(([host, rec]) => ({ host, count: rec.count, sample: rec.sample, hint: hintForHost(host, target.hostname) }));
     console.log("[detect-tags]", target.href, JSON.stringify(out));
     return res.status(200).json(out);
   } catch (e) {
