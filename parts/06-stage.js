@@ -15,11 +15,6 @@ let addrUnknown = false;
 let detectedTags = null;         // { amplitude:{detected,events}, braze:{...}, ga4:{...} }
 let detectedTagsUrl = null;
 let detectedTagsLoading = false;
-/* 클릭으로만 발생하는 커스텀 이벤트(상품 클릭 등)는 페이지를 가만히 열어두기만
-   해서는 절대 나오지 않는다 — 사용자가 "이 글자가 있는 걸 눌러줘"라고 미리
-   알려주면, 서버가 대신 그 요소를 찾아 눌러 보고 그 사이 나가는 요청까지
-   같이 모아 온다. 문서에는 저장하지 않는다. */
-let tagClickText = "";
 /* 잡힌 이벤트가 많아지면 하나하나 훑어보기 번거롭다 — "해외패키지"처럼
    업무상 익숙한 키워드로 이벤트 이름·속성 이름·속성 값을 한 번에 훑어서
    관련된 것만 추려 보여준다. 새로 요청을 보내는 게 아니라 이미 받아 둔
@@ -342,9 +337,7 @@ async function checkPageTags() {
   try {
     const token = await ensureToken().catch(() => null);
     const h = token ? { Authorization: "Bearer " + token } : {};
-    let apiUrl = "/api/detect-tags?url=" + encodeURIComponent(url);
-    if (tagClickText.trim()) apiUrl += "&clicks=" + encodeURIComponent(tagClickText.trim());
-    const r = await fetch(apiUrl, { headers: h });
+    const r = await fetch("/api/detect-tags?url=" + encodeURIComponent(url), { headers: h });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || ("서버 응답 " + r.status));
     detectedTags = j;
@@ -357,6 +350,56 @@ async function checkPageTags() {
   } catch (e) {
     detectedTags = null; detectedTagsUrl = null;
     toast("태그 확인에 실패했습니다: " + ((e && e.message) || "알 수 없는 오류"), "bad");
+  } finally {
+    detectedTagsLoading = false;
+    renderStage(); renderPanels();
+  }
+}
+/* 상품 클릭처럼 사용자 동작이 있어야만 나가는 이벤트는 checkPageTags()처럼
+   서버가 페이지를 가만히 열어두기만 해서는 절대 잡히지 않는다 — 실제
+   브라우저에서 직접 클릭해 보고 DevTools Network 탭에서 내보낸 HAR 파일을
+   그대로 가져와서 그 안의 요청들을 훑는다. 봇 감지·동의 배너·교차출처·
+   서버 실행시간 제한 어느 것도 걸리지 않는, 가장 확실한 방법이다. */
+function pickHarFile() {
+  const n = curNode();
+  const url = liveIframeUrl() || (n ? n.webUrl : browseUrl);
+  const inp = $("#harPick"); inp.value = "";
+  inp.onchange = () => { const f = inp.files && inp.files[0]; if (f) importHarFile(f, url); };
+  inp.click();
+}
+async function importHarFile(file, url) {
+  detectedTagsLoading = true; detectedTags = null; detectedTagsUrl = url || null;
+  renderStage(); renderPanels();
+  stageBusy("HAR 파일을 읽는 중…");
+  try {
+    const text = await file.text();
+    let har;
+    try { har = JSON.parse(text); } catch (e) { throw new Error("HAR 파일을 읽지 못했습니다(JSON 형식이 아님)"); }
+    const rawEntries = har && har.log && Array.isArray(har.log.entries) ? har.log.entries : null;
+    if (!rawEntries) throw new Error("올바른 HAR 파일이 아닙니다");
+    /* 응답 본문·헤더·타이밍 등은 필요 없다 — 업체 판단에 쓰는 url·method·요청
+       본문만 추려서 올린다(이미지 등까지 실린 원본 HAR은 훨씬 크다). */
+    const entries = rawEntries.map(e => ({
+      url: e && e.request && e.request.url,
+      method: e && e.request && e.request.method,
+      postData: e && e.request && e.request.postData ? e.request.postData.text : null
+    })).filter(e => e.url);
+    if (!entries.length) throw new Error("HAR 안에 요청이 없습니다");
+    const token = await ensureToken().catch(() => null);
+    const h = Object.assign({ "Content-Type": "application/json" }, token ? { Authorization: "Bearer " + token } : {});
+    const apiUrl = "/api/import-har" + (url ? "?url=" + encodeURIComponent(url) : "");
+    const r = await fetch(apiUrl, { method: "POST", headers: h, body: JSON.stringify({ entries }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ("서버 응답 " + r.status));
+    detectedTags = j; detectedTagsUrl = url || null;
+    const found = Object.keys(j).filter(k => j[k] && j[k].detected).map(k => PLAT[k] ? PLAT[k].name : k);
+    toast(found.length ? "가져옴(" + entries.length + "개 요청) · 감지됨 " + found.join(", ") : "이 HAR에서 Amplitude·Braze·GA4 요청을 찾지 못했습니다", found.length ? "ok" : "bad");
+    console.groupCollapsed("[HAR 가져오기] 원본 샘플 (문제 있으면 이걸 복사해서 알려주세요)");
+    console.log(j);
+    console.groupEnd();
+  } catch (e) {
+    detectedTags = null; detectedTagsUrl = null;
+    toast("HAR 가져오기에 실패했습니다: " + ((e && e.message) || "알 수 없는 오류"), "bad");
   } finally {
     detectedTagsLoading = false;
     renderStage(); renderPanels();

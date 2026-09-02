@@ -254,16 +254,19 @@ function propsFromDetected(properties) {
    사이트 구현에 따라 놓칠 수 있는 최선 추정치라는 점을 함께 알려준다. */
 function tagDetectionHtml(n) {
   if (!n || n.viewMode !== "web") return "";
-  /* $identify·session_start·page_view처럼 페이지를 열기만 해도 자동으로 나가는
-     이벤트 말고, 상품 클릭처럼 사용자가 눌러야만 나가는 커스텀 이벤트를 잡으려면
-     확인 전에 무엇을 눌러볼지 미리 알려줘야 한다 — 서버가 임의로 아무 데나
-     누르지 않도록, 여기 적은 글자가 있는 요소만 대신 눌러 본다. */
-  const clickField = '<div class="detectrow"><span class="webfield" style="flex:1; min-width:160px" title="태그 확인 전에 서버가 대신 눌러볼 텍스트">' +
-    ico("cursor", "xs") + '<input class="mono" id="tagClickIn" placeholder="확인 전 클릭할 텍스트, 쉼표로 구분 (선택)" value="' + esc(tagClickText) + '"></span></div>';
+  /* 상품 클릭처럼 사용자 동작이 있어야만 나가는 이벤트는 서버가 페이지를
+     가만히 열어두기만 해서는 절대 잡히지 않는다 — 가장 확실한 방법은 실제
+     브라우저에서 직접 클릭해 보고 그 결과를 DevTools에서 HAR로 내보내
+     가져오는 것이다(봇 감지·동의 배너·교차출처·서버 실행시간 제한 어느
+     것에도 걸리지 않는다). */
+  const harField = '<div class="detectrow">' +
+    '<button class="btn sm" type="button" data-har-pick>' + ico("folder", "xs") + "HAR 파일 가져오기</button>" +
+    '<span class="hint">실제 브라우저에서 클릭해 본 뒤 DevTools → Network → "Save all as HAR with content"로 내보낸 파일 — 클릭 이벤트까지 정확히 잡힙니다</span>' +
+    "</div>";
   if (detectedTagsLoading) {
-    return '<div class="tagdetect">' + clickField + '<div class="detectrow">' + ico("loop", "xs spin") + "태그를 확인하는 중… (20초 넘게 걸릴 수 있습니다)</div></div>";
+    return '<div class="tagdetect">' + harField + '<div class="detectrow">' + ico("loop", "xs spin") + "확인하는 중…</div></div>";
   }
-  if (!detectedTags || detectedTagsUrl !== n.webUrl) return '<div class="tagdetect">' + clickField + "</div>";
+  if (!detectedTags || detectedTagsUrl !== n.webUrl) return '<div class="tagdetect">' + harField + "</div>";
   /* "해외패키지"처럼 업무상 익숙한 키워드로, 이미 잡아 둔 이벤트 이름·속성
      이름·속성 값을 한 번에 훑어 관련된 것만 추려 본다 — 새로 요청을 보내지
      않고 지금 결과 안에서만 찾는다. */
@@ -293,30 +296,21 @@ function tagDetectionHtml(n) {
       body = matchedEvents.map(ev => {
         const name = ev.name, propCount = Object.keys(ev.properties || {}).length;
         const matched = existingNames.indexOf(String(name).toLowerCase()) >= 0;
-        /* 페이지를 열기만 해도 나가는 이벤트(load)와 지정한 클릭으로만 나간
-           이벤트(click)를 구분해서 보여준다 — 섞이면 QA할 때 헷갈린다. */
-        const phaseLabel = ev.phase === "click" ? "클릭" : ev.phase === "load+click" ? "로딩+클릭" : "로딩";
         return '<span class="chip" style="--c:' + (matched ? "var(--ok)" : "var(--warn)") + '" title="' +
             (propCount ? esc(Object.keys(ev.properties).join(", ")) : "속성 없음") + '">' +
             ico(matched ? "check" : "alert", "xs") + esc(name) +
-            ' <em style="opacity:.6; font-style:normal">· ' + phaseLabel + '</em>' +
             (propCount ? " · 속성 " + propCount + "개" : "") + "</span>" +
           (!matched && canEdit() ? '<button class="btn icon sm" data-detect-add data-detect-plat="' + key + '" data-detect-name="' + esc(name) + '" title="이 이름과 속성 그대로 태그 추가">' + ico("plus", "xs") + "</button>" : "");
       }).join("");
     }
     return '<div class="detectrow">' + platChip(key) + body + "</div>";
   }).join("");
-  const clicks = detectedTags.clicks || [];
-  const clicksHtml = clicks.length
-    ? '<div class="detectrow">' + clicks.map(c => '<span class="chip" style="--c:' + (c.clicked ? "var(--ok)" : "var(--bad)") + '">' +
-        ico(c.clicked ? "check" : "alert", "xs") + esc(c.text) + (c.clicked ? "" : " · 못 찾음") + "</span>").join("") + "</div>"
-    : "";
   const raw = showDetectRaw
     ? '<pre class="detectraw">' + esc(JSON.stringify(detectedTags, null, 2)) + "</pre>"
     : "";
-  return '<div class="tagdetect">' + clickField + '<div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
+  return '<div class="tagdetect">' + harField + '<div class="detecthead">웹에서 확인한 실제 트래킹 <span class="hint">최선 추정치 — 사이트 구현에 따라 놓칠 수 있습니다</span>' +
     '<button class="btn sm" type="button" data-detect-raw style="margin-left:auto">' + (showDetectRaw ? "원본 감추기" : "원본 보기") + "</button></div>" +
-    clicksHtml + searchField + rows + raw + "</div>";
+    searchField + rows + raw + "</div>";
 }
 let showDetectRaw = false;
 function renderTagPanel() {
@@ -546,13 +540,13 @@ function initPanels() {
     const id = e.target.value; if (id) jumpToTag(id);
   });
   $("#tagList").addEventListener("input", e => {
-    if (e.target.id === "tagClickIn") tagClickText = e.target.value;     // 다시 그리지 않는다 — 타이핑 중 포커스가 끊기지 않도록
     if (e.target.id === "tagSearchIn") tagSearchText = e.target.value;   // "탐색" 눌러야 실제로 걸러진다
   });
   $("#tagList").addEventListener("keydown", e => {
     if (e.target.id === "tagSearchIn" && e.key === "Enter") { e.preventDefault(); renderTagPanel(); }
   });
   $("#tagList").addEventListener("click", e => {
+    if (e.target.closest("[data-har-pick]")) return pickHarFile();
     if (e.target.closest("[data-tag-search]")) return renderTagPanel();
     if (e.target.closest("[data-detect-raw]")) { showDetectRaw = !showDetectRaw; return renderTagPanel(); }
     const da = e.target.closest("[data-detect-add]");
