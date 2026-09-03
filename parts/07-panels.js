@@ -64,8 +64,8 @@ function tagPropsWithDiff(t) {
   const hist = t.diffHistory || [];
   const latest = hist[hist.length - 1];
   if (!latest || (Date.now() - latest.at) > DIFF_BADGE_MS) return rows;
-  const addedSet = new Set((latest.added || []).map(x => x.key.toLowerCase()));
-  const changedMap = new Map((latest.changed || []).map(x => [x.key.toLowerCase(), x]));
+  const addedSet = new Set((latest.added || []).map(x => x.key.trim().toLowerCase()));
+  const changedMap = new Map((latest.changed || []).map(x => [x.key.trim().toLowerCase(), x]));
   rows.forEach(p => {
     const k = (p.en || "").trim().toLowerCase();
     if (addedSet.has(k)) p.diffMark = "추가";
