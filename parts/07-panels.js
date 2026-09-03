@@ -53,11 +53,11 @@ function propLines(props) {
   }).join("") + "</div>";
 }
 /* 덮어쓰기로 속성이 바뀔 때마다 t.diffHistory에 한 줄씩 쌓아 둔다(최근
-   20개까지) — 최신 것만 남기지 않고 쌓아 두는 이유는 "이력" 버튼으로 지난
+   3개까지) — 최신 것만 남기지 않고 쌓아 두는 이유는 "이력" 버튼으로 지난
    변경들을 나중에도 다시 볼 수 있어야 하기 때문. 카드에 (추가)/(삭제)/
    (변경) 표시는 그중 가장 최근 것만, 그것도 저장한 지 일주일 안쪽일 때만
    보여준다 — 오래된 변경까지 계속 강조돼 있으면 오히려 잡음이 된다. */
-const DIFF_HISTORY_MAX = 20;
+const DIFF_HISTORY_MAX = 3;
 const DIFF_BADGE_MS = 7 * 24 * 60 * 60 * 1000;
 function tagPropsWithDiff(t) {
   const rows = effectiveProps(t).map(p => Object.assign({}, p));
@@ -729,7 +729,7 @@ function addDetectedTag(key, name, ev) {
   const newMap = {}; props.forEach(p => { if (p.en) newMap[p.en] = p.sample || ""; });   // 실제로 저장될 값(props) 기준으로 비교해야 표시가 어긋나지 않는다
   const diffs = diffProps(oldMap, newMap);
   /* 덮어쓰기를 실제로 확정하면(아래 data-ow-confirm) 이 결과를 t.diffHistory에
-     한 줄 추가한다(최근 20개까지) — 최근 것은 일주일간 태그 카드 속성 줄에
+     한 줄 추가한다(최근 3개까지) — 최근 것은 일주일간 태그 카드 속성 줄에
      그대로 (추가)/(삭제)/(변경)으로 보여주고, "이력" 버튼으로는 언제든
      지난 것까지 다 볼 수 있다. */
   const added = diffs.filter(d => d.mark === "추가").map(d => ({ key: d.key, val: d.newVal }));
