@@ -629,6 +629,12 @@ function editTag(id, prefill) {
      live에 쓰고, t는 화면에 뭘 보여줄지 계산하는 데만 쓴다. */
   const live = id ? n.tags.find(x => x.id === id) : null;
   if (id && !live) return;
+  /* 변경 이력은 "캡처된 값" 기준이 아니라 실제로 저장 버튼을 눌렀을 때의
+     이전/이후 값을 비교해서 남긴다 — 캡처된 값을 폼에 미리 채워 놨어도
+     사용자가 그 폼 안에서 속성을 직접 고치거나 새로 추가·삭제할 수 있고,
+     이력에는 그렇게 "실제로 저장한 결과"가 반영돼야 한다. 그래서 prefill을
+     섞기 전, 지금 저장돼 있는 그대로의 속성을 미리 스냅샷으로 떼어 둔다. */
+  const beforeProps = live ? (live.props || []).map(p => Object.assign({}, p)) : null;
   const t = Object.assign({
     platforms: ["amplitude"], path: "", eventKo: "", eventEn: "",
     area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
@@ -680,7 +686,23 @@ function editTag(id, prefill) {
         eventEn: v.eventEn || "unnamed_event", platforms: v.platforms && v.platforms.length ? v.platforms : ["amplitude"],
         props: specificProps
       });
-      if (id) Object.assign(live, rec); else { rec.id = uid("t"); n.tags.push(rec); }
+      if (id) {
+        /* 저장 직전(beforeProps) vs 지금 막 저장하려는 것(specificProps)을
+           비교 — 캡처로 채워졌든 사용자가 손으로 고쳤든 상관없이 "실제로
+           바뀐 결과"를 그대로 잡아낸다. */
+        if (beforeProps) {
+          const oldMap = {}; beforeProps.forEach(p => { if (p.en) oldMap[p.en] = p.sample || ""; });
+          const newMap = {}; specificProps.forEach(p => { if (p.en) newMap[p.en] = p.sample || ""; });
+          const diffs = diffProps(oldMap, newMap);
+          const added = diffs.filter(d => d.mark === "추가").map(d => ({ key: d.key, val: d.newVal }));
+          const removed = diffs.filter(d => d.mark === "삭제").map(d => ({ key: d.key, val: d.oldVal }));
+          const changed = diffs.filter(d => d.mark === "변경").map(d => ({ key: d.key, oldVal: d.oldVal, newVal: d.newVal }));
+          rec.diffHistory = (added.length || removed.length || changed.length)
+            ? (live.diffHistory || []).concat([{ at: Date.now(), added, removed, changed }]).slice(-DIFF_HISTORY_MAX)
+            : (live.diffHistory || []);
+        }
+        Object.assign(live, rec);
+      } else { rec.id = uid("t"); n.tags.push(rec); }
       markDirty(); renderFlow(); renderPanels(); renderTagView(true);
     },
     onDelete: id ? () => confirmDel("태그 " + tagEventEn(t) + " 를 삭제할까요?", () => {
@@ -725,19 +747,14 @@ function addDetectedTag(key, name, ev) {
   const existing = n.tags.find(t => platformsOf(t).indexOf(key) >= 0 && (tagEventEn(t) || "").trim().toLowerCase() === String(name).trim().toLowerCase());
   if (!existing) return editTag(null, { platforms: [key], eventEn: name, props });
 
+  /* 여기서 보여주는 건 "지금 캡처된 값대로 두면 이렇게 바뀐다"는 미리보기일
+     뿐이다 — 실제로 태그에 남는 변경 이력은 폼을 열고 저장하는 순간(사용자가
+     그 사이 속성을 직접 고치거나 더 추가·삭제해도) editTag()의 onSave에서
+     다시 계산한다. 그래야 캡처값이든 사용자가 손으로 고친 값이든 실제로
+     저장된 결과가 이력에 정확히 남는다. */
   const oldMap = {}; (existing.props || []).forEach(p => { if (p.en) oldMap[p.en] = p.sample || ""; });
-  const newMap = {}; props.forEach(p => { if (p.en) newMap[p.en] = p.sample || ""; });   // 실제로 저장될 값(props) 기준으로 비교해야 표시가 어긋나지 않는다
+  const newMap = {}; props.forEach(p => { if (p.en) newMap[p.en] = p.sample || ""; });
   const diffs = diffProps(oldMap, newMap);
-  /* 덮어쓰기를 실제로 확정하면(아래 data-ow-confirm) 이 결과를 t.diffHistory에
-     한 줄 추가한다(최근 3개까지) — 최근 것은 일주일간 태그 카드 속성 줄에
-     그대로 (추가)/(삭제)/(변경)으로 보여주고, "이력" 버튼으로는 언제든
-     지난 것까지 다 볼 수 있다. */
-  const added = diffs.filter(d => d.mark === "추가").map(d => ({ key: d.key, val: d.newVal }));
-  const removed = diffs.filter(d => d.mark === "삭제").map(d => ({ key: d.key, val: d.oldVal }));
-  const changed = diffs.filter(d => d.mark === "변경").map(d => ({ key: d.key, oldVal: d.oldVal, newVal: d.newVal }));
-  const diffHistory = (added.length || removed.length || changed.length)
-    ? (existing.diffHistory || []).concat([{ at: Date.now(), added, removed, changed }]).slice(-DIFF_HISTORY_MAX)
-    : (existing.diffHistory || []);
   const root = modalHost();
   root.innerHTML =
     '<div class="scrim"><div class="modal glass" style="width:min(560px,100%)" role="dialog" aria-modal="true">' +
@@ -758,7 +775,7 @@ function addDetectedTag(key, name, ev) {
     if (e.target.closest("[data-ow-new]")) { closeModal(); return editTag(null, { platforms: [key], eventEn: name, props }); }
     if (e.target.closest("[data-ow-confirm]")) {
       closeModal();
-      return editTag(existing.id, { platforms: Array.from(new Set(platformsOf(existing).concat([key]))), eventEn: name, props, diffHistory });
+      return editTag(existing.id, { platforms: Array.from(new Set(platformsOf(existing).concat([key]))), eventEn: name, props });
     }
   });
 }
