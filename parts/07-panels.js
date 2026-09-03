@@ -33,18 +33,83 @@ function tagArea(t) { return t.area != null && t.area !== "" ? t.area : (t.selec
 function tchanChips(codes) {
   return (codes || []).map(c => '<span class="chip" style="--c:var(--ink-3)">' + esc(TCHAN[c] || c) + "</span>").join("");
 }
-/* 각 속성 줄을 고정된 5개 칸(공통배지·한글명·영문key·타입·샘플)으로 렌더링한다 —
-   값이 없어도 빈 칸을 그대로 두어야 grid 칼럼이 줄마다 어긋나지 않고 표처럼 정렬된다. */
+/* 각 속성 줄을 고정된 6개 칸(공통배지·한글명·영문key·타입·샘플·변경표시)으로
+   렌더링한다 — 값이 없어도 빈 칸을 그대로 두어야 grid 칼럼이 줄마다 어긋나지
+   않고 표처럼 정렬된다. 마지막 칸(diffMark)은 덮어쓰기로 등록됐을 때만
+   채워지는 (추가)/(삭제)/(변경) 표시로, 다음 덮어쓰기 전까지 그대로 남는다. */
 function propLines(props) {
   if (!props || !props.length) return "";
-  return '<div class="proplines">' + props.map(p =>
-    '<div class="propline">' +
+  return '<div class="proplines">' + props.map(p => {
+    const markColor = p.diffMark === "삭제" ? "var(--bad)" : p.diffMark === "추가" ? "var(--ok)" : p.diffMark === "변경" ? "var(--warn)" : null;
+    const markTitle = p.diffMark === "변경" && p.diffOld != null ? "이전 값: " + p.diffOld : "";
+    return '<div class="propline">' +
       '<span class="pcommon">' + (p.common ? '<span class="chip" style="--c:var(--camp)">공통</span>' : "") + "</span>" +
       '<span class="pko">' + esc(p.ko || "") + "</span>" +
       '<span class="pen mono">' + esc(p.en || "") + "</span>" +
       '<span class="ptype">' + esc(PTYPE[p.type] || p.type || "") + "</span>" +
       '<span class="psample mono">' + esc(p.sample || "") + "</span>" +
-    "</div>").join("") + "</div>";
+      '<span class="pdiff">' + (markColor ? '<span class="chip" style="--c:' + markColor + '" title="' + esc(markTitle) + '">(' + p.diffMark + ")</span>" : "") + "</span>" +
+    "</div>";
+  }).join("") + "</div>";
+}
+/* 덮어쓰기로 속성이 바뀔 때마다 t.diffHistory에 한 줄씩 쌓아 둔다(최근
+   20개까지) — 최신 것만 남기지 않고 쌓아 두는 이유는 "이력" 버튼으로 지난
+   변경들을 나중에도 다시 볼 수 있어야 하기 때문. 카드에 (추가)/(삭제)/
+   (변경) 표시는 그중 가장 최근 것만, 그것도 저장한 지 일주일 안쪽일 때만
+   보여준다 — 오래된 변경까지 계속 강조돼 있으면 오히려 잡음이 된다. */
+const DIFF_HISTORY_MAX = 20;
+const DIFF_BADGE_MS = 7 * 24 * 60 * 60 * 1000;
+function tagPropsWithDiff(t) {
+  const rows = effectiveProps(t).map(p => Object.assign({}, p));
+  const hist = t.diffHistory || [];
+  const latest = hist[hist.length - 1];
+  if (!latest || (Date.now() - latest.at) > DIFF_BADGE_MS) return rows;
+  const addedSet = new Set((latest.added || []).map(x => x.key.toLowerCase()));
+  const changedMap = new Map((latest.changed || []).map(x => [x.key.toLowerCase(), x]));
+  rows.forEach(p => {
+    const k = (p.en || "").trim().toLowerCase();
+    if (addedSet.has(k)) p.diffMark = "추가";
+    else if (changedMap.has(k)) { p.diffMark = "변경"; p.diffOld = changedMap.get(k).oldVal; }
+  });
+  (latest.removed || []).forEach(x => {
+    rows.push({ ko: "", en: x.key, type: "", sample: x.val, common: false, diffMark: "삭제" });
+  });
+  return rows;
+}
+/* diffHistory 한 항목({at, added, removed, changed})을 diffRowHtml()이
+   그대로 그릴 수 있는 {key, oldVal, newVal, mark} 모양으로 펼친다 — "이미
+   등록된 태그입니다" 확인창에서 쓰던 렌더러를 이력 모달에서도 그대로 쓴다. */
+function historyToDiffRows(h) {
+  const rows = [];
+  (h.added || []).forEach(x => rows.push({ key: x.key, oldVal: "", newVal: x.val, mark: "추가" }));
+  (h.removed || []).forEach(x => rows.push({ key: x.key, oldVal: x.val, newVal: "", mark: "삭제" }));
+  (h.changed || []).forEach(x => rows.push({ key: x.key, oldVal: x.oldVal, newVal: x.newVal, mark: "변경" }));
+  return rows.sort((a, b) => a.key.localeCompare(b.key));
+}
+function fmtHistDate(ms) {
+  const d = new Date(ms);
+  const pad = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "." + pad(d.getMonth() + 1) + "." + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+function openTagHistoryModal(tagId) {
+  const n = curNode(); if (!n) return;
+  const t = n.tags.find(x => x.id === tagId); if (!t) return;
+  const hist = (t.diffHistory || []).slice().reverse();
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass" style="width:min(560px,100%)" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("loop") + "<h3>변경 이력</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body" style="gap:12px">' +
+        (hist.length
+          ? hist.map(h => '<div>' +
+              '<div class="hint" style="margin-bottom:4px">' + esc(fmtHistDate(h.at)) + " 덮어쓰기</div>" +
+              '<div class="difftable">' + historyToDiffRows(h).map(diffRowHtml).join("") + "</div>" +
+            "</div>").join("")
+          : '<div class="empty">' + ico("loop") + "<div>기록된 변경 이력이 없습니다</div></div>") +
+      "</div>" +
+      '<div class="modal-foot"><div class="spacer"></div><button class="btn" data-x>닫기</button></div>' +
+    "</div></div>";
+  root.addEventListener("click", e => { if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal(); });
 }
 function sampleRowsOf(t) { return Object.entries(TSAMPLE_KEYS).filter(([k]) => t[k]); }
 /* 태깅 설정(우측 패널) 카드 안에서는 접혔다 펼쳐지는 아코디언 + 한 줄에 하나씩 쌓아서 보여준다 */
@@ -153,24 +218,32 @@ function openTagMovePicker(tagId) {
           '<button class="btn sm on" type="button" data-mode="move">' + ico("share", "xs") + "이동</button>" +
           '<button class="btn sm" type="button" data-mode="copy">' + ico("copy", "xs") + "복사</button>" +
         "</div>" +
-        '<input class="field" id="tmqInput" placeholder="페이지 이름·경로로 찾기 (모든 여정지도)">' +
+        '<div style="display:flex; gap:8px">' +
+          '<select class="field" id="tmqBoard" style="max-width:180px">' + boardOptions("all") + "</select>" +
+          '<input class="field" id="tmqInput" placeholder="페이지 이름·경로로 찾기" style="flex:1">' +
+        "</div>" +
         '<div id="tmqResults" class="qs-results"></div>' +
       "</div>" +
     "</div></div>";
-  const inp = $("#tmqInput"), out = $("#tmqResults");
+  const inp = $("#tmqInput"), out = $("#tmqResults"), boardSel = $("#tmqBoard");
   const render = () => {
     const q = inp.value.toLowerCase().trim();
+    const onlyBi = boardSel.value === "all" ? null : +boardSel.value;
     const rows = [];
-    state.boards.forEach(b => b.nodes.forEach(n => {
-      if (n === srcNode) return;   // 자기 자신은 옮길 대상이 될 수 없다
-      if (q && (n.name + " " + (n.path || "")).toLowerCase().indexOf(q) < 0) return;
-      rows.push({ n, b });
-    }));
+    state.boards.forEach((b, bi) => {
+      if (onlyBi !== null && bi !== onlyBi) return;   // 선택한 여정지도만
+      b.nodes.forEach(n => {
+        if (n === srcNode) return;   // 자기 자신은 옮길 대상이 될 수 없다
+        if (q && (n.name + " " + (n.path || "")).toLowerCase().indexOf(q) < 0) return;
+        rows.push({ n, b });
+      });
+    });
     if (!rows.length) { out.innerHTML = '<div class="empty">' + ico("search") + "<div>일치하는 페이지가 없습니다</div></div>"; return; }
     out.innerHTML = rows.slice(0, 50).map(({ n, b }) =>
       qsRow("map", n.name, b.name + (n.path ? " · " + n.path : ""), state.boards.indexOf(b), n.id)).join("");
   };
   inp.addEventListener("input", render);
+  boardSel.addEventListener("change", render);
   $("#tagMoveMode").addEventListener("click", e => {
     const b = e.target.closest("[data-mode]"); if (!b) return;
     mode = b.dataset.mode;
@@ -444,6 +517,7 @@ function renderTagPanel() {
     return '<div class="card tagcard' + (expanded ? " expanded" : "") + '" data-tag="' + t.id + '">' +
       '<div class="card-top">' + platChips(platformsOf(t)) +
         '<div class="spacer"></div>' +
+        ((t.diffHistory || []).length ? '<button class="btn icon sm" data-tag-history="' + t.id + '" title="변경 이력 보기">' + ico("loop", "xs") + "</button>" : "") +
         (canEdit() ? '<button class="btn icon sm edit-only" data-tag-move="' + t.id + '" title="다른 페이지로 이동·복사">' + ico("share", "xs") + "</button>" : "") +
         acts("tag", t.id) + "</div>" +
       '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
@@ -459,7 +533,7 @@ function renderTagPanel() {
           (tagArea(t) ? "<span>영역 <span class=\"mono\" style=\"font-size:10.5px\">" + esc(tagArea(t)) + "</span></span>" : "") +
         "</div>" +
         (t.channels && t.channels.length ? '<div class="rowseg">' + tchanChips(t.channels) + "</div>" : "") +
-        propLines(effectiveProps(t)) +
+        propLines(tagPropsWithDiff(t)) +
         (t.note ? '<div class="hint">' + esc(t.note) + "</div>" : "") +
         sampleAccordion(t)
       : "") +
@@ -652,8 +726,18 @@ function addDetectedTag(key, name, ev) {
   if (!existing) return editTag(null, { platforms: [key], eventEn: name, props });
 
   const oldMap = {}; (existing.props || []).forEach(p => { if (p.en) oldMap[p.en] = p.sample || ""; });
-  const newMap = Object.assign({}, (ev && ev.properties) || {});
+  const newMap = {}; props.forEach(p => { if (p.en) newMap[p.en] = p.sample || ""; });   // 실제로 저장될 값(props) 기준으로 비교해야 표시가 어긋나지 않는다
   const diffs = diffProps(oldMap, newMap);
+  /* 덮어쓰기를 실제로 확정하면(아래 data-ow-confirm) 이 결과를 t.diffHistory에
+     한 줄 추가한다(최근 20개까지) — 최근 것은 일주일간 태그 카드 속성 줄에
+     그대로 (추가)/(삭제)/(변경)으로 보여주고, "이력" 버튼으로는 언제든
+     지난 것까지 다 볼 수 있다. */
+  const added = diffs.filter(d => d.mark === "추가").map(d => ({ key: d.key, val: d.newVal }));
+  const removed = diffs.filter(d => d.mark === "삭제").map(d => ({ key: d.key, val: d.oldVal }));
+  const changed = diffs.filter(d => d.mark === "변경").map(d => ({ key: d.key, oldVal: d.oldVal, newVal: d.newVal }));
+  const diffHistory = (added.length || removed.length || changed.length)
+    ? (existing.diffHistory || []).concat([{ at: Date.now(), added, removed, changed }]).slice(-DIFF_HISTORY_MAX)
+    : (existing.diffHistory || []);
   const root = modalHost();
   root.innerHTML =
     '<div class="scrim"><div class="modal glass" style="width:min(560px,100%)" role="dialog" aria-modal="true">' +
@@ -674,7 +758,7 @@ function addDetectedTag(key, name, ev) {
     if (e.target.closest("[data-ow-new]")) { closeModal(); return editTag(null, { platforms: [key], eventEn: name, props }); }
     if (e.target.closest("[data-ow-confirm]")) {
       closeModal();
-      return editTag(existing.id, { platforms: Array.from(new Set(platformsOf(existing).concat([key]))), eventEn: name, props });
+      return editTag(existing.id, { platforms: Array.from(new Set(platformsOf(existing).concat([key]))), eventEn: name, props, diffHistory });
     }
   });
 }
@@ -728,6 +812,8 @@ function initPanels() {
     if (mg) return mergeTags(mg.dataset.mergeTags.split(","));
     const mv = e.target.closest("[data-tag-move]");
     if (mv) return openTagMovePicker(mv.dataset.tagMove);
+    const hi = e.target.closest("[data-tag-history]");
+    if (hi) return openTagHistoryModal(hi.dataset.tagHistory);
     if (e.target.closest("[data-har-pick]")) return pickHarFile();
     if (e.target.closest("[data-detect-raw]")) { showDetectRaw = !showDetectRaw; return renderTagPanel(); }
     const da = e.target.closest("[data-detect-add]");
