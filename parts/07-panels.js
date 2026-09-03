@@ -324,6 +324,7 @@ function pasteTagLineValue(text, label) {
   return v.replace(/\s+$/, "");
 }
 function parsePasteTagText(text) {
+  const platformRaw = pasteTagLineValue(text, "플랫폼");
   const link = pasteTagLineValue(text, "링크");
   const linkKo = pasteTagLineValue(text, "링크한글명");
   const eventEn = pasteTagLineValue(text, "이벤트명");
@@ -333,12 +334,20 @@ function parsePasteTagText(text) {
   if (!eventEn && !action && !propsRaw) return null;   // 알아볼 수 있는 줄이 하나도 없으면 이 형식이 아니다
   let path = "";
   try { path = link ? new URL(link).pathname : ""; } catch (e) {}
-  return {
-    eventEn: eventEn, action: action, path: path,
-    trigger: keyByLabel(TRIGGER, triggerRaw, "click"),
-    props: parsePropsStr(propsRaw),
-    note: [linkKo, link].filter(Boolean).join(" · ")
-  };
+  /* "플랫폼: amplitude" 처럼 크롤러가 어느 업체에서 감지했는지 같이 적어
+     주면, PLAT의 키(amplitude/braze/ga4) 또는 한글 표시명 둘 다 인식해서
+     플랫폼 체크박스를 그 값으로 자동 선택한다 — 못 알아보면 기본값(폼의
+     amplitude)을 그대로 둔다. */
+  const platforms = platformsFromStr(platformRaw);
+  return Object.assign(
+    {
+      eventEn: eventEn, action: action, path: path,
+      trigger: keyByLabel(TRIGGER, triggerRaw, "click"),
+      props: parsePropsStr(propsRaw),
+      note: [linkKo, link].filter(Boolean).join(" · ")
+    },
+    platforms.length ? { platforms: platforms } : {}
+  );
 }
 function openPasteTagModal() {
   const n = curNode(); if (!n || !canEdit()) return;
@@ -349,7 +358,7 @@ function openPasteTagModal() {
       '<div class="modal-body">' +
         '<p class="hint">크롤러 프로그램에서 "복사" 버튼으로 복사한 내용을 아래에 붙여넣으세요(Ctrl+V).</p>' +
         '<textarea class="field mono" id="pasteTagArea" rows="8" placeholder="' +
-          esc("링크: https://...\n링크한글명: 유사상품추천 영역\n이벤트명: pkg_select_prod_main\n태그명: 유사상품추천 영역 內 상품 클릭\n트리거: 클릭\n속성: 로그인여부 :: login :: 불리언 :: true | 웹회원번호 :: webCustNo :: 문자열 :: 12017329991") +
+          esc("플랫폼: amplitude\n링크: https://...\n링크한글명: 유사상품추천 영역\n이벤트명: pkg_select_prod_main\n태그명: 유사상품추천 영역 內 상품 클릭\n트리거: 클릭\n속성: 로그인여부 :: login :: 불리언 :: true | 웹회원번호 :: webCustNo :: 문자열 :: 12017329991") +
         '" style="resize:vertical"></textarea>' +
       "</div>" +
       '<div class="modal-foot"><button class="btn" data-x>취소</button><div class="spacer"></div>' +
