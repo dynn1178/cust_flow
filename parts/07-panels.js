@@ -571,7 +571,6 @@ let showDetectRaw = false;
 function renderTagPanel() {
   const n = curNode(), box = $("#tagList");
   $("#tagCount").textContent = n ? n.tags.length : 0;
-  renderTagJumpSelect();
   const detectHtml = tagDetectionHtml(n);
   const dupeHtml = duplicateTagsHtml(n);
   if (!n) { box.innerHTML = '<div class="empty">' + ico("tag") + "<div>페이지를 선택하세요</div></div>"; updateToggleAllBtn(n); return; }
@@ -588,13 +587,18 @@ function renderTagPanel() {
     return '<div class="card tagcard' + (expanded ? " expanded" : "") + '" data-tag="' + t.id + '">' +
       '<div class="card-top">' + platChips(platformsOf(t)) +
         '<div class="spacer"></div>' +
-        ((t.diffHistory || []).length ? '<button class="btn icon sm" data-tag-history="' + t.id + '" title="변경 이력 보기">' + ico("loop", "xs") + "</button>" : "") +
-        (canEdit() ? '<button class="btn icon sm edit-only" data-tag-move="' + t.id + '" title="다른 페이지로 이동·복사">' + ico("share", "xs") + "</button>" : "") +
+        /* 수정·삭제 아이콘과 똑같이 "마우스를 올렸을 때만" 보이도록 같은
+           .card-acts 안에 넣는다 — 여러 개를 만들어도 .card:hover 규칙이
+           클래스로 걸려 있어 전부 똑같이 나타난다. */
+        '<div class="card-acts">' +
+          ((t.diffHistory || []).length ? '<button class="btn icon sm" data-tag-history="' + t.id + '" title="변경 이력 보기">' + ico("loop", "xs") + "</button>" : "") +
+          (canEdit() ? '<button class="btn icon sm edit-only" data-tag-move="' + t.id + '" title="다른 페이지로 이동·복사">' + ico("share", "xs") + "</button>" : "") +
+        "</div>" +
         acts("tag", t.id) + "</div>" +
       '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
         '<span class="tagcaret">▸</span>' +
-        '<span class="evt">' + esc(t.action || "(태그명 없음)") +
-          (tagEventEn(t) ? ' <em class="mono" style="font-style:normal; font-size:10.5px; color:var(--ink-3)">' + esc(tagEventEn(t)) + "</em>" : "") +
+        '<span class="evt">' + esc(tagEventEn(t) || "(이벤트명 없음)") +
+          (t.action ? ' <em class="mono" style="font-style:normal; font-size:10.5px; color:var(--ink-3)">[' + esc(t.action) + "]</em>" : "") +
         "</span>" +
         '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
       "</button>" +
@@ -624,13 +628,44 @@ function updateToggleAllBtn(n) {
   btn.innerHTML = ico(allExpanded ? "density" : "grid", "xs") + (allExpanded ? "모두 접기" : "모두 펼치기");
   btn.disabled = !tags.length;
 }
-function renderTagJumpSelect() {
-  const sel = $("#tagJumpSelect"); if (!sel) return;
-  const cur = sel.value;
+/* "등록된 태그로 이동" — 네이티브 <select>는 검색이 안 되고 플랫폼도 못
+   보여줘서, 검색창 + 목록으로 된 작은 창으로 바꿨다(openTagMovePicker와
+   같은 틀). 문서 전체(모든 여정지도)의 태그를 대상으로 한다. */
+function openTagJumpPicker() {
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass qsearch" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("tag") + "<h3>등록된 태그로 이동</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body" style="gap:8px">' +
+        '<input class="field" id="tjqInput" placeholder="태그명·이벤트명·페이지·여정지도로 찾기">' +
+        '<div id="tjqResults" class="qs-results"></div>' +
+      "</div>" +
+    "</div></div>";
+  const inp = $("#tjqInput"), out = $("#tjqResults");
   const all = allTags();
-  sel.innerHTML = '<option value="">등록된 태그로 이동…</option>' +
-    all.map(({ t, n, b }) => '<option value="' + t.id + '">' + esc(b.name) + " · " + esc(n.name) + " · " + esc(t.action || tagEventEn(t) || "(이름 없음)") + "</option>").join("");
-  if (all.some(x => x.t.id === cur)) sel.value = cur; else sel.value = "";
+  const render = () => {
+    const q = inp.value.toLowerCase().trim();
+    const rows = all.filter(({ t, n, b }) => !q ||
+      (platformsToStr(platformsOf(t)) + " " + (t.action || "") + " " + tagEventEn(t) + " " + n.name + " " + b.name).toLowerCase().indexOf(q) >= 0);
+    if (!rows.length) { out.innerHTML = '<div class="empty">' + ico("search") + "<div>일치하는 태그가 없습니다</div></div>"; return; }
+    out.innerHTML = rows.slice(0, 100).map(({ t, n, b }) =>
+      '<button class="qs-row" type="button" data-tag="' + t.id + '">' + platChips(platformsOf(t)) +
+        '<span class="qs-t">' + esc(t.action || tagEventEn(t) || "(이름 없음)") + "</span>" +
+        '<span class="qs-s">' + esc(b.name) + " · " + esc(n.name) + "</span></button>").join("");
+  };
+  inp.addEventListener("input", render);
+  out.addEventListener("click", e => {
+    const row = e.target.closest("[data-tag]"); if (!row) return;
+    closeModal();
+    jumpToTag(row.dataset.tag);
+  });
+  root.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.stopPropagation(); closeModal(); }
+    if (e.key === "Enter") { const first = $(".qs-row", out); if (first) first.click(); }
+  });
+  root.addEventListener("click", e => { if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal(); });
+  render();
+  setTimeout(() => inp.focus(), 0);
 }
 function jumpToTag(tagId) {
   const hit = allTags().find(x => x.t.id === tagId); if (!hit) return;
@@ -910,9 +945,7 @@ function initPanels() {
     n.tags.forEach(t => { if (allExpanded) expandedTags.delete(t.id); else expandedTags.add(t.id); });
     renderTagPanel();
   });
-  $("#tagJumpSelect").addEventListener("change", e => {
-    const id = e.target.value; if (id) jumpToTag(id);
-  });
+  $("#tagJumpSelect").addEventListener("click", () => openTagJumpPicker());
   $("#tagList").addEventListener("click", e => {
     const mg = e.target.closest("[data-merge-tags]");
     if (mg) return mergeTags(mg.dataset.mergeTags.split(","));

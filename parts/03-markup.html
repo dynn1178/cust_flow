@@ -213,7 +213,9 @@
           <button class="btn sm edit-only" id="btnPasteTag" title="크롤러 등 외부 도구에서 복사한 태그 내용을 붙여넣어 바로 채웁니다"><svg class="ico xs"><use href="#i-copy"/></svg>붙여넣기로 추가</button>
         </div>
         <div class="pane-subhead">
-          <select class="field" id="tagJumpSelect"><option value="">등록된 태그로 이동…</option></select>
+          <button class="field" id="tagJumpSelect" type="button" style="display:flex; align-items:center; gap:6px; text-align:left; cursor:pointer; color:var(--ink-3)">
+            <svg class="ico xs"><use href="#i-search"/></svg>등록된 태그로 이동…
+          </button>
         </div>
         <div class="pane-body" id="tagList"></div>
       </aside>
