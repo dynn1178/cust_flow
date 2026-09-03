@@ -53,11 +53,11 @@ function propLines(props) {
   }).join("") + "</div>";
 }
 /* 덮어쓰기로 속성이 바뀔 때마다 t.diffHistory에 한 줄씩 쌓아 둔다(최근
-   3개까지) — 최신 것만 남기지 않고 쌓아 두는 이유는 "이력" 버튼으로 지난
+   10개까지) — 최신 것만 남기지 않고 쌓아 두는 이유는 "이력" 버튼으로 지난
    변경들을 나중에도 다시 볼 수 있어야 하기 때문. 카드에 (추가)/(삭제)/
    (변경) 표시는 그중 가장 최근 것만, 그것도 저장한 지 일주일 안쪽일 때만
    보여준다 — 오래된 변경까지 계속 강조돼 있으면 오히려 잡음이 된다. */
-const DIFF_HISTORY_MAX = 3;
+const DIFF_HISTORY_MAX = 10;
 const DIFF_BADGE_MS = 7 * 24 * 60 * 60 * 1000;
 function tagPropsWithDiff(t) {
   const rows = effectiveProps(t).map(p => Object.assign({}, p));
