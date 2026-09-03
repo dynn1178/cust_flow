@@ -4495,7 +4495,9 @@ function renderTagPanel() {
         acts("tag", t.id) + "</div>" +
       '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
         '<span class="tagcaret">▸</span>' +
-        '<span class="evt">' + esc(t.action || "(태그명 없음)") + "</span>" +
+        '<span class="evt">' + esc(t.action || "(태그명 없음)") +
+          (tagEventEn(t) ? ' <em class="mono" style="font-style:normal; font-size:10.5px; color:var(--ink-3)">' + esc(tagEventEn(t)) + "</em>" : "") +
+        "</span>" +
         '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
       "</button>" +
       (expanded ?
