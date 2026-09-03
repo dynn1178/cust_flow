@@ -133,7 +133,7 @@ function perfBadge(code, mode) {
     '<i class="' + (d > 0 ? "up" : "dn") + (sig ? " sig" : "") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
   const short = p.month.slice(2).replace("-", "");                 // 2026-07 → 2607
   const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR" +
-    (p.prevMonth ? " · " + p.prevMonth + " 대비 증감 (진한 화살표 = 표본을 감안해도 의미 있는 변화)" : "");
+    (p.prevMonth ? " · " + p.prevMonth + " 대비 증감" : "");
   if (mode === "line") {
     /* 값(퍼센트)은 검정으로 통일해서 그냥 수치로 읽히게 하고, 증감(화살표)만
        방향에 따라 국내 관행대로 상승=빨강·하락=파랑으로 색을 준다 — 예전엔

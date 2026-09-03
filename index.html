@@ -368,11 +368,11 @@ select.field{cursor:pointer}
    증감(화살표) 쪽에서만 방향을 알려준다 */
 .perfline .ctr,.perfline .cvr{color:var(--ink)}
 .perfline .sep{color:var(--ink-3); opacity:.6}
-/* 국내 관행대로 상승은 빨강, 하락은 파랑 — 표본을 감안해도 의미 있는
-   변화만 진하게(sig), 흐린 화살표는 노이즈일 수 있다는 뜻 */
+/* 국내 관행대로 상승은 빨강, 하락은 파랑 — 통계적 유의성(sig)과 무관하게
+   항상 또렷한 색으로 보여준다(예전엔 유의하지 않으면 45% 흐리게 처리했는데
+   그 결과 파란색이 지나치게 옅어 보였다) */
 .perfline .pf-deltas{font-size:.72em; font-weight:400}
-.perfline i{font-style:normal; font-weight:700; opacity:.45; white-space:nowrap}
-.perfline i.sig{opacity:1}
+.perfline i{font-style:normal; font-weight:700; white-space:nowrap}
 .perfline i.up{color:#e0483f}
 .perfline i.dn{color:#1a54d6}
 /* 예전엔 margin-left:auto로 오른쪽 끝까지 밀어 붙였는데, 그러면 한 줄에
@@ -7391,7 +7391,7 @@ function perfBadge(code, mode) {
     '<i class="' + (d > 0 ? "up" : "dn") + (sig ? " sig" : "") + '">' + (d > 0 ? "▲" : "▼") + Math.abs(d).toFixed(1) + "</i>");
   const short = p.month.slice(2).replace("-", "");                 // 2026-07 → 2607
   const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR" +
-    (p.prevMonth ? " · " + p.prevMonth + " 대비 증감 (진한 화살표 = 표본을 감안해도 의미 있는 변화)" : "");
+    (p.prevMonth ? " · " + p.prevMonth + " 대비 증감" : "");
   if (mode === "line") {
     /* 값(퍼센트)은 검정으로 통일해서 그냥 수치로 읽히게 하고, 증감(화살표)만
        방향에 따라 국내 관행대로 상승=빨강·하락=파랑으로 색을 준다 — 예전엔
