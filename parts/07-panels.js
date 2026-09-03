@@ -635,12 +635,13 @@ function updateToggleAllBtn(n) {
 function openTagJumpPicker() {
   const anchor = $("#tagJumpSelect");
   const root = $("#menuRoot");
-  root.innerHTML = '<div class="menu glass" style="width:360px">' +
+  const W = Math.min(560, innerWidth - 16);
+  root.innerHTML = '<div class="menu glass" style="width:' + W + 'px">' +
     '<input class="field" id="tjqInput" placeholder="태그명·이벤트명·페이지·여정지도로 찾기" style="margin-bottom:4px">' +
     '<div id="tjqResults" style="max-height:320px; overflow:auto"></div>' +
   "</div>";
   const m = $(".menu", root), r = anchor.getBoundingClientRect();
-  m.style.left = clamp(r.left, 8, innerWidth - 380) + "px";
+  m.style.left = clamp(r.left, 8, innerWidth - W - 8) + "px";
   m.style.top = Math.min(r.bottom + 6, innerHeight - 10) + "px";
 
   const inp = $("#tjqInput"), out = $("#tjqResults");
@@ -651,9 +652,9 @@ function openTagJumpPicker() {
       (platformsToStr(platformsOf(t)) + " " + (t.action || "") + " " + tagEventEn(t) + " " + n.name + " " + b.name).toLowerCase().indexOf(q) >= 0);
     out.innerHTML = rows.length ? rows.slice(0, 100).map(({ t, n, b }) =>
       '<button class="mi" type="button" data-tag="' + t.id + '">' + platChips(platformsOf(t)) +
-        '<span style="font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:130px">' +
+        '<span style="font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1">' +
           esc(t.action || tagEventEn(t) || "(이름 없음)") + "</span>" +
-        '<span class="cnt" style="font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px">' +
+        '<span class="cnt" style="font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:44%; flex:none">' +
           esc(b.name) + " · " + esc(n.name) + "</span></button>").join("")
       : '<div class="mi" style="cursor:default; color:var(--ink-3)">일치하는 태그가 없습니다</div>';
   };

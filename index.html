@@ -1934,6 +1934,19 @@ function autoSidePair(ra, rb) {
   if (Math.abs(dx) * (ra.h + rb.h) >= Math.abs(dy) * (ra.w + rb.w)) return dx >= 0 ? ["e", "w"] : ["w", "e"];
   return dy >= 0 ? ["s", "n"] : ["n", "s"];
 }
+/* 곡선이 카드 자기 자신 위로 다시 들어오는지 볼 때 쓴다 — r.fullH가 있으면
+   (태그·캠페인 목록까지 늘어진 카드) 그 바닥까지를 카드 영역으로 본다. */
+function rectContainsPt(r, x, y) {
+  const top = r.y, bottom = r.y + (r.fullH != null ? r.fullH : r.h);
+  return x > r.x + 1 && x < r.x + r.w - 1 && y > top + 1 && y < bottom - 1;
+}
+function bezierPoint(p0, c1, c2, p1, t) {
+  const mt = 1 - t, mt2 = mt * mt, t2 = t * t;
+  return {
+    x: mt2 * mt * p0.x + 3 * mt2 * t * c1.x + 3 * mt * t2 * c2.x + t2 * t * p1.x,
+    y: mt2 * mt * p0.y + 3 * mt2 * t * c1.y + 3 * mt * t2 * c2.y + t2 * t * p1.y
+  };
+}
 function edgeGeom(e) {
   const a = nodeById(e.from), b = nodeById(e.to);
   if (!a || !b) return null;
@@ -2026,8 +2039,26 @@ function pathFor(e) {
       const s = NSZ[id];
       return s && s.frameH ? Math.max(0, s.h - s.frameH) : 0;
     };
-    const c1 = clamp(Math.max(dist * 0.42, listExtra(e.from, g.s1) + 34), 40, 220);
-    const c2 = clamp(Math.max(dist * 0.42, listExtra(e.to, g.s2) + 34), 40, 220);
+    let c1 = clamp(Math.max(dist * 0.42, listExtra(e.from, g.s1) + 34), 40, 220);
+    let c2 = clamp(Math.max(dist * 0.42, listExtra(e.to, g.s2) + 34), 40, 220);
+    /* 계산한 곡선이 (다른 카드가 아니라) 자기 자신의 출발·도착 카드를 다시
+       가로질러 들어가는지만 확인한다 — 캔버스의 다른 카드는 검사하지 않아
+       가볍다(부딪혀도 상관없다는 전제). 걸리면 그만큼 더 빠져나간 뒤에
+       휘도록 늘려서 다시 확인 — 몇 번 반복해도 안 풀리면 그 상태로 둔다. */
+    for (let i = 0; i < 4; i++) {
+      const cp1 = { x: g.p1.x + g.n1.x * c1, y: g.p1.y + g.n1.y * c1 };
+      const cp2 = { x: g.p2.x + g.n2.x * c2, y: g.p2.y + g.n2.y * c2 };
+      let hitA = false, hitB = false;
+      for (let s = 1; s <= 8; s++) {
+        const t = s / 9;
+        const pt = bezierPoint(g.p1, cp1, cp2, g.p2, t);
+        if (t < 0.5 && rectContainsPt(g.ra, pt.x, pt.y)) hitA = true;
+        if (t > 0.5 && rectContainsPt(g.rb, pt.x, pt.y)) hitB = true;
+      }
+      if (!hitA && !hitB) break;
+      if (hitA) c1 = Math.min(c1 * 1.6, 280);
+      if (hitB) c2 = Math.min(c2 * 1.6, 280);
+    }
     return "M " + g.p1.x + " " + g.p1.y +
       " C " + (g.p1.x + g.n1.x * c1) + " " + (g.p1.y + g.n1.y * c1) +
       " " + (g.p2.x + g.n2.x * c2) + " " + (g.p2.y + g.n2.y * c2) +
@@ -4558,12 +4589,13 @@ function updateToggleAllBtn(n) {
 function openTagJumpPicker() {
   const anchor = $("#tagJumpSelect");
   const root = $("#menuRoot");
-  root.innerHTML = '<div class="menu glass" style="width:360px">' +
+  const W = Math.min(560, innerWidth - 16);
+  root.innerHTML = '<div class="menu glass" style="width:' + W + 'px">' +
     '<input class="field" id="tjqInput" placeholder="태그명·이벤트명·페이지·여정지도로 찾기" style="margin-bottom:4px">' +
     '<div id="tjqResults" style="max-height:320px; overflow:auto"></div>' +
   "</div>";
   const m = $(".menu", root), r = anchor.getBoundingClientRect();
-  m.style.left = clamp(r.left, 8, innerWidth - 380) + "px";
+  m.style.left = clamp(r.left, 8, innerWidth - W - 8) + "px";
   m.style.top = Math.min(r.bottom + 6, innerHeight - 10) + "px";
 
   const inp = $("#tjqInput"), out = $("#tjqResults");
@@ -4574,9 +4606,9 @@ function openTagJumpPicker() {
       (platformsToStr(platformsOf(t)) + " " + (t.action || "") + " " + tagEventEn(t) + " " + n.name + " " + b.name).toLowerCase().indexOf(q) >= 0);
     out.innerHTML = rows.length ? rows.slice(0, 100).map(({ t, n, b }) =>
       '<button class="mi" type="button" data-tag="' + t.id + '">' + platChips(platformsOf(t)) +
-        '<span style="font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:130px">' +
+        '<span style="font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1">' +
           esc(t.action || tagEventEn(t) || "(이름 없음)") + "</span>" +
-        '<span class="cnt" style="font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px">' +
+        '<span class="cnt" style="font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:44%; flex:none">' +
           esc(b.name) + " · " + esc(n.name) + "</span></button>").join("")
       : '<div class="mi" style="cursor:default; color:var(--ink-3)">일치하는 태그가 없습니다</div>';
   };
