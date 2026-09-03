@@ -332,20 +332,22 @@ function drawEdgeHandles() {
   if (!e || !canEdit()) { if (box.innerHTML) box.innerHTML = ""; return; }
   const g = edgeGeom(e); if (!g) { box.innerHTML = ""; return; }
   const pts = [g.p1].concat(g.wps, [g.p2]);
-  const isHeightOnly = g.wps.length <= 1;                 // 점이 0개(자동) 또는 1개(높이 고정)일 때만 "높이 점"으로 다룬다
+  const isDefaultCurve = e.route !== "ortho" && e.route !== "line";
+  const isHeightOnly = isDefaultCurve && g.wps.length <= 1; // 기본 곡선에서 점이 0개(자동) 또는 1개(높이 고정)일 때만 "높이 점"으로 다룬다
   let h = "";
   g.wps.forEach((p, i) => {
-    h += '<circle class="wp' + (isHeightOnly ? " hgt" : "") + '" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (isHeightOnly ? 7 : 6) + '"><title>드래그해서 높이 조절 · 더블클릭하면 자동으로</title></circle>';
+    h += '<circle class="wp' + (isHeightOnly ? " hgt" : "") + '" data-wp="' + i + '" cx="' + p.x + '" cy="' + p.y + '" r="' + (isHeightOnly ? 7 : 6) + '"><title>' +
+      (isHeightOnly ? "드래그해서 높이 조절 · 더블클릭하면 자동으로" : "드래그해서 위치 조절 · 더블클릭하면 점 삭제") + "</title></circle>";
     /* 높이를 고정한 뒤엔 처음 쓰는 사람도 바로 알아볼 수 있게, 더블클릭 대신
        누르기만 하면 되는 × 되돌리기 버튼을 점 옆에 항상 띄워 둔다. */
-    if (g.wps.length === 1) {
+    if (isHeightOnly && g.wps.length === 1) {
       h += '<g class="wp-reset" data-wpreset="' + i + '" transform="translate(' + (p.x + 13) + "," + (p.y - 13) + ')">' +
         '<circle r="8"></circle><path d="M-3 -3 L3 3 M3 -3 L-3 3"></path><title>자동 높이로 되돌리기</title></g>';
     }
   });
   for (let i = 0; i < pts.length - 1; i++) {
     let m;
-    const heightAdd = pts.length === 2;                   // 아직 점이 없는 구간 — 실제 곡선 위의 중점을 쓴다(직선 중점이 아니라)
+    const heightAdd = isDefaultCurve && pts.length === 2;  // 아직 점이 없는 기본 곡선 구간 — 실제 곡선 위의 중점을 쓴다(직선 중점이 아니라)
     if (heightAdd) {
       const rec = EDGE_EL[e.id], L = rec && rec.wire && rec.wire.getTotalLength();
       m = L ? rec.wire.getPointAtLength(L / 2) : { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
@@ -354,7 +356,8 @@ function drawEdgeHandles() {
     }
     h += '<circle class="wpadd' + (heightAdd ? " hgt" : "") + '" data-add="' + i + '"' +
       (heightAdd ? ' data-hgt="1" data-lockx="' + m.x + '"' : "") +
-      ' cx="' + m.x + '" cy="' + m.y + '" r="' + (heightAdd ? 7 : 5) + '"><title>드래그해서 높이 고정</title></circle>';
+      ' cx="' + m.x + '" cy="' + m.y + '" r="' + (heightAdd ? 7 : 5) + '"><title>' +
+      (heightAdd ? "드래그해서 높이 고정" : "드래그해서 선을 나누고 점 추가") + "</title></circle>";
   }
   box.innerHTML = h;
 }
@@ -722,12 +725,15 @@ function initFlow() {
       e.preventDefault(); e.stopPropagation();
       const ed = edgeById(sel.edge);
       let idx, lockX = null;
-      /* 아직 손대지 않은 기본(자동) 경로의 노란 점 — 좌우로는 움직이지 않고
+      /* 아직 손대지 않은 기본(자동) 곡선 경로의 노란 점 — 좌우로는 움직이지 않고
          높이(위·아래)만 고정한다. 점이 이미 하나 있으면 그 점도 계속 같은
-         규칙을 따른다(점 하나짜리 경로 = "높이 고정" 용도로 취급). */
+         규칙을 따른다(점 하나짜리 경로 = "높이 고정" 용도로 취급). 이 관례는
+         기본 곡선 전용이다 — ortho/line 경로는 애초에 좌우로 꺾어 돌아가는
+         용도라 X를 잠그면 그 점을 영영 좌우로 옮길 수 없게 되어 버린다. */
+      const isDefaultCurve = ed.route !== "ortho" && ed.route !== "line";
       if (wp) {
         idx = +wp.dataset.wp;
-        if (ed.points.length === 1) lockX = ed.points[idx].x;
+        if (isDefaultCurve && ed.points.length === 1) lockX = ed.points[idx].x;
         const key = sel.edge + ":" + idx, now = Date.now();
         if (lastWpTap.key === key && now - lastWpTap.t < 400) {   /* 짧게 두 번 = 더블클릭 → 점 삭제(자동으로) */
           lastWpTap = { key: null, t: 0 };
