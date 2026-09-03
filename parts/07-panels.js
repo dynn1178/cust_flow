@@ -353,7 +353,7 @@ function openPasteTagModal() {
         '" style="resize:vertical"></textarea>' +
       "</div>" +
       '<div class="modal-foot"><button class="btn" data-x>취소</button><div class="spacer"></div>' +
-        '<button class="btn primary" data-paste-fill">채우기</button></div>' +
+        '<button class="btn primary" type="button" data-paste-fill>채우기</button></div>' +
     "</div></div>";
   root.addEventListener("click", e => {
     if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
