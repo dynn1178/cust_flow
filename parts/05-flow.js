@@ -78,18 +78,43 @@ function autoSide(r, target) {
   if (Math.abs(dx) * r.h >= Math.abs(dy) * r.w) return dx >= 0 ? "e" : "w";
   return dy >= 0 ? "s" : "n";
 }
+/* 두 카드가 겹치거나 나란히 붙어 있을 때, 양쪽 연결점을 각자 따로(자기
+   중심에서 상대 중심까지의 각도만 보고) 고르면 서로 마주보지 않는 변을
+   고르는 경우가 생긴다 — 그러면 선이 상대 카드를 가로질러 들어갔다 나오면서
+   화살표가 카드 안쪽으로 숨어 안 보이게 된다(카드가 겹쳐 있을 때 특히 흔함).
+   그래서 waypoint(노란 점)로 손수 방향을 잡지 않은 기본 연결은, 두 카드의
+   위치 관계를 같이 보고 "겹치는 축의 반대쪽" 변끼리 마주보게 짝지어 고른다:
+   세로로는 겹치는데(같은 높이대) 가로로 떨어져 있으면 좌우 변끼리,
+   가로로는 겹치는데 세로로 떨어져 있으면 위아래 변끼리. 둘 다 겹치거나
+   (완전히 포개짐) 둘 다 안 겹치면(대각선 배치) 기존 각도 판정을 그대로 쓴다. */
+function overlapsRange(a1, a2, b1, b2) { return a1 < b2 && b1 < a2; }
+function autoSidePair(ra, rb) {
+  const overlapY = overlapsRange(ra.y, ra.y + ra.h, rb.y, rb.y + rb.h);
+  const overlapX = overlapsRange(ra.x, ra.x + ra.w, rb.x, rb.x + rb.w);
+  const cxA = ra.x + ra.w / 2, cxB = rb.x + rb.w / 2;
+  const cyA = ra.midY != null ? ra.midY : ra.y + ra.h / 2, cyB = rb.midY != null ? rb.midY : rb.y + rb.h / 2;
+  if (overlapY && !overlapX) return cxB >= cxA ? ["e", "w"] : ["w", "e"];
+  if (overlapX && !overlapY) return cyB >= cyA ? ["s", "n"] : ["n", "s"];
+  const dx = cxB - cxA, dy = cyB - cyA;
+  if (Math.abs(dx) * (ra.h + rb.h) >= Math.abs(dy) * (ra.w + rb.w)) return dx >= 0 ? ["e", "w"] : ["w", "e"];
+  return dy >= 0 ? ["s", "n"] : ["n", "s"];
+}
 function edgeGeom(e) {
   const a = nodeById(e.from), b = nodeById(e.to);
   if (!a || !b) return null;
   const raNom = nodeNominalRect(a), rbNom = nodeNominalRect(b);
   const ra = nodeVisibleRect(a, raNom), rb = nodeVisibleRect(b, rbNom);
   const wps = (e.points || []).map(p => ({ x: p.x, y: p.y }));
-  const firstT = wps[0] || { x: rb.x + rb.w / 2, y: rb.y + rb.h / 2 };
-  const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
+  const firstT = wps[0] || null;
+  const lastT = wps[wps.length - 1] || null;
+  const pinned1 = e.a1 && e.a1 !== "auto", pinned2 = e.a2 && e.a2 !== "auto";
   /* 어느 변에 붙을지는 항상 기준 크기(raNom/rbNom)로만 판정 — 카드가
-     커져도 이 판정 자체는 흔들리지 않는다. */
-  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(raNom, firstT);
-  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rbNom, lastT);
+     커져도 이 판정 자체는 흔들리지 않는다. waypoint가 있거나 사용자가
+     직접 변을 고정했으면 그 지점/그 변을 그대로 쓰고(기존 동작 그대로),
+     둘 다 자동일 때만 위 짝짓기 판정을 쓴다. */
+  const pair = autoSidePair(raNom, rbNom);
+  const s1 = pinned1 ? e.a1 : (firstT ? autoSide(raNom, firstT) : pair[0]);
+  const s2 = pinned2 ? e.a2 : (lastT ? autoSide(rbNom, lastT) : pair[1]);
   const t1 = e.a1t, t2 = e.a2t;
   return { p1: sidePoint(ra, s1, t1), n1: SIDE_N[s1], p2: sidePoint(rb, s2, t2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2, t1, t2 };
 }

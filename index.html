@@ -1061,6 +1061,7 @@ tr:hover .rowacts{opacity:1}
           <button class="btn sm" id="btnExpRight" title="이 영역을 아래 전체(가로 끝에서 끝)로 넓히고 여정 지도는 줄입니다"><svg class="ico xs"><use href="#i-fit"/></svg><span id="expRightLabel">확장</span></button>
           <button class="btn sm" id="btnToggleAllTags" title="모든 태그를 펼치거나 접습니다"><svg class="ico xs"><use href="#i-grid"/></svg>모두 펼치기</button>
           <button class="btn sm edit-only" id="btnAddTag"><svg class="ico xs"><use href="#i-plus"/></svg>추가</button>
+          <button class="btn sm edit-only" id="btnPasteTag" title="크롤러 등 외부 도구에서 복사한 태그 내용을 붙여넣어 바로 채웁니다"><svg class="ico xs"><use href="#i-copy"/></svg>붙여넣기로 추가</button>
         </div>
         <div class="pane-subhead">
           <select class="field" id="tagJumpSelect"><option value="">등록된 태그로 이동…</option></select>
@@ -1902,18 +1903,43 @@ function autoSide(r, target) {
   if (Math.abs(dx) * r.h >= Math.abs(dy) * r.w) return dx >= 0 ? "e" : "w";
   return dy >= 0 ? "s" : "n";
 }
+/* 두 카드가 겹치거나 나란히 붙어 있을 때, 양쪽 연결점을 각자 따로(자기
+   중심에서 상대 중심까지의 각도만 보고) 고르면 서로 마주보지 않는 변을
+   고르는 경우가 생긴다 — 그러면 선이 상대 카드를 가로질러 들어갔다 나오면서
+   화살표가 카드 안쪽으로 숨어 안 보이게 된다(카드가 겹쳐 있을 때 특히 흔함).
+   그래서 waypoint(노란 점)로 손수 방향을 잡지 않은 기본 연결은, 두 카드의
+   위치 관계를 같이 보고 "겹치는 축의 반대쪽" 변끼리 마주보게 짝지어 고른다:
+   세로로는 겹치는데(같은 높이대) 가로로 떨어져 있으면 좌우 변끼리,
+   가로로는 겹치는데 세로로 떨어져 있으면 위아래 변끼리. 둘 다 겹치거나
+   (완전히 포개짐) 둘 다 안 겹치면(대각선 배치) 기존 각도 판정을 그대로 쓴다. */
+function overlapsRange(a1, a2, b1, b2) { return a1 < b2 && b1 < a2; }
+function autoSidePair(ra, rb) {
+  const overlapY = overlapsRange(ra.y, ra.y + ra.h, rb.y, rb.y + rb.h);
+  const overlapX = overlapsRange(ra.x, ra.x + ra.w, rb.x, rb.x + rb.w);
+  const cxA = ra.x + ra.w / 2, cxB = rb.x + rb.w / 2;
+  const cyA = ra.midY != null ? ra.midY : ra.y + ra.h / 2, cyB = rb.midY != null ? rb.midY : rb.y + rb.h / 2;
+  if (overlapY && !overlapX) return cxB >= cxA ? ["e", "w"] : ["w", "e"];
+  if (overlapX && !overlapY) return cyB >= cyA ? ["s", "n"] : ["n", "s"];
+  const dx = cxB - cxA, dy = cyB - cyA;
+  if (Math.abs(dx) * (ra.h + rb.h) >= Math.abs(dy) * (ra.w + rb.w)) return dx >= 0 ? ["e", "w"] : ["w", "e"];
+  return dy >= 0 ? ["s", "n"] : ["n", "s"];
+}
 function edgeGeom(e) {
   const a = nodeById(e.from), b = nodeById(e.to);
   if (!a || !b) return null;
   const raNom = nodeNominalRect(a), rbNom = nodeNominalRect(b);
   const ra = nodeVisibleRect(a, raNom), rb = nodeVisibleRect(b, rbNom);
   const wps = (e.points || []).map(p => ({ x: p.x, y: p.y }));
-  const firstT = wps[0] || { x: rb.x + rb.w / 2, y: rb.y + rb.h / 2 };
-  const lastT = wps[wps.length - 1] || { x: ra.x + ra.w / 2, y: ra.y + ra.h / 2 };
+  const firstT = wps[0] || null;
+  const lastT = wps[wps.length - 1] || null;
+  const pinned1 = e.a1 && e.a1 !== "auto", pinned2 = e.a2 && e.a2 !== "auto";
   /* 어느 변에 붙을지는 항상 기준 크기(raNom/rbNom)로만 판정 — 카드가
-     커져도 이 판정 자체는 흔들리지 않는다. */
-  const s1 = e.a1 && e.a1 !== "auto" ? e.a1 : autoSide(raNom, firstT);
-  const s2 = e.a2 && e.a2 !== "auto" ? e.a2 : autoSide(rbNom, lastT);
+     커져도 이 판정 자체는 흔들리지 않는다. waypoint가 있거나 사용자가
+     직접 변을 고정했으면 그 지점/그 변을 그대로 쓰고(기존 동작 그대로),
+     둘 다 자동일 때만 위 짝짓기 판정을 쓴다. */
+  const pair = autoSidePair(raNom, rbNom);
+  const s1 = pinned1 ? e.a1 : (firstT ? autoSide(raNom, firstT) : pair[0]);
+  const s2 = pinned2 ? e.a2 : (lastT ? autoSide(rbNom, lastT) : pair[1]);
   const t1 = e.a1t, t2 = e.a2t;
   return { p1: sidePoint(ra, s1, t1), n1: SIDE_N[s1], p2: sidePoint(rb, s2, t2), n2: SIDE_N[s2], wps, self: e.from === e.to, ra, rb, s1, s2, t1, t2 };
 }
@@ -4193,6 +4219,66 @@ function parsePropsStr(s) {
     return { ko: parts[0] || "", en: parts[1] || "", type: keyByLabel(PTYPE, parts[2], "string"), sample: parts[3] || "" };
   });
 }
+/* ---------------- 외부 크롤러에서 붙여넣기로 태그 채우기 ----------------
+   별도로 만든 사이트 크롤링 프로그램이 "링크: .../태그명: .../속성: ..."
+   형식의 텍스트 한 덩어리를 클립보드에 복사해 주면, 여기 붙여넣어 그대로
+   태그 폼을 채운다. 속성 줄 형식(" :: "/" | " 구분)은 이미 CSV 일괄
+   업로드에서 쓰는 것과 똑같아서 parsePropsStr()을 그대로 재사용한다. */
+function pasteTagLineValue(text, label) {
+  const lines = String(text || "").split(/\r?\n/);
+  const line = lines.find(l => l.trim().startsWith(label + ":"));
+  if (!line) return "";
+  /* .trim()으로 앞쪽 공백을 전부 지우면 안 된다 — "속성" 값은 첫 속성의
+     한글명이 비어 있으면 " :: en :: type :: sample"처럼 진짜 구분자 공백으로
+     시작하는데, 그걸 지워버리면 parsePropsStr()이 첫 구분자를 못 찾아서
+     첫 속성 하나가 통째로 밀린다. "라벨: " 사이의 공백 한 칸만 걷어낸다. */
+  let v = line.slice(line.indexOf(":") + 1);
+  if (v.charAt(0) === " ") v = v.slice(1);
+  return v.replace(/\s+$/, "");
+}
+function parsePasteTagText(text) {
+  const link = pasteTagLineValue(text, "링크");
+  const linkKo = pasteTagLineValue(text, "링크한글명");
+  const eventEn = pasteTagLineValue(text, "이벤트명");
+  const action = pasteTagLineValue(text, "태그명");
+  const triggerRaw = pasteTagLineValue(text, "트리거");
+  const propsRaw = pasteTagLineValue(text, "속성");
+  if (!eventEn && !action && !propsRaw) return null;   // 알아볼 수 있는 줄이 하나도 없으면 이 형식이 아니다
+  let path = "";
+  try { path = link ? new URL(link).pathname : ""; } catch (e) {}
+  return {
+    eventEn: eventEn, action: action, path: path,
+    trigger: keyByLabel(TRIGGER, triggerRaw, "click"),
+    props: parsePropsStr(propsRaw),
+    note: [linkKo, link].filter(Boolean).join(" · ")
+  };
+}
+function openPasteTagModal() {
+  const n = curNode(); if (!n || !canEdit()) return;
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass" style="width:min(560px,100%)" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("copy") + "<h3>붙여넣기로 태그 추가</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' +
+        '<p class="hint">크롤러 프로그램에서 "복사" 버튼으로 복사한 내용을 아래에 붙여넣으세요(Ctrl+V).</p>' +
+        '<textarea class="field mono" id="pasteTagArea" rows="8" placeholder="' +
+          esc("링크: https://...\n링크한글명: 유사상품추천 영역\n이벤트명: pkg_select_prod_main\n태그명: 유사상품추천 영역 內 상품 클릭\n트리거: 클릭\n속성: 로그인여부 :: login :: 불리언 :: true | 웹회원번호 :: webCustNo :: 문자열 :: 12017329991") +
+        '" style="resize:vertical"></textarea>' +
+      "</div>" +
+      '<div class="modal-foot"><button class="btn" data-x>취소</button><div class="spacer"></div>' +
+        '<button class="btn primary" data-paste-fill">채우기</button></div>' +
+    "</div></div>";
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
+    if (e.target.closest("[data-paste-fill]")) {
+      const parsed = parsePasteTagText($("#pasteTagArea").value);
+      if (!parsed) return toast("붙여넣은 내용에서 태그 정보를 찾지 못했습니다 — 형식을 확인해 주세요", "bad");
+      closeModal();
+      return editTag(null, parsed);
+    }
+  });
+  setTimeout(() => $("#pasteTagArea").focus(), 0);
+}
 function channelsToStr(codes) { return (codes || []).map(c => TCHAN[c] || c).join(", "); }
 function channelsFromStr(s) {
   return String(s || "").split(",").map(x => keyByLabel(TCHAN, x, null)).filter(Boolean);
@@ -4701,6 +4787,7 @@ function editCamp(id) {
 }
 function initPanels() {
   $("#btnAddTag").addEventListener("click", () => editTag(null));
+  $("#btnPasteTag").addEventListener("click", () => openPasteTagModal());
   $("#btnAddCamp").addEventListener("click", () => openCampPicker());
   $("#btnToggleAllTags").addEventListener("click", () => {
     const n = curNode(); if (!n || !n.tags.length) return;

@@ -306,6 +306,66 @@ function parsePropsStr(s) {
     return { ko: parts[0] || "", en: parts[1] || "", type: keyByLabel(PTYPE, parts[2], "string"), sample: parts[3] || "" };
   });
 }
+/* ---------------- 외부 크롤러에서 붙여넣기로 태그 채우기 ----------------
+   별도로 만든 사이트 크롤링 프로그램이 "링크: .../태그명: .../속성: ..."
+   형식의 텍스트 한 덩어리를 클립보드에 복사해 주면, 여기 붙여넣어 그대로
+   태그 폼을 채운다. 속성 줄 형식(" :: "/" | " 구분)은 이미 CSV 일괄
+   업로드에서 쓰는 것과 똑같아서 parsePropsStr()을 그대로 재사용한다. */
+function pasteTagLineValue(text, label) {
+  const lines = String(text || "").split(/\r?\n/);
+  const line = lines.find(l => l.trim().startsWith(label + ":"));
+  if (!line) return "";
+  /* .trim()으로 앞쪽 공백을 전부 지우면 안 된다 — "속성" 값은 첫 속성의
+     한글명이 비어 있으면 " :: en :: type :: sample"처럼 진짜 구분자 공백으로
+     시작하는데, 그걸 지워버리면 parsePropsStr()이 첫 구분자를 못 찾아서
+     첫 속성 하나가 통째로 밀린다. "라벨: " 사이의 공백 한 칸만 걷어낸다. */
+  let v = line.slice(line.indexOf(":") + 1);
+  if (v.charAt(0) === " ") v = v.slice(1);
+  return v.replace(/\s+$/, "");
+}
+function parsePasteTagText(text) {
+  const link = pasteTagLineValue(text, "링크");
+  const linkKo = pasteTagLineValue(text, "링크한글명");
+  const eventEn = pasteTagLineValue(text, "이벤트명");
+  const action = pasteTagLineValue(text, "태그명");
+  const triggerRaw = pasteTagLineValue(text, "트리거");
+  const propsRaw = pasteTagLineValue(text, "속성");
+  if (!eventEn && !action && !propsRaw) return null;   // 알아볼 수 있는 줄이 하나도 없으면 이 형식이 아니다
+  let path = "";
+  try { path = link ? new URL(link).pathname : ""; } catch (e) {}
+  return {
+    eventEn: eventEn, action: action, path: path,
+    trigger: keyByLabel(TRIGGER, triggerRaw, "click"),
+    props: parsePropsStr(propsRaw),
+    note: [linkKo, link].filter(Boolean).join(" · ")
+  };
+}
+function openPasteTagModal() {
+  const n = curNode(); if (!n || !canEdit()) return;
+  const root = modalHost();
+  root.innerHTML =
+    '<div class="scrim"><div class="modal glass" style="width:min(560px,100%)" role="dialog" aria-modal="true">' +
+      '<div class="modal-head">' + ico("copy") + "<h3>붙여넣기로 태그 추가</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
+      '<div class="modal-body">' +
+        '<p class="hint">크롤러 프로그램에서 "복사" 버튼으로 복사한 내용을 아래에 붙여넣으세요(Ctrl+V).</p>' +
+        '<textarea class="field mono" id="pasteTagArea" rows="8" placeholder="' +
+          esc("링크: https://...\n링크한글명: 유사상품추천 영역\n이벤트명: pkg_select_prod_main\n태그명: 유사상품추천 영역 內 상품 클릭\n트리거: 클릭\n속성: 로그인여부 :: login :: 불리언 :: true | 웹회원번호 :: webCustNo :: 문자열 :: 12017329991") +
+        '" style="resize:vertical"></textarea>' +
+      "</div>" +
+      '<div class="modal-foot"><button class="btn" data-x>취소</button><div class="spacer"></div>' +
+        '<button class="btn primary" data-paste-fill">채우기</button></div>' +
+    "</div></div>";
+  root.addEventListener("click", e => {
+    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
+    if (e.target.closest("[data-paste-fill]")) {
+      const parsed = parsePasteTagText($("#pasteTagArea").value);
+      if (!parsed) return toast("붙여넣은 내용에서 태그 정보를 찾지 못했습니다 — 형식을 확인해 주세요", "bad");
+      closeModal();
+      return editTag(null, parsed);
+    }
+  });
+  setTimeout(() => $("#pasteTagArea").focus(), 0);
+}
 function channelsToStr(codes) { return (codes || []).map(c => TCHAN[c] || c).join(", "); }
 function channelsFromStr(s) {
   return String(s || "").split(",").map(x => keyByLabel(TCHAN, x, null)).filter(Boolean);
@@ -814,6 +874,7 @@ function editCamp(id) {
 }
 function initPanels() {
   $("#btnAddTag").addEventListener("click", () => editTag(null));
+  $("#btnPasteTag").addEventListener("click", () => openPasteTagModal());
   $("#btnAddCamp").addEventListener("click", () => openCampPicker());
   $("#btnToggleAllTags").addEventListener("click", () => {
     const n = curNode(); if (!n || !n.tags.length) return;
