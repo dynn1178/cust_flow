@@ -8,7 +8,12 @@
 const PERF_C = ["#2f6fed", "#e0483f", "#12a97a", "#8b5cf6", "#e08a1e", "#0ea5b7"];
 const perfFilter = { q: "", goal: "all", chan: "all", owner: "all", seg: "all" };
 let perfPicked = [];                          // 차트에 그릴 캠페인코드 (최대 6개)
-const perfPeriod = { from: null, to: null };  // 집계 기간 — 직접 고른다
+/* 집계 기간 — 직접 고른다. toPinned가 false인 동안(=사용자가 "끝" 달을
+   직접 고른 적이 없는 동안)에는 새로고침할 때마다 가장 최신 달을 계속
+   따라간다 — 데이터를 새로 불러왔는데 지난달 화면 그대로 멈춰 있지 않게.
+   한 번이라도 직접 고르면(toPinned=true) 그 뒤로는 사용자 선택을 존중해
+   새로고침해도 마음대로 되돌리지 않는다. */
+const perfPeriod = { from: null, to: null, toPinned: false };
 let perfShowLabels = true;                    // 각 점·막대에 값을 적을지
 
 const pct1 = v => (v == null ? "-" : v.toFixed(1) + "%");
@@ -385,7 +390,7 @@ function renderPerfView(force) {
   const allMonths = perfMonths();
   if (allMonths.length) {
     if (!perfPeriod.from || allMonths.indexOf(perfPeriod.from) < 0) perfPeriod.from = allMonths[0];
-    if (!perfPeriod.to || allMonths.indexOf(perfPeriod.to) < 0) perfPeriod.to = allMonths[allMonths.length - 1];
+    if (!perfPeriod.toPinned || !perfPeriod.to || allMonths.indexOf(perfPeriod.to) < 0) perfPeriod.to = allMonths[allMonths.length - 1];
     if (perfPeriod.from > perfPeriod.to) perfPeriod.from = perfPeriod.to;
   }
   $("#perfFrom").innerHTML = monthOptions(allMonths, perfPeriod.from);
@@ -508,7 +513,7 @@ function initPerfView() {
     });
   });
   $("#perfFrom").addEventListener("change", e => { perfPeriod.from = e.target.value; renderPerfView(true); });
-  $("#perfTo").addEventListener("change", e => { perfPeriod.to = e.target.value; renderPerfView(true); });
+  $("#perfTo").addEventListener("change", e => { perfPeriod.to = e.target.value; perfPeriod.toPinned = true; renderPerfView(true); });
   $("#perfLabels").addEventListener("change", e => { perfShowLabels = e.target.checked; renderPerfView(true); });
   $("#perfSearch").addEventListener("input", e => { perfFilter.q = e.target.value.toLowerCase().trim(); renderPerfView(true); });
   $("#perfList").addEventListener("change", e => {

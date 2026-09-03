@@ -345,14 +345,17 @@ select.field{cursor:pointer}
 /* 여정 지도 노드의 실적 한 줄 — 캠페인 이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
 .perfline{display:flex; align-items:center; gap:4px; font-family:var(--f-mono); font-weight:600;
   flex-wrap:wrap; row-gap:1px; margin-top:1px}
-.perfline .mon{color:var(--ink-3); font-weight:500; font-size:.82em; white-space:nowrap}
+.perfline .mon{color:var(--ink-3); font-weight:500; font-size:.74em; white-space:nowrap}
 .perfline .ctr,.perfline .sep,.perfline .cvr{white-space:nowrap}
 .perfline .ctr{color:#2f6fed} .perfline .cvr{color:#e0483f}
 .perfline .sep{color:var(--ink-3); opacity:.6}
 /* 표본을 감안해도 의미 있는 변화만 진하게 — 흐린 화살표는 노이즈일 수 있다는 뜻 */
 .perfline i{font-style:normal; font-size:.72em; margin-left:1px; opacity:.4; font-weight:400}
 .perfline i.sig{opacity:1; font-weight:700}
-.perfline .mon{margin-left:auto}
+/* 예전엔 margin-left:auto로 오른쪽 끝까지 밀어 붙였는데, 그러면 한 줄에
+   다 들어갈 공간이 있어도 굳이 남은 폭을 전부 요구하는 셈이라 줄바꿈이
+   필요 이상으로 자주 일어났다 — 그냥 cvr 바로 뒤에 붙여서 필요한 만큼만
+   차지하게 한다. */
 .g-more{font-size:max(12px,min(15.5px,calc(12px / max(var(--zoom,1),.65)))); color:var(--ink-3); padding-left:12px}
 .g-empty{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--ink-3); text-align:center; padding-top:2px}
 .g-miss{font-size:max(11px,min(14px,calc(11px / max(var(--zoom,1),.65)))); color:var(--warn); display:flex; align-items:center; gap:6px}
