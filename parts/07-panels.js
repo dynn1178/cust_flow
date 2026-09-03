@@ -370,7 +370,9 @@ function openPasteTagModal() {
       const parsed = parsePasteTagText($("#pasteTagArea").value);
       if (!parsed) return toast("붙여넣은 내용에서 태그 정보를 찾지 못했습니다 — 형식을 확인해 주세요", "bad");
       closeModal();
-      return editTag(null, parsed);
+      const platforms = parsed.platforms && parsed.platforms.length ? parsed.platforms : ["amplitude"];
+      const rest = Object.assign({}, parsed); delete rest.platforms; delete rest.props;
+      return addOrMergeTag(platforms, parsed.eventEn, parsed.props, rest);
     }
   });
   setTimeout(() => $("#pasteTagArea").focus(), 0);
@@ -812,27 +814,39 @@ function diffRowHtml(d) {
     (d.mark ? '<span class="chip" style="--c:' + color + '">(' + d.mark + ")</span>" : "") +
   "</div>";
 }
-function addDetectedTag(key, name, ev) {
+/* HAR 감지("+")든 붙여넣기("채우기")든, "이벤트명·속성이 같은 태그가 이미
+   있으면 덮어쓸지(=플랫폼을 합칠지) 확인"하는 절차는 완전히 같다 — 플랫폼이
+   다르더라도 이벤트명이 같으면 같은 로직으로 다룬다(예: Amplitude로 캡처한
+   걸 붙여넣었는데 Braze로 이미 등록돼 있으면, 두 플랫폼을 합친 태그 하나로
+   만들 수 있어야 한다). platforms = 이번에 반영하려는 플랫폼 목록,
+   newExtra = 새 태그를 만들 때만 같이 채울 값(태그명·트리거·경로·메모 등) —
+   기존 태그를 덮어쓸 때는 플랫폼·속성만 합치고 사람이 이미 적어 둔 다른
+   칸(태그명 등)은 건드리지 않는다. */
+function addOrMergeTag(platforms, name, props, newExtra) {
   const n = curNode(); if (!n || !canEdit()) return;
-  const props = propsFromDetected(ev && ev.properties);
-  const existing = n.tags.find(t => platformsOf(t).indexOf(key) >= 0 && (tagEventEn(t) || "").trim().toLowerCase() === String(name).trim().toLowerCase());
-  if (!existing) return editTag(null, { platforms: [key], eventEn: name, props });
+  newExtra = newExtra || {};
+  const nameLower = String(name || "").trim().toLowerCase();
+  const existing = nameLower ? n.tags.find(t => (tagEventEn(t) || "").trim().toLowerCase() === nameLower) : null;
+  if (!existing) return editTag(null, Object.assign({ platforms: platforms, eventEn: name, props: props }, newExtra));
 
-  /* 여기서 보여주는 건 "지금 캡처된 값대로 두면 이렇게 바뀐다"는 미리보기일
-     뿐이다 — 실제로 태그에 남는 변경 이력은 폼을 열고 저장하는 순간(사용자가
-     그 사이 속성을 직접 고치거나 더 추가·삭제해도) editTag()의 onSave에서
-     다시 계산한다. 그래야 캡처값이든 사용자가 손으로 고친 값이든 실제로
-     저장된 결과가 이력에 정확히 남는다. */
+  /* 여기서 보여주는 건 "지금 캡처된/붙여넣은 값대로 두면 이렇게 바뀐다"는
+     미리보기일 뿐이다 — 실제로 태그에 남는 변경 이력은 폼을 열고 저장하는
+     순간(사용자가 그 사이 속성을 직접 고치거나 더 추가·삭제해도)
+     editTag()의 onSave에서 다시 계산한다. 그래야 캡처값이든 사용자가 손으로
+     고친 값이든 실제로 저장된 결과가 이력에 정확히 남는다. */
   const oldMap = {}; (existing.props || []).forEach(p => { if (p.en) oldMap[p.en] = p.sample || ""; });
-  const newMap = {}; props.forEach(p => { if (p.en) newMap[p.en] = p.sample || ""; });
+  const newMap = {}; (props || []).forEach(p => { if (p.en) newMap[p.en] = p.sample || ""; });
   const diffs = diffProps(oldMap, newMap);
+  const existingPlats = platformsOf(existing);
+  const newPlats = (platforms || []).filter(p => existingPlats.indexOf(p) < 0);
   const root = modalHost();
   root.innerHTML =
     '<div class="scrim"><div class="modal glass" style="width:min(560px,100%)" role="dialog" aria-modal="true">' +
       '<div class="modal-head">' + ico("alert") + "<h3>이미 등록된 태그입니다</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
       '<div class="modal-body">' +
-        '<p class="hint">"' + esc(name) + '"은(는) 이미 <b>' + esc(existing.action || existing.eventKo || "이름 없는 태그") + "</b>(으)로 등록돼 있습니다. " +
-          "덮어쓰면 속성이 아래처럼 바뀝니다 — 등록 전 값 기준으로 (삭제)·(추가)·(변경)을 표시합니다.</p>" +
+        '<p class="hint">"' + esc(name) + '"은(는) 이미 <b>' + esc(existing.action || existing.eventKo || "이름 없는 태그") + "</b>(으)로 " + esc(platformsToStr(existingPlats)) + "에 등록돼 있습니다. " +
+          (newPlats.length ? "덮어쓰면 <b>" + esc(platformsToStr(newPlats)) + "</b> 플랫폼이 합쳐지고, " : "덮어쓰면 ") +
+          "속성이 아래처럼 바뀝니다 — 등록 전 값 기준으로 (삭제)·(추가)·(변경)을 표시합니다.</p>" +
         '<div class="difftable">' + (diffs.length ? diffs.map(diffRowHtml).join("") : '<div class="hint">속성 차이가 없습니다</div>') + "</div>" +
       "</div>" +
       '<div class="modal-foot">' +
@@ -843,12 +857,15 @@ function addDetectedTag(key, name, ev) {
     "</div></div>";
   root.addEventListener("click", e => {
     if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
-    if (e.target.closest("[data-ow-new]")) { closeModal(); return editTag(null, { platforms: [key], eventEn: name, props }); }
+    if (e.target.closest("[data-ow-new]")) { closeModal(); return editTag(null, Object.assign({ platforms: platforms, eventEn: name, props: props }, newExtra)); }
     if (e.target.closest("[data-ow-confirm]")) {
       closeModal();
-      return editTag(existing.id, { platforms: Array.from(new Set(platformsOf(existing).concat([key]))), eventEn: name, props });
+      return editTag(existing.id, { platforms: Array.from(new Set(existingPlats.concat(platforms))), eventEn: name, props: props });
     }
   });
+}
+function addDetectedTag(key, name, ev) {
+  return addOrMergeTag([key], name, propsFromDetected(ev && ev.properties));
 }
 function editCamp(id) {
   const n = curNode(); if (!n || !canEdit()) return;
