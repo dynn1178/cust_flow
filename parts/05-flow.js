@@ -323,6 +323,32 @@ function moveEdgesOf(nodeId) {
   if (sel.edge) drawEdgeHandles();
 }
 
+/* 목표 좌표(x,y)가 실제 그려진 와이어(path) 위에서 몇 길이(length) 지점에
+   해당하는지 찾는다 — ortho·곡선 경로는 두 실제 점 사이가 직선이 아니라
+   꺾이거나 휘어 있어서, "+ 점 추가" 손잡이를 두 점의 산술 중점에 두면
+   실제 선에서 멀리 떨어져 둥둥 떠 보인다(간격이 벌어질수록 더 멀어짐).
+   와이어 위를 샘플링해 가장 가까운 지점을 찾아, 손잡이가 항상 선 위에
+   붙어 있도록 한다. */
+function lenAtPoint(wire, totalLen, x, y) {
+  let bestLen = 0, bestD = Infinity;
+  const N = 60;
+  for (let i = 0; i <= N; i++) {
+    const l = totalLen * i / N, p = wire.getPointAtLength(l);
+    const d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+    if (d < bestD) { bestD = d; bestLen = l; }
+  }
+  let step = totalLen / N;
+  for (let iter = 0; iter < 8 && step > 0.05; iter++) {
+    step /= 2;
+    [bestLen - step, bestLen + step].forEach(l => {
+      if (l < 0 || l > totalLen) return;
+      const p = wire.getPointAtLength(l);
+      const d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+      if (d < bestD) { bestD = d; bestLen = l; }
+    });
+  }
+  return bestLen;
+}
 /* 선택된 연결선의 경로 편집 손잡이 — 점이 하나도 없으면(=아직 자동 경로) 실제
    그려진 곡선의 중점에 노란 점을 놓아 "위·아래로 끌면 그 높이로 고정" 임을
    보여준다. 점을 만들고 나면(=높이를 고정하면) 같은 점을 계속 노란색으로 둔다. */
@@ -345,19 +371,18 @@ function drawEdgeHandles() {
         '<circle r="8"></circle><path d="M-3 -3 L3 3 M3 -3 L-3 3"></path><title>자동 높이로 되돌리기</title></g>';
     }
   });
+  const rec = EDGE_EL[e.id], L = rec && rec.wire && rec.wire.getTotalLength();
+  const lens = L ? pts.map(p => lenAtPoint(rec.wire, L, p.x, p.y)) : null;
   for (let i = 0; i < pts.length - 1; i++) {
-    let m;
-    const heightAdd = isDefaultCurve && pts.length === 2;  // 아직 점이 없는 기본 곡선 구간 — 실제 곡선 위의 중점을 쓴다(직선 중점이 아니라)
-    if (heightAdd) {
-      const rec = EDGE_EL[e.id], L = rec && rec.wire && rec.wire.getTotalLength();
-      m = L ? rec.wire.getPointAtLength(L / 2) : { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
-    } else {
-      m = { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
-    }
-    h += '<circle class="wpadd' + (heightAdd ? " hgt" : "") + '" data-add="' + i + '"' +
+    const heightAdd = isDefaultCurve && pts.length === 2;  // 아직 점이 없는 기본 곡선 구간
+    // 실제 와이어 위의 두 실점 사이 길이의 중점 — 항상 눈에 보이는 선 위에 붙는다
+    const m = lens ? rec.wire.getPointAtLength((lens[i] + lens[i + 1]) / 2)
+      : { x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2 };
+    h += '<g class="wpadd' + (heightAdd ? " hgt" : "") + '" data-add="' + i + '"' +
       (heightAdd ? ' data-hgt="1" data-lockx="' + m.x + '"' : "") +
-      ' cx="' + m.x + '" cy="' + m.y + '" r="' + (heightAdd ? 7 : 5) + '"><title>' +
-      (heightAdd ? "드래그해서 높이 고정" : "드래그해서 선을 나누고 점 추가") + "</title></circle>";
+      ' transform="translate(' + m.x + "," + m.y + ')"><circle r="' + (heightAdd ? 7 : 6) + '"></circle>' +
+      '<path d="M-3 0 L3 0 M0 -3 L0 3"></path><title>' +
+      (heightAdd ? "드래그해서 높이 고정" : "드래그해서 선을 나누고 점 추가") + "</title></g>";
   }
   box.innerHTML = h;
 }
