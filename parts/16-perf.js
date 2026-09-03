@@ -135,10 +135,19 @@ function perfBadge(code, mode) {
   const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR" +
     (p.prevMonth ? " · " + p.prevMonth + " 대비 증감 (진한 화살표 = 표본을 감안해도 의미 있는 변화)" : "");
   if (mode === "line") {
+    /* 값(퍼센트)은 검정으로 통일해서 그냥 수치로 읽히게 하고, 증감(화살표)만
+       방향에 따라 국내 관행대로 상승=빨강·하락=파랑으로 색을 준다 — 예전엔
+       CTR·CVR을 파랑·빨강으로 구분했는데, 그러면 정작 "올랐는지 내렸는지"는
+       한눈에 안 들어왔다. 값 줄과 증감 줄을 나눠서 두 줄로 보여준다. */
+    const dCtr = arrow(p.dCtr, p.sigCtr), dCvr = arrow(p.dCvr, p.sigCvr);
     return '<span class="perfline" title="' + esc(tip) + '">' +
-      '<span class="ctr">' + pct1(p.ctr) + arrow(p.dCtr, p.sigCtr) + "</span>" +
-      '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + arrow(p.dCvr, p.sigCvr) + "</span>" +
-      '<span class="mon">(' + esc(short) + ")</span></span>";
+      '<span class="pf-vals">' +
+        '<span class="ctr">' + pct1(p.ctr) + "</span>" +
+        '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + "</span>" +
+        '<span class="mon">(' + esc(short) + ")</span>" +
+      "</span>" +
+      (dCtr || dCvr ? '<span class="pf-deltas">' + dCtr + (dCtr && dCvr ? '<span class="sep">/</span>' : "") + dCvr + "</span>" : "") +
+    "</span>";
   }
   return '<span class="perfbadge' + (mode === "sm" ? " sm" : "") + '" title="' + esc(tip) + '">' +
     '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr, p.sigCtr) + "</span>" +

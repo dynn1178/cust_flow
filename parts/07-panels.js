@@ -629,43 +629,48 @@ function updateToggleAllBtn(n) {
   btn.disabled = !tags.length;
 }
 /* "등록된 태그로 이동" — 네이티브 <select>는 검색이 안 되고 플랫폼도 못
-   보여줘서, 검색창 + 목록으로 된 작은 창으로 바꿨다(openTagMovePicker와
-   같은 틀). 문서 전체(모든 여정지도)의 태그를 대상으로 한다. */
+   보여줘서 바꿨다. 화면을 어둡게 덮는 모달 대신, 보드 전환 메뉴
+   (openBoardMenu)와 같은 "버튼 바로 아래 붙는 드롭다운"으로 만들어서
+   가볍게 열고 닫히게 한다. 문서 전체(모든 여정지도)의 태그를 대상으로 한다. */
 function openTagJumpPicker() {
-  const root = modalHost();
-  root.innerHTML =
-    '<div class="scrim"><div class="modal glass qsearch" role="dialog" aria-modal="true">' +
-      '<div class="modal-head">' + ico("tag") + "<h3>등록된 태그로 이동</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
-      '<div class="modal-body" style="gap:8px">' +
-        '<input class="field" id="tjqInput" placeholder="태그명·이벤트명·페이지·여정지도로 찾기">' +
-        '<div id="tjqResults" class="qs-results"></div>' +
-      "</div>" +
-    "</div></div>";
+  const anchor = $("#tagJumpSelect");
+  const root = $("#menuRoot");
+  root.innerHTML = '<div class="menu glass" style="width:360px">' +
+    '<input class="field" id="tjqInput" placeholder="태그명·이벤트명·페이지·여정지도로 찾기" style="margin-bottom:4px">' +
+    '<div id="tjqResults" style="max-height:320px; overflow:auto"></div>' +
+  "</div>";
+  const m = $(".menu", root), r = anchor.getBoundingClientRect();
+  m.style.left = clamp(r.left, 8, innerWidth - 380) + "px";
+  m.style.top = Math.min(r.bottom + 6, innerHeight - 10) + "px";
+
   const inp = $("#tjqInput"), out = $("#tjqResults");
   const all = allTags();
   const render = () => {
     const q = inp.value.toLowerCase().trim();
     const rows = all.filter(({ t, n, b }) => !q ||
       (platformsToStr(platformsOf(t)) + " " + (t.action || "") + " " + tagEventEn(t) + " " + n.name + " " + b.name).toLowerCase().indexOf(q) >= 0);
-    if (!rows.length) { out.innerHTML = '<div class="empty">' + ico("search") + "<div>일치하는 태그가 없습니다</div></div>"; return; }
-    out.innerHTML = rows.slice(0, 100).map(({ t, n, b }) =>
-      '<button class="qs-row" type="button" data-tag="' + t.id + '">' + platChips(platformsOf(t)) +
-        '<span class="qs-t">' + esc(t.action || tagEventEn(t) || "(이름 없음)") + "</span>" +
-        '<span class="qs-s">' + esc(b.name) + " · " + esc(n.name) + "</span></button>").join("");
+    out.innerHTML = rows.length ? rows.slice(0, 100).map(({ t, n, b }) =>
+      '<button class="mi" type="button" data-tag="' + t.id + '">' + platChips(platformsOf(t)) +
+        '<span style="font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:130px">' +
+          esc(t.action || tagEventEn(t) || "(이름 없음)") + "</span>" +
+        '<span class="cnt" style="font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px">' +
+          esc(b.name) + " · " + esc(n.name) + "</span></button>").join("")
+      : '<div class="mi" style="cursor:default; color:var(--ink-3)">일치하는 태그가 없습니다</div>';
   };
   inp.addEventListener("input", render);
-  out.addEventListener("click", e => {
+  root.addEventListener("click", e => {
     const row = e.target.closest("[data-tag]"); if (!row) return;
-    closeModal();
+    closeMenu();
     jumpToTag(row.dataset.tag);
   });
   root.addEventListener("keydown", e => {
-    if (e.key === "Escape") { e.stopPropagation(); closeModal(); }
-    if (e.key === "Enter") { const first = $(".qs-row", out); if (first) first.click(); }
+    if (e.key === "Escape") closeMenu();
+    if (e.key === "Enter") { const first = $(".mi[data-tag]", out); if (first) first.click(); }
   });
-  root.addEventListener("click", e => { if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal(); });
   render();
   setTimeout(() => inp.focus(), 0);
+  const away = e => { if (!e.target.closest(".menu") && !e.target.closest("#tagJumpSelect")) { closeMenu(); document.removeEventListener("pointerdown", away); } };
+  setTimeout(() => document.addEventListener("pointerdown", away), 0);
 }
 function jumpToTag(tagId) {
   const hit = allTags().find(x => x.t.id === tagId); if (!hit) return;

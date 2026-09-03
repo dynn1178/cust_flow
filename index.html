@@ -350,16 +350,24 @@ select.field{cursor:pointer}
 .g-name.mono{font-family:var(--f-mono)}
 .g-row.simple .g-name{font-weight:500; color:var(--ink-2)}
 .g-meta{font-size:.84em; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-/* 여정 지도 노드의 실적 한 줄 — 캠페인 이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
-.perfline{display:flex; align-items:center; gap:4px; font-family:var(--f-mono); font-weight:600;
-  flex-wrap:wrap; row-gap:1px; margin-top:1px}
+/* 여정 지도 노드의 실적 두 줄 — 위는 값(퍼센트), 아래는 증감. 캠페인
+   이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
+.perfline{display:flex; flex-direction:column; font-family:var(--f-mono); font-weight:600; margin-top:1px}
+.perfline .pf-vals{display:flex; align-items:center; gap:4px; flex-wrap:wrap; row-gap:1px}
+.perfline .pf-deltas{display:flex; align-items:center; gap:4px; margin-top:1px}
 .perfline .mon{color:var(--ink-3); font-weight:500; font-size:.74em; white-space:nowrap}
 .perfline .ctr,.perfline .sep,.perfline .cvr{white-space:nowrap}
-.perfline .ctr{color:#2f6fed} .perfline .cvr{color:#e0483f}
+/* 값은 오르든 내리든 그냥 수치로 읽히도록 검정으로 통일한다 — 색은
+   증감(화살표) 쪽에서만 방향을 알려준다 */
+.perfline .ctr,.perfline .cvr{color:var(--ink)}
 .perfline .sep{color:var(--ink-3); opacity:.6}
-/* 표본을 감안해도 의미 있는 변화만 진하게 — 흐린 화살표는 노이즈일 수 있다는 뜻 */
-.perfline i{font-style:normal; font-size:.72em; margin-left:1px; opacity:.4; font-weight:400}
-.perfline i.sig{opacity:1; font-weight:700}
+/* 국내 관행대로 상승은 빨강, 하락은 파랑 — 표본을 감안해도 의미 있는
+   변화만 진하게(sig), 흐린 화살표는 노이즈일 수 있다는 뜻 */
+.perfline .pf-deltas{font-size:.72em; font-weight:400}
+.perfline i{font-style:normal; font-weight:700; opacity:.45; white-space:nowrap}
+.perfline i.sig{opacity:1}
+.perfline i.up{color:#e0483f}
+.perfline i.dn{color:#2f6fed}
 /* 예전엔 margin-left:auto로 오른쪽 끝까지 밀어 붙였는데, 그러면 한 줄에
    다 들어갈 공간이 있어도 굳이 남은 폭을 전부 요구하는 셈이라 줄바꿈이
    필요 이상으로 자주 일어났다 — 그냥 cvr 바로 뒤에 붙여서 필요한 만큼만
@@ -4544,43 +4552,48 @@ function updateToggleAllBtn(n) {
   btn.disabled = !tags.length;
 }
 /* "등록된 태그로 이동" — 네이티브 <select>는 검색이 안 되고 플랫폼도 못
-   보여줘서, 검색창 + 목록으로 된 작은 창으로 바꿨다(openTagMovePicker와
-   같은 틀). 문서 전체(모든 여정지도)의 태그를 대상으로 한다. */
+   보여줘서 바꿨다. 화면을 어둡게 덮는 모달 대신, 보드 전환 메뉴
+   (openBoardMenu)와 같은 "버튼 바로 아래 붙는 드롭다운"으로 만들어서
+   가볍게 열고 닫히게 한다. 문서 전체(모든 여정지도)의 태그를 대상으로 한다. */
 function openTagJumpPicker() {
-  const root = modalHost();
-  root.innerHTML =
-    '<div class="scrim"><div class="modal glass qsearch" role="dialog" aria-modal="true">' +
-      '<div class="modal-head">' + ico("tag") + "<h3>등록된 태그로 이동</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
-      '<div class="modal-body" style="gap:8px">' +
-        '<input class="field" id="tjqInput" placeholder="태그명·이벤트명·페이지·여정지도로 찾기">' +
-        '<div id="tjqResults" class="qs-results"></div>' +
-      "</div>" +
-    "</div></div>";
+  const anchor = $("#tagJumpSelect");
+  const root = $("#menuRoot");
+  root.innerHTML = '<div class="menu glass" style="width:360px">' +
+    '<input class="field" id="tjqInput" placeholder="태그명·이벤트명·페이지·여정지도로 찾기" style="margin-bottom:4px">' +
+    '<div id="tjqResults" style="max-height:320px; overflow:auto"></div>' +
+  "</div>";
+  const m = $(".menu", root), r = anchor.getBoundingClientRect();
+  m.style.left = clamp(r.left, 8, innerWidth - 380) + "px";
+  m.style.top = Math.min(r.bottom + 6, innerHeight - 10) + "px";
+
   const inp = $("#tjqInput"), out = $("#tjqResults");
   const all = allTags();
   const render = () => {
     const q = inp.value.toLowerCase().trim();
     const rows = all.filter(({ t, n, b }) => !q ||
       (platformsToStr(platformsOf(t)) + " " + (t.action || "") + " " + tagEventEn(t) + " " + n.name + " " + b.name).toLowerCase().indexOf(q) >= 0);
-    if (!rows.length) { out.innerHTML = '<div class="empty">' + ico("search") + "<div>일치하는 태그가 없습니다</div></div>"; return; }
-    out.innerHTML = rows.slice(0, 100).map(({ t, n, b }) =>
-      '<button class="qs-row" type="button" data-tag="' + t.id + '">' + platChips(platformsOf(t)) +
-        '<span class="qs-t">' + esc(t.action || tagEventEn(t) || "(이름 없음)") + "</span>" +
-        '<span class="qs-s">' + esc(b.name) + " · " + esc(n.name) + "</span></button>").join("");
+    out.innerHTML = rows.length ? rows.slice(0, 100).map(({ t, n, b }) =>
+      '<button class="mi" type="button" data-tag="' + t.id + '">' + platChips(platformsOf(t)) +
+        '<span style="font-weight:600; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:130px">' +
+          esc(t.action || tagEventEn(t) || "(이름 없음)") + "</span>" +
+        '<span class="cnt" style="font-weight:400; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:110px">' +
+          esc(b.name) + " · " + esc(n.name) + "</span></button>").join("")
+      : '<div class="mi" style="cursor:default; color:var(--ink-3)">일치하는 태그가 없습니다</div>';
   };
   inp.addEventListener("input", render);
-  out.addEventListener("click", e => {
+  root.addEventListener("click", e => {
     const row = e.target.closest("[data-tag]"); if (!row) return;
-    closeModal();
+    closeMenu();
     jumpToTag(row.dataset.tag);
   });
   root.addEventListener("keydown", e => {
-    if (e.key === "Escape") { e.stopPropagation(); closeModal(); }
-    if (e.key === "Enter") { const first = $(".qs-row", out); if (first) first.click(); }
+    if (e.key === "Escape") closeMenu();
+    if (e.key === "Enter") { const first = $(".mi[data-tag]", out); if (first) first.click(); }
   });
-  root.addEventListener("click", e => { if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) closeModal(); });
   render();
   setTimeout(() => inp.focus(), 0);
+  const away = e => { if (!e.target.closest(".menu") && !e.target.closest("#tagJumpSelect")) { closeMenu(); document.removeEventListener("pointerdown", away); } };
+  setTimeout(() => document.addEventListener("pointerdown", away), 0);
 }
 function jumpToTag(tagId) {
   const hit = allTags().find(x => x.t.id === tagId); if (!hit) return;
@@ -7310,10 +7323,19 @@ function perfBadge(code, mode) {
   const tip = p.month + " 실적 · 앞이 CTR, 뒤가 CVR" +
     (p.prevMonth ? " · " + p.prevMonth + " 대비 증감 (진한 화살표 = 표본을 감안해도 의미 있는 변화)" : "");
   if (mode === "line") {
+    /* 값(퍼센트)은 검정으로 통일해서 그냥 수치로 읽히게 하고, 증감(화살표)만
+       방향에 따라 국내 관행대로 상승=빨강·하락=파랑으로 색을 준다 — 예전엔
+       CTR·CVR을 파랑·빨강으로 구분했는데, 그러면 정작 "올랐는지 내렸는지"는
+       한눈에 안 들어왔다. 값 줄과 증감 줄을 나눠서 두 줄로 보여준다. */
+    const dCtr = arrow(p.dCtr, p.sigCtr), dCvr = arrow(p.dCvr, p.sigCvr);
     return '<span class="perfline" title="' + esc(tip) + '">' +
-      '<span class="ctr">' + pct1(p.ctr) + arrow(p.dCtr, p.sigCtr) + "</span>" +
-      '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + arrow(p.dCvr, p.sigCvr) + "</span>" +
-      '<span class="mon">(' + esc(short) + ")</span></span>";
+      '<span class="pf-vals">' +
+        '<span class="ctr">' + pct1(p.ctr) + "</span>" +
+        '<span class="sep">/</span><span class="cvr">' + pct1(p.cvr) + "</span>" +
+        '<span class="mon">(' + esc(short) + ")</span>" +
+      "</span>" +
+      (dCtr || dCvr ? '<span class="pf-deltas">' + dCtr + (dCtr && dCvr ? '<span class="sep">/</span>' : "") + dCvr + "</span>" : "") +
+    "</span>";
   }
   return '<span class="perfbadge' + (mode === "sm" ? " sm" : "") + '" title="' + esc(tip) + '">' +
     '<span class="pb ctr">CTR ' + pct1(p.ctr) + arrow(p.dCtr, p.sigCtr) + "</span>" +

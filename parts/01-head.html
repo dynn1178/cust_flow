@@ -342,16 +342,24 @@ select.field{cursor:pointer}
 .g-name.mono{font-family:var(--f-mono)}
 .g-row.simple .g-name{font-weight:500; color:var(--ink-2)}
 .g-meta{font-size:.84em; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
-/* 여정 지도 노드의 실적 한 줄 — 캠페인 이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
-.perfline{display:flex; align-items:center; gap:4px; font-family:var(--f-mono); font-weight:600;
-  flex-wrap:wrap; row-gap:1px; margin-top:1px}
+/* 여정 지도 노드의 실적 두 줄 — 위는 값(퍼센트), 아래는 증감. 캠페인
+   이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
+.perfline{display:flex; flex-direction:column; font-family:var(--f-mono); font-weight:600; margin-top:1px}
+.perfline .pf-vals{display:flex; align-items:center; gap:4px; flex-wrap:wrap; row-gap:1px}
+.perfline .pf-deltas{display:flex; align-items:center; gap:4px; margin-top:1px}
 .perfline .mon{color:var(--ink-3); font-weight:500; font-size:.74em; white-space:nowrap}
 .perfline .ctr,.perfline .sep,.perfline .cvr{white-space:nowrap}
-.perfline .ctr{color:#2f6fed} .perfline .cvr{color:#e0483f}
+/* 값은 오르든 내리든 그냥 수치로 읽히도록 검정으로 통일한다 — 색은
+   증감(화살표) 쪽에서만 방향을 알려준다 */
+.perfline .ctr,.perfline .cvr{color:var(--ink)}
 .perfline .sep{color:var(--ink-3); opacity:.6}
-/* 표본을 감안해도 의미 있는 변화만 진하게 — 흐린 화살표는 노이즈일 수 있다는 뜻 */
-.perfline i{font-style:normal; font-size:.72em; margin-left:1px; opacity:.4; font-weight:400}
-.perfline i.sig{opacity:1; font-weight:700}
+/* 국내 관행대로 상승은 빨강, 하락은 파랑 — 표본을 감안해도 의미 있는
+   변화만 진하게(sig), 흐린 화살표는 노이즈일 수 있다는 뜻 */
+.perfline .pf-deltas{font-size:.72em; font-weight:400}
+.perfline i{font-style:normal; font-weight:700; opacity:.45; white-space:nowrap}
+.perfline i.sig{opacity:1}
+.perfline i.up{color:#e0483f}
+.perfline i.dn{color:#2f6fed}
 /* 예전엔 margin-left:auto로 오른쪽 끝까지 밀어 붙였는데, 그러면 한 줄에
    다 들어갈 공간이 있어도 굳이 남은 폭을 전부 요구하는 셈이라 줄바꿈이
    필요 이상으로 자주 일어났다 — 그냥 cvr 바로 뒤에 붙여서 필요한 만큼만
