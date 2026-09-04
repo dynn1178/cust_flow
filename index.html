@@ -455,7 +455,8 @@ select.field{cursor:pointer}
   cursor:pointer; text-align:left; font:inherit; color:inherit}
 .tagcaret{font-size:9px; color:var(--ink-3); transition:transform .12s; flex:none}
 .tagcard.expanded .tagcaret{transform:rotate(90deg)}
-.tagsummary .evt{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tagsummary .evt{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px}
+.tagsummary .chip{flex:none; font-size:11.5px}
 .tagcard.flash{animation:tagflash 1.4s ease}
 @keyframes tagflash{0%,100%{box-shadow:none}20%,60%{box-shadow:0 0 0 2px var(--accent)}}
 /* 웹 모드 — "태그 확인"으로 서버가 감지한 실제 트래킹과 등록된 태그를 견주는 상자 */
@@ -1278,7 +1279,8 @@ const FOCUS = {
   amplitude: { name: "Amplitude 위주", ico: "amp", c: "var(--amp)" },
   braze:     { name: "Braze 위주", ico: "braze", c: "var(--braze)" },
   ga4:       { name: "GA4 위주", ico: "ga4", c: "var(--ga4)" },
-  incomplete:{ name: "미완성만", ico: "alert", c: "var(--warn)" }
+  incomplete:{ name: "미완성만", ico: "alert", c: "var(--warn)" },
+  todoTag:   { name: "작업예정 태그만", ico: "tag", c: "var(--warn)" }
 };
 /* 데이터 완성도 — 화면 이미지·태그가 없는 페이지를 놓치지 않도록 */
 function completeness(n) {
@@ -2263,6 +2265,13 @@ function incompleteRowsBig(n) {
   if (!miss.length) return '<div class="g-empty">모두 등록됨</div>';
   return '<div class="node-list">' + miss.map(m => '<div class="g-miss">' + ico("alert", "xs") + esc(m) + "</div>").join("") + "</div>";
 }
+function todoTagRowsBig(n) {
+  const list = n.tags.filter(t => t.status === "todo");
+  if (!list.length) return '<div class="g-empty">작업 예정 태그 없음</div>';
+  return '<div class="node-list">' + list.slice(0, 6).map(t =>
+    gRow(TSTATUS_C.todo, tagEventEn(t), (TRIGGER[t.trigger] || t.trigger) + (tagArea(t) ? " · " + esc(tagArea(t)) : ""), true)
+  ).join("") + (list.length > 6 ? '<div class="g-more">+' + (list.length - 6) + "개 더</div>" : "") + "</div>";
+}
 /* 이 페이지에 붙은 캠페인들의 최신월 실적을 합친다 — 성과 위주 보기의 색·배지에 쓴다 */
 function nodePerfSum(n) {
   let rev = 0, cnt = 0;
@@ -2278,6 +2287,7 @@ function focusCount(n, f) {
   if (f === "camp") return n.camps.length;
   if (f === "perf") return nodePerfSum(n).count;
   if (f === "incomplete") return completeness(n).length;
+  if (f === "todoTag") return n.tags.filter(t => t.status === "todo").length;
   if (PLAT[f]) return n.tags.filter(t => platformsOf(t).indexOf(f) >= 0).length;
   return 0;
 }
@@ -2310,6 +2320,7 @@ function nodeHtml(n) {
       (n.camps.length > 4 ? '<div class="g-more">+' + (n.camps.length - 4) + "개 더</div>" : "") + "</div>" : "";
   } else if (f === "camp" || f === "perf") body = campRowsBig(n);
   else if (f === "incomplete") body = incompleteRowsBig(n);
+  else if (f === "todoTag") body = todoTagRowsBig(n);
   else if (PLAT[f]) body = tagRowsBig(n, f);
 
   const miss = completeness(n);
@@ -4577,8 +4588,14 @@ function renderTagPanel() {
   box.innerHTML = detectHtml + dupeHtml + n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
     const expanded = expandedTags.has(t.id);
     return '<div class="card tagcard' + (expanded ? " expanded" : "") + '" data-tag="' + t.id + '">' +
-      '<div class="card-top">' + platChips(platformsOf(t)) +
-        '<div class="spacer"></div>' +
+      '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
+        '<span class="tagcaret">▸</span>' +
+        '<span class="evt">' + esc(tagEventEn(t) || "(이벤트명 없음)") +
+          (t.action ? ' <em class="mono" style="font-style:normal">[' + esc(t.action) + "]</em>" : "") +
+        "</span>" +
+        '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
+      "</button>" +
+      '<div class="card-top">' +
         /* 수정·삭제 아이콘과 똑같이 "마우스를 올렸을 때만" 보이도록 같은
            .card-acts 안에 넣는다 — 여러 개를 만들어도 .card:hover 규칙이
            클래스로 걸려 있어 전부 똑같이 나타난다. */
@@ -4586,14 +4603,10 @@ function renderTagPanel() {
           ((t.diffHistory || []).length ? '<button class="btn icon sm" data-tag-history="' + t.id + '" title="변경 이력 보기">' + ico("loop", "xs") + "</button>" : "") +
           (canEdit() ? '<button class="btn icon sm edit-only" data-tag-move="' + t.id + '" title="다른 페이지로 이동·복사">' + ico("share", "xs") + "</button>" : "") +
         "</div>" +
-        acts("tag", t.id) + "</div>" +
-      '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
-        '<span class="tagcaret">▸</span>' +
-        '<span class="evt">' + esc(tagEventEn(t) || "(이벤트명 없음)") +
-          (t.action ? ' <em class="mono" style="font-style:normal; font-size:10.5px; color:var(--ink-3)">[' + esc(t.action) + "]</em>" : "") +
-        "</span>" +
-        '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
-      "</button>" +
+        acts("tag", t.id) +
+        '<div class="spacer"></div>' +
+        '<span class="chip" style="--c:' + TSTATUS_C[t.status] + '" title="개발 상태 · ' + TSTATUS[t.status] + '">' + TSTATUS[t.status] + "</span>" +
+        platChips(platformsOf(t)) + "</div>" +
       (expanded ?
         '<div style="font-size:12.5px">' + (t.eventKo ? "<b>" + esc(t.eventKo) + "</b> " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
         '<div class="meta stack">' +
@@ -4743,7 +4756,7 @@ function editTag(id, prefill) {
   const beforeProps = live ? (live.props || []).map(p => Object.assign({}, p)) : null;
   const t = Object.assign({
     platforms: ["amplitude"], path: "", eventKo: "", eventEn: "",
-    area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
+    area: "", trigger: "click", channels: [], action: "", props: [], status: "live", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
   }, live || {}, prefill || {});
   const values = Object.assign({}, t, {
@@ -4764,8 +4777,8 @@ function editTag(id, prefill) {
       { k: "action", label: "태그명", ph: "버튼 클릭" },
       { k: "trigger", label: "트리거", type: "select", opts: TRIGGER },
       { k: "channels", label: "채널", type: "multi", opts: TCHAN },
-      { k: "props", label: "속성", type: "kv" },
       { k: "status", label: "개발확인", type: "select", opts: TSTATUS },
+      { k: "props", label: "속성", type: "kv" },
       { k: "note", label: "메모", type: "textarea" },
       { type: "group", label: "테스트 샘플 (web_pc · web_mo · app_aos · app_ios)", fields: [
         { k: "testSampleWebPc", label: "web_pc", type: "textarea", mono: true, ph: '{"user_type":"guest"}' },

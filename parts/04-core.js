@@ -74,7 +74,8 @@ const FOCUS = {
   amplitude: { name: "Amplitude 위주", ico: "amp", c: "var(--amp)" },
   braze:     { name: "Braze 위주", ico: "braze", c: "var(--braze)" },
   ga4:       { name: "GA4 위주", ico: "ga4", c: "var(--ga4)" },
-  incomplete:{ name: "미완성만", ico: "alert", c: "var(--warn)" }
+  incomplete:{ name: "미완성만", ico: "alert", c: "var(--warn)" },
+  todoTag:   { name: "작업예정 태그만", ico: "tag", c: "var(--warn)" }
 };
 /* 데이터 완성도 — 화면 이미지·태그가 없는 페이지를 놓치지 않도록 */
 function completeness(n) {

@@ -29,7 +29,8 @@
   cursor:pointer; text-align:left; font:inherit; color:inherit}
 .tagcaret{font-size:9px; color:var(--ink-3); transition:transform .12s; flex:none}
 .tagcard.expanded .tagcaret{transform:rotate(90deg)}
-.tagsummary .evt{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.tagsummary .evt{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px}
+.tagsummary .chip{flex:none; font-size:11.5px}
 .tagcard.flash{animation:tagflash 1.4s ease}
 @keyframes tagflash{0%,100%{box-shadow:none}20%,60%{box-shadow:0 0 0 2px var(--accent)}}
 /* 웹 모드 — "태그 확인"으로 서버가 감지한 실제 트래킹과 등록된 태그를 견주는 상자 */

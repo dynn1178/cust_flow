@@ -585,8 +585,14 @@ function renderTagPanel() {
   box.innerHTML = detectHtml + dupeHtml + n.tags.slice().sort((a, b) => minOrder(a) - minOrder(b)).map(t => {
     const expanded = expandedTags.has(t.id);
     return '<div class="card tagcard' + (expanded ? " expanded" : "") + '" data-tag="' + t.id + '">' +
-      '<div class="card-top">' + platChips(platformsOf(t)) +
-        '<div class="spacer"></div>' +
+      '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
+        '<span class="tagcaret">▸</span>' +
+        '<span class="evt">' + esc(tagEventEn(t) || "(이벤트명 없음)") +
+          (t.action ? ' <em class="mono" style="font-style:normal">[' + esc(t.action) + "]</em>" : "") +
+        "</span>" +
+        '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
+      "</button>" +
+      '<div class="card-top">' +
         /* 수정·삭제 아이콘과 똑같이 "마우스를 올렸을 때만" 보이도록 같은
            .card-acts 안에 넣는다 — 여러 개를 만들어도 .card:hover 규칙이
            클래스로 걸려 있어 전부 똑같이 나타난다. */
@@ -594,14 +600,10 @@ function renderTagPanel() {
           ((t.diffHistory || []).length ? '<button class="btn icon sm" data-tag-history="' + t.id + '" title="변경 이력 보기">' + ico("loop", "xs") + "</button>" : "") +
           (canEdit() ? '<button class="btn icon sm edit-only" data-tag-move="' + t.id + '" title="다른 페이지로 이동·복사">' + ico("share", "xs") + "</button>" : "") +
         "</div>" +
-        acts("tag", t.id) + "</div>" +
-      '<button type="button" class="tagsummary" data-tag-toggle="' + t.id + '">' +
-        '<span class="tagcaret">▸</span>' +
-        '<span class="evt">' + esc(tagEventEn(t) || "(이벤트명 없음)") +
-          (t.action ? ' <em class="mono" style="font-style:normal; font-size:10.5px; color:var(--ink-3)">[' + esc(t.action) + "]</em>" : "") +
-        "</span>" +
-        '<span class="chip" style="--c:var(--ink-3)">' + esc(TRIGGER[t.trigger] || t.trigger) + "</span>" +
-      "</button>" +
+        acts("tag", t.id) +
+        '<div class="spacer"></div>' +
+        '<span class="chip" style="--c:' + TSTATUS_C[t.status] + '" title="개발 상태 · ' + TSTATUS[t.status] + '">' + TSTATUS[t.status] + "</span>" +
+        platChips(platformsOf(t)) + "</div>" +
       (expanded ?
         '<div style="font-size:12.5px">' + (t.eventKo ? "<b>" + esc(t.eventKo) + "</b> " : "") + (tagEventEn(t) ? '<span class="mono" style="font-size:10.5px;color:var(--ink-3)">' + esc(tagEventEn(t)) + "</span>" : "") + "</div>" +
         '<div class="meta stack">' +
@@ -751,7 +753,7 @@ function editTag(id, prefill) {
   const beforeProps = live ? (live.props || []).map(p => Object.assign({}, p)) : null;
   const t = Object.assign({
     platforms: ["amplitude"], path: "", eventKo: "", eventEn: "",
-    area: "", trigger: "click", channels: [], action: "", props: [], status: "todo", note: "",
+    area: "", trigger: "click", channels: [], action: "", props: [], status: "live", note: "",
     testSampleWebPc: "", testSampleWebMo: "", testSampleAppAos: "", testSampleAppIos: ""
   }, live || {}, prefill || {});
   const values = Object.assign({}, t, {
@@ -772,8 +774,8 @@ function editTag(id, prefill) {
       { k: "action", label: "태그명", ph: "버튼 클릭" },
       { k: "trigger", label: "트리거", type: "select", opts: TRIGGER },
       { k: "channels", label: "채널", type: "multi", opts: TCHAN },
-      { k: "props", label: "속성", type: "kv" },
       { k: "status", label: "개발확인", type: "select", opts: TSTATUS },
+      { k: "props", label: "속성", type: "kv" },
       { k: "note", label: "메모", type: "textarea" },
       { type: "group", label: "테스트 샘플 (web_pc · web_mo · app_aos · app_ios)", fields: [
         { k: "testSampleWebPc", label: "web_pc", type: "textarea", mono: true, ph: '{"user_type":"guest"}' },

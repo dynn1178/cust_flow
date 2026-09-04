@@ -421,6 +421,13 @@ function incompleteRowsBig(n) {
   if (!miss.length) return '<div class="g-empty">모두 등록됨</div>';
   return '<div class="node-list">' + miss.map(m => '<div class="g-miss">' + ico("alert", "xs") + esc(m) + "</div>").join("") + "</div>";
 }
+function todoTagRowsBig(n) {
+  const list = n.tags.filter(t => t.status === "todo");
+  if (!list.length) return '<div class="g-empty">작업 예정 태그 없음</div>';
+  return '<div class="node-list">' + list.slice(0, 6).map(t =>
+    gRow(TSTATUS_C.todo, tagEventEn(t), (TRIGGER[t.trigger] || t.trigger) + (tagArea(t) ? " · " + esc(tagArea(t)) : ""), true)
+  ).join("") + (list.length > 6 ? '<div class="g-more">+' + (list.length - 6) + "개 더</div>" : "") + "</div>";
+}
 /* 이 페이지에 붙은 캠페인들의 최신월 실적을 합친다 — 성과 위주 보기의 색·배지에 쓴다 */
 function nodePerfSum(n) {
   let rev = 0, cnt = 0;
@@ -436,6 +443,7 @@ function focusCount(n, f) {
   if (f === "camp") return n.camps.length;
   if (f === "perf") return nodePerfSum(n).count;
   if (f === "incomplete") return completeness(n).length;
+  if (f === "todoTag") return n.tags.filter(t => t.status === "todo").length;
   if (PLAT[f]) return n.tags.filter(t => platformsOf(t).indexOf(f) >= 0).length;
   return 0;
 }
@@ -468,6 +476,7 @@ function nodeHtml(n) {
       (n.camps.length > 4 ? '<div class="g-more">+' + (n.camps.length - 4) + "개 더</div>" : "") + "</div>" : "";
   } else if (f === "camp" || f === "perf") body = campRowsBig(n);
   else if (f === "incomplete") body = incompleteRowsBig(n);
+  else if (f === "todoTag") body = todoTagRowsBig(n);
   else if (PLAT[f]) body = tagRowsBig(n, f);
 
   const miss = completeness(n);
