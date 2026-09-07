@@ -340,6 +340,9 @@ function applyRoleUI() {
   const btn = $("#btnAuth"), label = $("#authName");
   btn.style.display = "";                       // 항상 보이게 — 설정 입구가 여기다
   document.body.classList.toggle("viewer", on && !isStaff());
+  /* 구글 로그인을 안 한 사람(익명 뷰어 포함)은 여정 지도·태그 목록만 — 캠페인·성과
+     시트는 /api/sheets 가 서버에서도 막지만(실제 방어선), 탭 자체도 숨겨서 헷갈리지 않게 한다 */
+  document.body.classList.toggle("guestview", on && (!me || !!me.guest));
   if (!on) {
     label.textContent = "구글로 로그인";
     btn.classList.remove("on");

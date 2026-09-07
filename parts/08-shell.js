@@ -95,6 +95,7 @@ initTheme();
 
 /* 목록 뷰는 열 때만 그린다 — 탭 전환이 즉시 반응하도록 */
 function switchView(v) {
+  if ((v === "camps" || v === "perf") && document.body.classList.contains("guestview")) v = "map";
   $$(".view").forEach(s => s.classList.toggle("on", s.id === "view-" + v));
   $$("#viewTabs .btn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   if (v === "tags") renderTagView();

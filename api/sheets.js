@@ -101,6 +101,7 @@ async function whoAmI(req) {
   const r = await fetch(SUPA_URL + "/auth/v1/user", { headers: h });
   if (!r.ok) return null;
   const u = await r.json();
+  if (u.is_anonymous) return null;          // 익명(비회원) 세션은 캠페인·성과 시트를 못 본다 — 구글 로그인한 회원만
   let role = "viewer";
   try {
     const m = await fetch(SUPA_URL + "/rest/v1/jta_members?select=role&id=eq." + encodeURIComponent(u.id), { headers: h });

@@ -65,6 +65,10 @@ button,input,select,textarea{font:inherit; color:inherit}
 .mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
 body.ro .edit-only{display:none !important}
 body.viewer .staff-only{display:none !important}
+/* 로그인 안 한 방문자(익명 뷰어 포함) — 캠페인·성과 추이 탭은 아예 숨긴다.
+   실제 방어선은 /api/sheets 의 서버 쪽 검사이고, 이건 헷갈리지 않게 숨기는 것뿐이다 */
+body.guestview #viewTabs [data-view="camps"],
+body.guestview #viewTabs [data-view="perf"]{display:none !important}
 .avatar{width:22px; height:22px; border-radius:99px; flex:none; object-fit:cover; border:1px solid var(--stroke)}
 .avatar.ph{display:grid; place-items:center; background:var(--glass-2); color:var(--ink-3)}
 .rolechip{display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:99px; margin-left:5px;
@@ -6889,7 +6893,7 @@ function applySheetPayload(j, at) {
 async function loadSheets(opt) {
   const o = opt || {};
   if (SHEETS.loading) return;
-  if (!supaOn() || !me) { SHEETS.err = "로그인하면 캠페인 시트를 불러옵니다"; renderSyncBars(); return; }
+  if (!supaOn() || !me || me.guest) { SHEETS.err = "로그인하면 캠페인 시트를 불러옵니다"; renderSyncBars(); return; }
   SHEETS.loading = true; SHEETS.err = null;
   renderSyncBars();
   try {
@@ -7268,6 +7272,7 @@ function initSheets() {
 }
 /* 접속 직후 — 캐시로 먼저 그리고 시트를 다시 읽는다 */
 async function bootSheets() {
+  if (me && me.guest) { SHEETS.err = "로그인하면 캠페인 시트를 불러옵니다"; renderSyncBars(); return; }  // 같은 브라우저에 남은 캐시로 우회되지 않도록
   const had = await loadSheetCache();
   if (had) { renderSyncBars(); invalidateViews(); renderFlow(); renderPanels(); }
   await loadSheets({});
@@ -8379,6 +8384,9 @@ function applyRoleUI() {
   const btn = $("#btnAuth"), label = $("#authName");
   btn.style.display = "";                       // 항상 보이게 — 설정 입구가 여기다
   document.body.classList.toggle("viewer", on && !isStaff());
+  /* 구글 로그인을 안 한 사람(익명 뷰어 포함)은 여정 지도·태그 목록만 — 캠페인·성과
+     시트는 /api/sheets 가 서버에서도 막지만(실제 방어선), 탭 자체도 숨겨서 헷갈리지 않게 한다 */
+  document.body.classList.toggle("guestview", on && (!me || !!me.guest));
   if (!on) {
     label.textContent = "구글로 로그인";
     btn.classList.remove("on");
@@ -8536,6 +8544,7 @@ initTheme();
 
 /* 목록 뷰는 열 때만 그린다 — 탭 전환이 즉시 반응하도록 */
 function switchView(v) {
+  if ((v === "camps" || v === "perf") && document.body.classList.contains("guestview")) v = "map";
   $$(".view").forEach(s => s.classList.toggle("on", s.id === "view-" + v));
   $$("#viewTabs .btn").forEach(b => b.classList.toggle("on", b.dataset.view === v));
   if (v === "tags") renderTagView();

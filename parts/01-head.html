@@ -57,6 +57,10 @@ button,input,select,textarea{font:inherit; color:inherit}
 .mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
 body.ro .edit-only{display:none !important}
 body.viewer .staff-only{display:none !important}
+/* 로그인 안 한 방문자(익명 뷰어 포함) — 캠페인·성과 추이 탭은 아예 숨긴다.
+   실제 방어선은 /api/sheets 의 서버 쪽 검사이고, 이건 헷갈리지 않게 숨기는 것뿐이다 */
+body.guestview #viewTabs [data-view="camps"],
+body.guestview #viewTabs [data-view="perf"]{display:none !important}
 .avatar{width:22px; height:22px; border-radius:99px; flex:none; object-fit:cover; border:1px solid var(--stroke)}
 .avatar.ph{display:grid; place-items:center; background:var(--glass-2); color:var(--ink-3)}
 .rolechip{display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:99px; margin-left:5px;
