@@ -472,8 +472,7 @@ function nodeHtml(n) {
 
   let body = "";
   if (f === "all") {
-    body = n.camps.length ? '<div class="node-list">' + n.camps.slice(0, 4).map(campRow).join("") +
-      (n.camps.length > 4 ? '<div class="g-more">+' + (n.camps.length - 4) + "개 더</div>" : "") + "</div>" : "";
+    body = n.camps.length ? '<div class="node-list">' + n.camps.map(campRow).join("") + "</div>" : "";
   } else if (f === "camp" || f === "perf") body = campRowsBig(n);
   else if (f === "incomplete") body = incompleteRowsBig(n);
   else if (f === "todoTag") body = todoTagRowsBig(n);

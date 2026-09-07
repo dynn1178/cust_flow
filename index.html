@@ -349,17 +349,18 @@ select.field{cursor:pointer}
 .node.size-l .bdg b{font-size:max(15.5px,min(21px,calc(15.5px / var(--zoom,1))))}
 
 /* 목록 — 태그·캠페인이 여러 개면 그냥 아래로 계속 쌓인다(잘리지 않음) */
-.node-list{display:flex; flex-direction:column; gap:6px; padding-top:6px; border-top:1px dashed var(--stroke-2)}
+.node-list{display:flex; flex-direction:column; gap:12px; padding-top:6px; border-top:1px dashed var(--stroke-2)}
 .g-row{display:flex; align-items:flex-start; gap:6px; font-size:max(16px,min(21px,calc(16px / max(var(--zoom,1),.65))))}
 .g-dot{width:6px; height:6px; border-radius:99px; flex:none; margin-top:.5em}
 .g-body{flex:1; min-width:0; display:flex; flex-direction:column; gap:1px}
 .g-name{color:var(--ink); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .g-name.mono{font-family:var(--f-mono)}
 .g-row.simple .g-name{font-weight:500; color:var(--ink-2)}
-.g-meta{font-size:.84em; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.g-meta{font-size:.84em; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-left:10px}
 /* 여정 지도 노드의 실적 두 줄 — 위는 값(퍼센트), 아래는 증감. 캠페인
-   이름과 같은 크기(1em)라 확대/축소에 함께 따라간다 */
-.perfline{display:flex; flex-direction:column; font-family:var(--f-mono); font-weight:600; margin-top:1px}
+   이름과 같은 크기(1em)라 확대/축소에 함께 따라간다. 제목 바로 아래
+   줄이라 왼쪽에 살짝 들여써서 한 항목(문단)의 소속임을 눈에 띄게 한다. */
+.perfline{display:flex; flex-direction:column; font-family:"Malgun Gothic","맑은 고딕",var(--f-ui); font-variant-numeric:tabular-nums; font-weight:600; margin-top:1px; padding-left:10px}
 .perfline .pf-vals{display:flex; align-items:center; gap:4px; flex-wrap:wrap; row-gap:1px}
 .perfline .pf-deltas{display:flex; align-items:center; gap:4px; margin-top:1px}
 .perfline .mon{color:var(--ink-3); font-weight:500; font-size:.74em; white-space:nowrap}
@@ -371,7 +372,7 @@ select.field{cursor:pointer}
 /* 국내 관행대로 상승은 빨강, 하락은 파랑 — 통계적 유의성(sig)과 무관하게
    항상 또렷한 색으로 보여준다(예전엔 유의하지 않으면 45% 흐리게 처리했는데
    그 결과 파란색이 지나치게 옅어 보였다) */
-.perfline .pf-deltas{font-size:.72em; font-weight:400}
+.perfline .pf-deltas{font-size:.92em; font-weight:600}
 .perfline i{font-style:normal; font-weight:700; white-space:nowrap}
 .perfline i.up{color:#e0483f}
 .perfline i.dn{color:#1a54d6}
@@ -2316,8 +2317,7 @@ function nodeHtml(n) {
 
   let body = "";
   if (f === "all") {
-    body = n.camps.length ? '<div class="node-list">' + n.camps.slice(0, 4).map(campRow).join("") +
-      (n.camps.length > 4 ? '<div class="g-more">+' + (n.camps.length - 4) + "개 더</div>" : "") + "</div>" : "";
+    body = n.camps.length ? '<div class="node-list">' + n.camps.map(campRow).join("") + "</div>" : "";
   } else if (f === "camp" || f === "perf") body = campRowsBig(n);
   else if (f === "incomplete") body = incompleteRowsBig(n);
   else if (f === "todoTag") body = todoTagRowsBig(n);
