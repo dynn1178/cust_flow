@@ -59,7 +59,7 @@ function readCallback() {                        // 로그인 후 되돌아온 �
     refresh_token: q.get("refresh_token"),
     expires_at: Date.now() + (Number(q.get("expires_in")) || 3600) * 1000
   });
-  history.replaceState(null, "", location.pathname + location.search);
+  window.history.replaceState(null, "", location.pathname + location.search);
 
   /* Supabase 는 Redirect URLs 허용 목록에 없는 주소를 무시하고 Site URL 로 보낸다.
      토큰은 이미 이 브라우저에 저장했으니, 같은 사이트라면 원래 있던 페이지로 되돌린다. */

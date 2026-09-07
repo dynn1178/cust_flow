@@ -12,7 +12,10 @@
    구조 변경에만 적용되고, 화면 이미지 등록/삭제나 보드 자체의 추가/삭제는
    대상이 아니다. */
 const HISTORY_LIMIT = 50, HISTORY_COALESCE_MS = 600;
-let history = {};             // boardId -> { base, undo:[], redo:[] }
+/* 이름을 history로 두면 전역 스코프에서 브라우저의 window.history를 가리게 돼
+   history.replaceState() 같은 호출이 (엉뚱한 이 객체를 가리켜) 깨진다 — 그래서
+   undoStore로 부른다. */
+let undoStore = {};           // boardId -> { base, undo:[], redo:[] }
 let historyTimer = null;
 let applyingHistory = false;
 
@@ -24,12 +27,12 @@ function boardSnapshot(b) {
 }
 function historyOf(b) {
   if (!b) return null;
-  let h = history[b.id];
-  if (!h) h = history[b.id] = { base: boardSnapshot(b), undo: [], redo: [] };
+  let h = undoStore[b.id];
+  if (!h) h = undoStore[b.id] = { base: boardSnapshot(b), undo: [], redo: [] };
   return h;
 }
 function updateHistoryUI() {
-  const h = history[B().id];
+  const h = undoStore[B().id];
   const u = $("#btnUndo"), r = $("#btnRedo");
   if (u) u.disabled = !h || !h.undo.length;
   if (r) r.disabled = !h || !h.redo.length;
@@ -102,7 +105,7 @@ function redo() {
   toast("다시 실행했습니다", "ok");
 }
 function seedHistoryForAllBoards() {
-  history = {};
+  undoStore = {};
   state.boards.forEach(historyOf);
   updateHistoryUI();
 }

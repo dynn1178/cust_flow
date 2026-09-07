@@ -5945,7 +5945,7 @@ function openBoardMenu() {
         const goneId = B().id;
         state.boards.splice(state.bi, 1);
         state.bi = Math.max(0, state.bi - 1);
-        delete history[goneId];
+        delete undoStore[goneId];
         sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null };
         mounted = { id: null, key: null, w: 0, h: 0 };
         $("#nodeLayer").innerHTML = "";
@@ -5975,7 +5975,10 @@ function initBoards() {
    구조 변경에만 적용되고, 화면 이미지 등록/삭제나 보드 자체의 추가/삭제는
    대상이 아니다. */
 const HISTORY_LIMIT = 50, HISTORY_COALESCE_MS = 600;
-let history = {};             // boardId -> { base, undo:[], redo:[] }
+/* 이름을 history로 두면 전역 스코프에서 브라우저의 window.history를 가리게 돼
+   history.replaceState() 같은 호출이 (엉뚱한 이 객체를 가리켜) 깨진다 — 그래서
+   undoStore로 부른다. */
+let undoStore = {};           // boardId -> { base, undo:[], redo:[] }
 let historyTimer = null;
 let applyingHistory = false;
 
@@ -5987,12 +5990,12 @@ function boardSnapshot(b) {
 }
 function historyOf(b) {
   if (!b) return null;
-  let h = history[b.id];
-  if (!h) h = history[b.id] = { base: boardSnapshot(b), undo: [], redo: [] };
+  let h = undoStore[b.id];
+  if (!h) h = undoStore[b.id] = { base: boardSnapshot(b), undo: [], redo: [] };
   return h;
 }
 function updateHistoryUI() {
-  const h = history[B().id];
+  const h = undoStore[B().id];
   const u = $("#btnUndo"), r = $("#btnRedo");
   if (u) u.disabled = !h || !h.undo.length;
   if (r) r.disabled = !h || !h.redo.length;
@@ -6065,7 +6068,7 @@ function redo() {
   toast("다시 실행했습니다", "ok");
 }
 function seedHistoryForAllBoards() {
-  history = {};
+  undoStore = {};
   state.boards.forEach(historyOf);
   updateHistoryUI();
 }
@@ -8095,7 +8098,7 @@ function readCallback() {                        // 로그인 후 되돌아온 �
     refresh_token: q.get("refresh_token"),
     expires_at: Date.now() + (Number(q.get("expires_in")) || 3600) * 1000
   });
-  history.replaceState(null, "", location.pathname + location.search);
+  window.history.replaceState(null, "", location.pathname + location.search);
 
   /* Supabase 는 Redirect URLs 허용 목록에 없는 주소를 무시하고 Site URL 로 보낸다.
      토큰은 이미 이 브라우저에 저장했으니, 같은 사이트라면 원래 있던 페이지로 되돌린다. */

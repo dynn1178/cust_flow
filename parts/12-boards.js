@@ -90,7 +90,7 @@ function openBoardMenu() {
         const goneId = B().id;
         state.boards.splice(state.bi, 1);
         state.bi = Math.max(0, state.bi - 1);
-        delete history[goneId];
+        delete undoStore[goneId];
         sel = { node: (B().nodes[0] || {}).id || null, edge: null, layer: null };
         mounted = { id: null, key: null, w: 0, h: 0 };
         $("#nodeLayer").innerHTML = "";
