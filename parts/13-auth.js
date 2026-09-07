@@ -113,6 +113,27 @@ function signIn() {
   try { localStorage.setItem(BACK, back); } catch (e) {}
   location.href = c.url + "/auth/v1/authorize?provider=google&redirect_to=" + encodeURIComponent(back);
 }
+/* 구글 로그인 없이 들어온 사람도 뷰어로 열람만 할 수 있도록 — Supabase
+   "익명 로그인"으로 진짜 세션(auth.uid())을 발급받는다. jta_docs_read 등의
+   RLS 는 "로그인한 사람은 모두 열람"이라 익명 세션도 그대로 통과한다.
+   프로젝트에서 Authentication → Anonymous Sign-Ins 를 켜지 않았으면 조용히
+   실패하고 기존처럼 "로그인이 필요합니다" 화면으로 남는다. */
+async function signInAnon() {
+  const c = supaCfg();
+  let r;
+  try {
+    r = await fetch(c.url + "/auth/v1/signup", {
+      method: "POST",
+      headers: { apikey: c.anon, "Content-Type": "application/json" },
+      body: JSON.stringify({ data: {} })
+    });
+  } catch (e) { return null; }
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => null);
+  if (!j || !j.access_token) return null;
+  saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000 });
+  return session;
+}
 async function signOut() {
   try { await sapi("/auth/v1/logout", { method: "POST" }); } catch (e) {}
   saveSession(null); me = null;
@@ -131,8 +152,9 @@ async function fetchMe() {
       rows = await sapi("/rest/v1/jta_members?select=*&id=eq." + u.id, {});
       p = rows && rows[0];
     }
-    me = p ? { id: p.id, email: p.email, name: p.name || p.email, avatar: p.avatar, role: p.role }
-           : { id: u.id, email: u.email, name: u.email, avatar: null, role: "viewer" };
+    const guest = !!u.is_anonymous;                 // 익명 세션 — 실제 계정 없이 뷰어로 열람 중
+    me = p ? { id: p.id, email: p.email, name: p.name || p.email || (guest ? "게스트" : ""), avatar: p.avatar, role: p.role, guest: guest }
+           : { id: u.id, email: u.email, name: u.email || (guest ? "게스트" : ""), avatar: null, role: "viewer", guest: guest };
   } catch (e) {
     me = null;
     if (e && (e.status === 401 || e.status === 403)) saveSession(null);   // 만료·무효 토큰만 정리
@@ -317,9 +339,10 @@ function applyRoleUI() {
     btn.title = "구글 로그인은 배포한 주소에서만 됩니다 (로컬 파일에서는 불가)";
     return;
   }
-  $("use", btn).setAttribute("href", me ? "#i-check" : "#i-lock");
-  btn.title = me ? me.email : "구글 계정으로 로그인";
-  if (me) {
+  const signedIn = me && !me.guest;               // 익명 뷰어는 "로그인 안 한 상태"로 보여준다
+  $("use", btn).setAttribute("href", signedIn ? "#i-check" : "#i-lock");
+  btn.title = signedIn ? me.email : "구글 계정으로 로그인";
+  if (signedIn) {
     const r = ROLE[me.role] || ROLE.viewer;
     label.innerHTML = esc(me.name) + ' <span class="rolechip" style="--c:' + r.c + '">' + r.name + "</span>";
     $("#btnAuth").classList.add("on");
@@ -330,7 +353,7 @@ function applyRoleUI() {
 }
 function openAuthMenu() {
   if (!supaOn()) return openServerModal();       // 연결 정보가 비어 있을 때만 설정 화면
-  if (!me) return signIn();                      // 설정 화면 없이 바로 구글 로그인
+  if (!me || me.guest) return signIn();          // 설정 화면 없이 바로 구글 로그인
   openMenu(
     '<div class="mi" style="cursor:default">' + ico("check", "xs") + esc(me.email) + "</div>" +
     (isStaff() ? '<button class="mi" data-act="members">' + ico("lock", "xs") + "회원 · 권한 관리</button>" : "") +
