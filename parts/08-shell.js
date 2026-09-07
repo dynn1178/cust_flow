@@ -274,13 +274,10 @@ async function boot() {
     if (readCallback() === "redirect") return;   // 로그인 시작 지점으로 되돌아가는 중
     loadSession();
     await fetchMe();
-    if (!me) {                                    // 로그인 안 한 방문자 — 익명 세션으로 뷰어 열람만 열어준다
-      if (await signInAnon()) await fetchMe();
-    }
     applyRoleUI();
     let ok = false;
     if (me) { try { ok = await serverLoad(); } catch (e) { toast("서버에서 불러오지 못했습니다", "bad"); } }
-    if (!me) { setSaveChip("off", "로그인이 필요합니다"); renderAll(); }
+    if (!me) { setSaveChip("off", "로그인이 필요합니다"); renderAll(); openLoginGateModal(); }
     else if (!ok) { setSaveChip("dirty", "서버에 문서가 없습니다 — 저장하면 만들어집니다"); renderAll(); }
     $("#btnShare").innerHTML = ico("share") + "<span>서버 저장</span>";
     updateStorageUI(); initLock();
