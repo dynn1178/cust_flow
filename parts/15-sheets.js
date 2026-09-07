@@ -247,7 +247,7 @@ function applySheetPayload(j, at) {
 async function loadSheets(opt) {
   const o = opt || {};
   if (SHEETS.loading) return;
-  if (!supaOn() || !me || me.guest) { SHEETS.err = "로그인하면 캠페인 시트를 불러옵니다"; renderSyncBars(); return; }
+  if (!supaOn() || !isStaff()) { SHEETS.err = "캠페인·성과 열람은 운영자 이상만 할 수 있습니다"; renderSyncBars(); return; }
   SHEETS.loading = true; SHEETS.err = null;
   renderSyncBars();
   try {
@@ -626,7 +626,7 @@ function initSheets() {
 }
 /* 접속 직후 — 캐시로 먼저 그리고 시트를 다시 읽는다 */
 async function bootSheets() {
-  if (me && me.guest) { SHEETS.err = "로그인하면 캠페인 시트를 불러옵니다"; renderSyncBars(); return; }  // 같은 브라우저에 남은 캐시로 우회되지 않도록
+  if (!isStaff()) { SHEETS.err = "캠페인·성과 열람은 운영자 이상만 할 수 있습니다"; renderSyncBars(); return; }  // 같은 브라우저에 남은 캐시로 우회되지 않도록
   const had = await loadSheetCache();
   if (had) { renderSyncBars(); invalidateViews(); renderFlow(); renderPanels(); }
   await loadSheets({});

@@ -15,7 +15,7 @@
      SHEET_RAW_TAB  (선택)    기본 "3.개인화RAW"
 
    권한
-     읽기 = 로그인한 회원 누구나 · 쓰기 = 서버관리자·운영자
+     읽기·쓰기 모두 서버관리자·운영자만 (일반회원·비회원은 캠페인·성과를 볼 수 없다)
    ========================================================================== */
 const crypto = require("crypto");
 
@@ -247,12 +247,12 @@ module.exports = async function handler(req, res) {
     if (!SHEET_ID) throw httpErr(500, "SHEET_ID 환경변수가 설정되지 않았습니다");
     const me = await whoAmI(req);
     if (!me) throw httpErr(401, "로그인이 필요합니다");
+    if (!isStaff(me)) throw httpErr(403, "캠페인·성과 열람은 운영자 이상만 할 수 있습니다");
 
     if (req.method === "GET") {
       const url = new URL(req.url, "http://x");
       const action = url.searchParams.get("action") || "all";
       const fresh = url.searchParams.get("fresh") === "1";
-      if (fresh && !isStaff(me)) throw httpErr(403, "새로고침은 운영자 이상만 할 수 있습니다");
       const out = { role: me.role };
       if (action === "campaigns" || action === "all") out.campaigns = await cached("campaigns", readCampaigns, fresh);
       if (action === "perf" || action === "all") out.perf = await cached("perf", readPerf, fresh);
@@ -260,7 +260,6 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      if (!isStaff(me)) throw httpErr(403, "편집 권한이 없습니다. 서버관리자에게 운영자 권한을 요청하세요.");
       const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
       if (body.action !== "upsert") throw httpErr(400, "지원하지 않는 요청입니다");
       const r = await upsertCampaign(body);
