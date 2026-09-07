@@ -124,13 +124,21 @@ async function signInAnon() {
   try {
     r = await fetch(c.url + "/auth/v1/signup", {
       method: "POST",
-      headers: { apikey: c.anon, "Content-Type": "application/json" },
+      /* Authorization 헤더 없이 apikey만 보내면 게이트웨이가 막는 프로젝트가 있다 —
+         sapi()의 다른 호출들과 동일하게 anon key를 Authorization: Bearer 로도 보낸다 */
+      headers: { apikey: c.anon, Authorization: "Bearer " + c.anon, "Content-Type": "application/json" },
       body: JSON.stringify({ data: {} })
     });
-  } catch (e) { return null; }
-  if (!r.ok) return null;
+  } catch (e) { console.warn("익명 로그인 요청 실패", e); return null; }
+  if (!r.ok) {
+    const txt = await r.text().catch(() => "");
+    /* 프로젝트에서 Anonymous Sign-Ins 를 아직 안 켰거나 캡차가 걸려 있으면 여기로 온다 —
+       콘솔에 실제 사유를 남겨야 "켰는데 왜 안 되지"를 진단할 수 있다 */
+    console.warn("익명 로그인 거부됨 (" + r.status + ")", txt);
+    return null;
+  }
   const j = await r.json().catch(() => null);
-  if (!j || !j.access_token) return null;
+  if (!j || !j.access_token) { console.warn("익명 로그인 응답에 토큰이 없습니다", j); return null; }
   saveSession({ access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000 });
   return session;
 }

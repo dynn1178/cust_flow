@@ -311,5 +311,9 @@ async function boot() {
 function collectRefs() {
   return state.boards.reduce((a, b) => a.concat(b.nodes.filter(n => n.shot && n.shot.ref).map(n => n.shot.ref)), []);
 }
+/* 구글 로그인 후 되돌아왔을 때 브라우저가 로그인 전 페이지를 뒤로가기 캐시(bfcache)
+   에서 그대로 복원하면 boot()가 다시 실행되지 않아 로그인 전 화면이 남는다 —
+   새로고침해야 반영되던 문제. 복원된 페이지(event.persisted)는 강제로 다시 불러온다. */
+window.addEventListener("pageshow", e => { if (e.persisted) location.reload(); });
 boot();
 </script>
