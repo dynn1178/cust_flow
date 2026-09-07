@@ -277,7 +277,7 @@ async function boot() {
     applyRoleUI();
     let ok = false;
     if (me) { try { ok = await serverLoad(); } catch (e) { toast("서버에서 불러오지 못했습니다", "bad"); } }
-    if (!me) { setSaveChip("off", "로그인이 필요합니다"); renderAll(); openLoginGateModal(); }
+    if (!me) { setSaveChip("off", "로그인이 필요합니다"); renderAll(); }
     else if (!ok) { setSaveChip("dirty", "서버에 문서가 없습니다 — 저장하면 만들어집니다"); renderAll(); }
     $("#btnShare").innerHTML = ico("share") + "<span>서버 저장</span>";
     updateStorageUI(); initLock();

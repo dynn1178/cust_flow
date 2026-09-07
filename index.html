@@ -65,6 +65,25 @@ button,input,select,textarea{font:inherit; color:inherit}
 .mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
 body.ro .edit-only{display:none !important}
 body.viewer .staff-only{display:none !important}
+
+/* 로그인 안내 게이트 — 로그인 안 한 방문자에게는 화면 내용을 통째로 가린다.
+   실제 방어선은 서버(RLS)지만, 빈 기본 보드가 그대로 보이면 헷갈리니 아예 가린다.
+   parts/13-auth.js 의 applyRoleUI() 가 body.gate-auth 를 토글한다. */
+.authgate{display:none}
+body.gate-auth .app,
+body.gate-auth #modalRoot,
+body.gate-auth #popRoot,
+body.gate-auth #menuRoot,
+body.gate-auth #toast{display:none !important}
+body.gate-auth .authgate{display:grid; place-items:center; position:fixed; inset:0; z-index:9999;
+  padding:24px; padding-bottom:max(24px, env(safe-area-inset-bottom))}
+.authgate-card{width:100%; max-width:420px; padding:30px 24px 26px; text-align:center; border-radius:var(--r-lg)}
+.authgate-ico{width:38px; height:38px; margin-bottom:14px; color:var(--accent);
+  fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+.authgate-card h1{margin:0 0 10px; font-size:17px; font-weight:700; line-height:1.4; letter-spacing:-.01em; color:var(--ink)}
+.authgate-card p{margin:0 0 18px; font-size:13px; line-height:1.7; color:var(--ink-2)}
+/* 좁은 화면에서는 "PC로 접속하세요" 안내(#pcGate)가 우선이다 — 로그인 게이트와 겹치지 않게 */
+@media (max-width: 860px){ .authgate{display:none !important} }
 .avatar{width:22px; height:22px; border-radius:99px; flex:none; object-fit:cover; border:1px solid var(--stroke)}
 .avatar.ph{display:grid; place-items:center; background:var(--glass-2); color:var(--ink-3)}
 .rolechip{display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:99px; margin-left:5px;
@@ -1191,6 +1210,16 @@ tr:hover .rowacts{opacity:1}
     <h1>모바일 페이지는 지원하지 않습니다</h1>
     <p>고객 여정 지도는 넓은 화면에서 쓰도록 만들어졌습니다.<br>PC로 접속해 주세요.</p>
     <div class="pcgate-url mono" id="pcGateUrl"></div>
+  </div>
+</div>
+
+<!-- 로그인 안내 — 로그인 안 한 방문자에게는 화면 내용을 통째로 가린다(parts/13-auth.js 가 켠다) -->
+<div class="authgate" id="authGate">
+  <div class="authgate-card glass">
+    <svg class="authgate-ico"><use href="#i-lock"/></svg>
+    <h1>구글 로그인이 필요합니다</h1>
+    <p>이 여정 지도는 로그인한 팀원만 열람할 수 있습니다.</p>
+    <button class="btn primary" id="authGateBtn"><svg class="ico xs"><use href="#i-check"/></svg>구글로 로그인</button>
   </div>
 </div>
 
@@ -8352,6 +8381,8 @@ function applyRoleUI() {
   /* .viewer 는 "운영자 이상이 아니다" — 게스트(익명)도 role이 viewer라 여기 걸린다.
      .staff-only 로 표시해 둔 캠페인·성과 추이 탭이 이 클래스로 함께 숨는다 */
   document.body.classList.toggle("viewer", on && !isStaff());
+  /* 서버 모드인데 로그인을 안 했으면 #authGate 가 화면 전체를 가린다(parts/01-head.html) */
+  document.body.classList.toggle("gate-auth", on && !me);
   if (!on) {
     label.textContent = "구글로 로그인";
     btn.classList.remove("on");
@@ -8407,23 +8438,9 @@ function openServerModal() {
     onDelete: c.url ? () => { try { localStorage.removeItem(SUPA_KEY); localStorage.removeItem(SESS); } catch (e) {} location.reload(); } : null
   });
 }
-/* 비회원 접속 시 안내 — 실제 방어선은 서버(RLS)라 닫아도 데이터가 새지 않는다.
-   그냥 로그인을 잊지 않도록 띄우는 안내창이라 닫기 버튼을 둔다. */
-function openLoginGateModal() {
-  const root = modalHost();
-  root.innerHTML =
-    '<div class="scrim"><div class="modal glass" style="width:min(420px,100%)" role="dialog" aria-modal="true">' +
-      '<div class="modal-head">' + ico("lock") + "<h3>구글 로그인이 필요합니다</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
-      '<div class="modal-body"><p class="hint">이 여정 지도는 로그인한 팀원만 열람할 수 있습니다.<br>우측 상단에서 구글 계정으로 로그인해 주세요.</p></div>' +
-      '<div class="modal-foot"><div class="spacer"></div><button class="btn primary" data-login>' + ico("check", "xs") + "구글로 로그인</button></div>" +
-    "</div></div>";
-  root.addEventListener("click", e => {
-    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
-    if (e.target.closest("[data-login]")) signIn();
-  });
-}
 function initAuth() {
   $("#btnAuth").addEventListener("click", openAuthMenu);
+  $("#authGateBtn").addEventListener("click", signIn);
   applyRoleUI();
 }
 
@@ -8705,7 +8722,7 @@ async function boot() {
     applyRoleUI();
     let ok = false;
     if (me) { try { ok = await serverLoad(); } catch (e) { toast("서버에서 불러오지 못했습니다", "bad"); } }
-    if (!me) { setSaveChip("off", "로그인이 필요합니다"); renderAll(); openLoginGateModal(); }
+    if (!me) { setSaveChip("off", "로그인이 필요합니다"); renderAll(); }
     else if (!ok) { setSaveChip("dirty", "서버에 문서가 없습니다 — 저장하면 만들어집니다"); renderAll(); }
     $("#btnShare").innerHTML = ico("share") + "<span>서버 저장</span>";
     updateStorageUI(); initLock();

@@ -312,6 +312,8 @@ function applyRoleUI() {
   /* .viewer 는 "운영자 이상이 아니다" — 게스트(익명)도 role이 viewer라 여기 걸린다.
      .staff-only 로 표시해 둔 캠페인·성과 추이 탭이 이 클래스로 함께 숨는다 */
   document.body.classList.toggle("viewer", on && !isStaff());
+  /* 서버 모드인데 로그인을 안 했으면 #authGate 가 화면 전체를 가린다(parts/01-head.html) */
+  document.body.classList.toggle("gate-auth", on && !me);
   if (!on) {
     label.textContent = "구글로 로그인";
     btn.classList.remove("on");
@@ -367,22 +369,8 @@ function openServerModal() {
     onDelete: c.url ? () => { try { localStorage.removeItem(SUPA_KEY); localStorage.removeItem(SESS); } catch (e) {} location.reload(); } : null
   });
 }
-/* 비회원 접속 시 안내 — 실제 방어선은 서버(RLS)라 닫아도 데이터가 새지 않는다.
-   그냥 로그인을 잊지 않도록 띄우는 안내창이라 닫기 버튼을 둔다. */
-function openLoginGateModal() {
-  const root = modalHost();
-  root.innerHTML =
-    '<div class="scrim"><div class="modal glass" style="width:min(420px,100%)" role="dialog" aria-modal="true">' +
-      '<div class="modal-head">' + ico("lock") + "<h3>구글 로그인이 필요합니다</h3><button class=\"btn icon sm\" data-x>" + ico("close", "xs") + "</button></div>" +
-      '<div class="modal-body"><p class="hint">이 여정 지도는 로그인한 팀원만 열람할 수 있습니다.<br>우측 상단에서 구글 계정으로 로그인해 주세요.</p></div>' +
-      '<div class="modal-foot"><div class="spacer"></div><button class="btn primary" data-login>' + ico("check", "xs") + "구글로 로그인</button></div>" +
-    "</div></div>";
-  root.addEventListener("click", e => {
-    if (e.target.closest("[data-x]") || e.target.classList.contains("scrim")) return closeModal();
-    if (e.target.closest("[data-login]")) signIn();
-  });
-}
 function initAuth() {
   $("#btnAuth").addEventListener("click", openAuthMenu);
+  $("#authGateBtn").addEventListener("click", signIn);
   applyRoleUI();
 }

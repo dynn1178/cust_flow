@@ -326,6 +326,16 @@
   </div>
 </div>
 
+<!-- 로그인 안내 — 로그인 안 한 방문자에게는 화면 내용을 통째로 가린다(parts/13-auth.js 가 켠다) -->
+<div class="authgate" id="authGate">
+  <div class="authgate-card glass">
+    <svg class="authgate-ico"><use href="#i-lock"/></svg>
+    <h1>구글 로그인이 필요합니다</h1>
+    <p>이 여정 지도는 로그인한 팀원만 열람할 수 있습니다.</p>
+    <button class="btn primary" id="authGateBtn"><svg class="ico xs"><use href="#i-check"/></svg>구글로 로그인</button>
+  </div>
+</div>
+
 <div id="modalRoot"></div>
 <div id="popRoot"></div>
 <div id="menuRoot"></div>
